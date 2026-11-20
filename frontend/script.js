@@ -320,35 +320,35 @@ const TASK_CONFIGS = {
   walking_gait: {
     label: "Walking Gait",
     dataFile: "assets/demo_walk_landmarks.json",
-    videoFile: "assets/demo_child_gait.mp4",
+    videoFile: "assets/tutorial_walking.mp4",
     poster: "",
     defaultAge: 24,
   },
   sitting_posture: {
     label: "Sitting Posture",
     dataFile: "assets/demo_sitting_landmarks.json",
-    videoFile: "",
+    videoFile: "assets/tutorial_sitting.mp4",
     poster: "assets/demo_sitting.jpg",
     defaultAge: 18,
   },
   standing_alignment: {
     label: "Standing Alignment",
     dataFile: "assets/demo_standing_landmarks.json",
-    videoFile: "",
+    videoFile: "assets/tutorial_standing.mp4",
     poster: "",
     defaultAge: 24,
   },
   balance_sway: {
     label: "Balance & Sway",
     dataFile: "assets/demo_balance_landmarks.json",
-    videoFile: "",
+    videoFile: "assets/tutorial_balance.mp4",
     poster: "",
     defaultAge: 36,
   },
   social_response: {
     label: "Social Response",
     dataFile: "assets/demo_social_landmarks.json",
-    videoFile: "",
+    videoFile: "assets/tutorial_social.mp4",
     poster: "",
     defaultAge: 20,
   },
@@ -571,9 +571,96 @@ function startTrackingLoop() {
   renderFrame();
 }
 
-// Draw 33 skeletal keypoints + connections directly on canvas
+// Target Guide Markers Toggle State
+let showGuideMarkers = true;
+const toggleMarkersBtn = document.getElementById("toggleMarkersBtn");
+const cameraGuideFrame = document.getElementById("cameraGuideFrame");
+
+if (toggleMarkersBtn) {
+  toggleMarkersBtn.addEventListener("click", () => {
+    showGuideMarkers = !showGuideMarkers;
+    toggleMarkersBtn.textContent = showGuideMarkers ? "🎯 Guide Markers: ON" : "🎯 Guide Markers: OFF";
+    toggleMarkersBtn.style.opacity = showGuideMarkers ? "1" : "0.6";
+    if (cameraGuideFrame) cameraGuideFrame.style.display = showGuideMarkers ? "block" : "none";
+  });
+}
+
+// Draw Floating Joint Measurement Badge Helper
+function drawFloatingBadge(ctx, text, x, y, bgColor = "rgba(15, 92, 92, 0.85)", textColor = "#ffffff") {
+  ctx.save();
+  ctx.font = "bold 11px system-ui, sans-serif";
+  const textWidth = ctx.measureText(text).width;
+  const paddingX = 6;
+  const paddingY = 3;
+  const boxWidth = textWidth + paddingX * 2;
+  const boxHeight = 18;
+
+  ctx.fillStyle = bgColor;
+  ctx.beginPath();
+  ctx.roundRect(x - boxWidth / 2, y - boxHeight / 2, boxWidth, boxHeight, 5);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = textColor;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// Draw 33 skeletal keypoints + connections + live alignment markers
 function drawSkeleton(ctx, landmarks, w, h) {
   ctx.clearRect(0, 0, w, h);
+
+  // Check framing status
+  const nose = landmarks ? landmarks[0] : null;
+  const lAnkle = landmarks ? landmarks[27] : null;
+  const rAnkle = landmarks ? landmarks[28] : null;
+  const headFramed = nose && (nose.visibility ?? 1) > 0.4 && nose.y > 0.05 && nose.y < 0.38;
+  const feetFramed = (lAnkle && (lAnkle.visibility ?? 1) > 0.4 && lAnkle.y > 0.65) ||
+                     (rAnkle && (rAnkle.visibility ?? 1) > 0.4 && rAnkle.y > 0.65);
+  const isFramed = headFramed && feetFramed;
+
+  if (cameraGuideFrame) {
+    cameraGuideFrame.classList.toggle("good-frame", Boolean(isFramed));
+  }
+
+  // Draw Camera Alignment Guide Markers on Canvas if enabled
+  if (showGuideMarkers) {
+    const guideColor = isFramed ? "rgba(16, 185, 129, 0.75)" : "rgba(232, 137, 28, 0.65)";
+    ctx.save();
+    ctx.strokeStyle = guideColor;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 6]);
+
+    // 1. Head Target Oval
+    ctx.beginPath();
+    ctx.ellipse(w * 0.5, h * 0.18, w * 0.13, h * 0.10, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 2. Shoulder Alignment Line
+    ctx.beginPath();
+    ctx.moveTo(w * 0.22, h * 0.32);
+    ctx.lineTo(w * 0.78, h * 0.32);
+    ctx.stroke();
+
+    // 3. Central Vertical Plumbline (Spinal Axis)
+    ctx.beginPath();
+    ctx.moveTo(w * 0.5, h * 0.28);
+    ctx.lineTo(w * 0.5, h * 0.72);
+    ctx.stroke();
+
+    // 4. Feet Ground Placement Box
+    ctx.beginPath();
+    ctx.roundRect(w * 0.26, h * 0.82, w * 0.48, h * 0.14, 8);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   if (!landmarks || landmarks.length < 33) return;
 
   const CONNECTIONS = [
@@ -614,6 +701,38 @@ function drawSkeleton(ctx, landmarks, w, h) {
       ctx.fill();
     }
   });
+
+  // Draw Live Biomechanical Floating Joint Markers
+  if (showGuideMarkers) {
+    const lkAngle = calcAngle(landmarks[23], landmarks[25], landmarks[27]);
+    const rkAngle = calcAngle(landmarks[24], landmarks[26], landmarks[28]);
+    const pLK = landmarks[25];
+    const pRK = landmarks[26];
+
+    if (pLK && (pLK.visibility ?? 1) > 0.4) {
+      drawFloatingBadge(ctx, `L Knee: ${lkAngle.toFixed(0)}°`, pLK.x * w - 38, pLK.y * h);
+    }
+    if (pRK && (pRK.visibility ?? 1) > 0.4) {
+      drawFloatingBadge(ctx, `R Knee: ${rkAngle.toFixed(0)}°`, pRK.x * w + 38, pRK.y * h);
+    }
+
+    // Mid-Spine Marker
+    const sMidX = (landmarks[11].x + landmarks[12].x) / 2;
+    const sMidY = (landmarks[11].y + landmarks[12].y) / 2;
+    const hMidX = (landmarks[23].x + landmarks[24].x) / 2;
+    const hMidY = (landmarks[23].y + landmarks[24].y) / 2;
+    const spineX = (sMidX + hMidX) / 2;
+    const spineY = (sMidY + hMidY) / 2;
+    const dx = sMidX - hMidX;
+    const dy = sMidY - hMidY;
+    const spineTilt = Math.abs((Math.atan2(dx, dy) * 180.0) / Math.PI);
+    drawFloatingBadge(ctx, `Spine: ${spineTilt.toFixed(1)}°`, spineX * w + 45, spineY * h, "rgba(232, 137, 28, 0.85)");
+
+    // Head / Gaze Marker
+    if (nose && (nose.visibility ?? 1) > 0.4) {
+      drawFloatingBadge(ctx, "Gaze: Centered", nose.x * w, nose.y * h - 22, "rgba(15, 92, 92, 0.9)");
+    }
+  }
 }
 
 // 3D Joint Angle Helper in Degrees
