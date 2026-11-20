@@ -8,6 +8,7 @@ from PIL import UnidentifiedImageError
 import numpy as np
 import io
 from pathlib import Path
+from video_analyzer import VideoLandmarkPayload, analyze_video_landmarks
 
 BASE_DIR = Path(__file__).resolve().parent
 SKIN_MODEL_PATH = BASE_DIR / "skin_model.keras"
@@ -140,9 +141,18 @@ def format_prediction(
 def health():
     return {
         "status": "healthy",
-        "message": "Skin & Eye Prediction API is running",
-        "endpoints": ["/predict/skin", "/predict/eye"],
+        "message": "Skin, Eye & 4D Child Health Video Screening API is running",
+        "endpoints": ["/predict/skin", "/predict/eye", "/analyze-video-landmarks"],
     }
+
+
+@app.post("/analyze-video-landmarks")
+async def analyze_video(payload: VideoLandmarkPayload):
+    try:
+        return analyze_video_landmarks(payload)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Landmark analysis error: {str(e)}")
+
 
 
 @app.post("/predict")

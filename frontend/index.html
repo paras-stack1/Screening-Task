@@ -4,31 +4,255 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Skin &amp; Eye Health Screening Demo</title>
+  <title>Child Health &amp; Developmental Screening (Across the 4Ds)</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js for Disease Probability Visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- MediaPipe Tasks Vision ES Module Loader -->
+  <script type="module">
+    import { FilesetResolver, PoseLandmarker, FaceLandmarker, DrawingUtils }
+      from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js";
+    window.MediaPipeVision = { FilesetResolver, PoseLandmarker, FaceLandmarker, DrawingUtils };
+    window.dispatchEvent(new CustomEvent("mediapipe-ready"));
+  </script>
 </head>
 
 <body>
   <main class="page">
     <header class="hero">
-      <h1>Skin &amp; Eye Screening Demo</h1>
-      <p class="subtitle">
-        Upload a photo in either card to detect the condition, status level, and probability graphs.
-      </p>
+      <div class="hero-top">
+        <span class="platform-tag">RBSK-Aligned Pediatric Screening Suite</span>
+        <h1>Child Health Screening Platform</h1>
+        <p class="subtitle">
+          Multi-modal triage across <strong>The 4Ds</strong>: Defects at birth, Deficiencies, Diseases, and Developmental delays.
+        </p>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="tab-video" role="tab" aria-selected="true">
+          <span class="tab-icon">🎥</span> Video Screening (4Ds)
+        </button>
+        <button class="nav-tab" data-tab="tab-skin" role="tab" aria-selected="false">
+          <span class="tab-icon">📸</span> Skin Condition
+        </button>
+        <button class="nav-tab" data-tab="tab-eye" role="tab" aria-selected="false">
+          <span class="tab-icon">👁️</span> Eye Condition
+        </button>
+      </nav>
     </header>
 
-    <div class="grid">
-      <!-- Skin Card -->
-      <section class="card card-skin" data-endpoint="/predict/skin">
+    <!-- TAB 1: VIDEO 4Ds SCREENING MODULE -->
+    <section id="tab-video" class="tab-content active" role="tabpanel">
+      <!-- "How It Works" Privacy-First Explainability Banner -->
+      <div class="explainability-card">
+        <div class="explain-header" id="toggleExplainBtn">
+          <div class="explain-title">
+            <span class="shield-icon">🛡️</span>
+            <div>
+              <strong>Privacy-First Architecture (Zero Video Storage) &amp; How It Works</strong>
+              <p>Learn how client-side MediaPipe landmark extraction maps to WHO/pediatric baselines.</p>
+            </div>
+          </div>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="explain-body" id="explainBody">
+          <div class="explain-grid">
+            <div class="explain-step">
+              <span class="step-badge">Stage 1</span>
+              <h4>Browser-Side 33 Landmarks</h4>
+              <p>
+                Video streams never touch the server. MediaPipe Tasks Vision runs entirely inside your browser,
+                extracting 33 3D skeletal coordinates and head yaw metrics at 10 FPS over 10–15 seconds (~50 KB JSON payload).
+              </p>
+            </div>
+            <div class="explain-step">
+              <span class="step-badge">Stage 2</span>
+              <h4>Invariant Biomechanical Normalization</h4>
+              <p>
+                The server subtracts Mid-Hip $H_{mid} = (P_{23} + P_{24})/2$ and scales coordinates by Torso Length
+                $L_{torso} = \|S_{mid} - H_{mid}\|_2$, eliminating camera distance and child size variations.
+              </p>
+            </div>
+            <div class="explain-step">
+              <span class="step-badge">Stage 3</span>
+              <h4>The 4Ds Clinical Mapping</h4>
+              <p>
+                Analyzes Gait Symmetry Index (GSI), Spine Tilt ($\theta_{spine}$), Knee-Ankle alignment, FFT Tremor frequencies,
+                and Auditory Orienting Latency mapped to non-diagnostic Green/Yellow/Red triage flags.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="video-screening-layout">
+        <!-- Left: Camera & Live Canvas View -->
+        <div class="camera-panel card">
+          <div class="camera-controls-bar">
+            <div class="control-group">
+              <label for="childAgeInput">Child Age (Months):</label>
+              <input type="number" id="childAgeInput" min="6" max="216" value="24" class="num-input" />
+            </div>
+            <div class="control-group">
+              <label for="taskTypeSelect">Screening Task:</label>
+              <select id="taskTypeSelect" class="select-input">
+                <option value="walking_gait">🚶 Walking Gait (Symmetry, CP, Limp, Hip Dysplasia)</option>
+                <option value="sitting_posture">🪑 Sitting Posture (Spine Tilt, Axial Hypotonia, Scoliosis)</option>
+                <option value="standing_alignment">🧍 Standing Alignment (Knee-Ankle Ratio, Bowed Legs, Rickets)</option>
+                <option value="balance_sway">⚖️ Balance &amp; Sway (Center-of-Mass Sway, Ataxia)</option>
+                <option value="social_response">🤝 Social Response (Auditory Name Call Orienting &amp; Eye Contact)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Video Container with Live Canvas Overlay -->
+          <div class="video-viewport-wrap">
+            <video id="webcamVideo" playsinline autoplay muted></video>
+            <canvas id="skeletonCanvas"></canvas>
+
+            <!-- Live HUD Overlays -->
+            <div class="hud-overlay top-left" id="framingBadge">
+              <span class="hud-dot yellow"></span> Waiting for Camera...
+            </div>
+            <div class="hud-overlay top-right" id="timerBadge" hidden>
+              ⏱️ <span id="countdownText">12.0s</span> | <span id="frameCountText">0 / 120</span>
+            </div>
+            <div class="hud-cue-alert" id="cueAlert" hidden>
+              🔔 AUDIO NAME CUE PROMPT!
+            </div>
+          </div>
+
+          <!-- Action Buttons & Status -->
+          <div class="camera-actions">
+            <button id="startCamBtn" class="action-btn primary-btn">
+              📷 Start Camera
+            </button>
+            <button id="startRecordBtn" class="action-btn record-btn" disabled>
+              ▶️ Start 12s Guided Screening
+            </button>
+            <button id="stopRecordBtn" class="action-btn secondary-btn" disabled>
+              ⏹️ Stop / Reset
+            </button>
+          </div>
+          <p id="videoStatus" class="status-msg" role="status"></p>
+        </div>
+
+        <!-- Right: Live Biomechanical Telemetry & Instructions -->
+        <div class="telemetry-panel card">
+          <div class="card-header">
+            <span class="badge blue">Live Telemetry</span>
+            <h3>Real-Time Biomechanical Readings</h3>
+            <p class="card-desc">Live landmark angles and metrics updated continuously at 10 FPS.</p>
+          </div>
+
+          <div class="telemetry-grid">
+            <div class="telemetry-item">
+              <span class="telemetry-label">Full-Body Framing</span>
+              <strong class="telemetry-val" id="teleFraming">Checking...</strong>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Spine Tilt Angle</span>
+              <strong class="telemetry-val" id="teleSpine">0.0°</strong>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Left Knee Angle</span>
+              <strong class="telemetry-val" id="teleLKnee">180.0°</strong>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Right Knee Angle</span>
+              <strong class="telemetry-val" id="teleRKnee">180.0°</strong>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Ankle Separation</span>
+              <strong class="telemetry-val" id="teleAnkle">0.00</strong>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Head Yaw / Gaze</span>
+              <strong class="telemetry-val" id="teleYaw">0.0° (Centered)</strong>
+            </div>
+          </div>
+
+          <!-- Live Task Instructions Card -->
+          <div class="task-instruction-box" id="taskInstructionBox">
+            <h4>📋 Guided Protocol</h4>
+            <p id="taskInstructionText">
+              Position the camera 2–3 meters away. Ensure the child's entire body from head to feet is visible inside the frame.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video Screening Results Section -->
+      <div id="videoResultsPanel" class="results-panel card" hidden>
+        <div class="results-banner" id="videoStatusBanner">
+          <div class="banner-top">
+            <span class="status-pill" id="videoStatusPill">STATUS</span>
+            <h3 id="videoResultHeading">Screening Analysis Complete</h3>
+          </div>
+          <p id="videoAdviceText" class="advice-para"></p>
+        </div>
+
+        <!-- The 4Ds Categorization Breakdown -->
+        <div class="four-ds-grid">
+          <div class="four-d-card" id="cardD1">
+            <div class="four-d-badge">D1</div>
+            <h4>Defects at Birth</h4>
+            <p class="four-d-desc">Club foot, hip dysplasia, neural tube/spine asymmetry.</p>
+            <div class="four-d-status" id="statusD1">Normal</div>
+          </div>
+          <div class="four-d-card" id="cardD2">
+            <div class="four-d-badge">D2</div>
+            <h4>Deficiencies</h4>
+            <p class="four-d-desc">Rickets lower-limb bowing, severe stunting alignment.</p>
+            <div class="four-d-status" id="statusD2">Normal</div>
+          </div>
+          <div class="four-d-card" id="cardD3">
+            <div class="four-d-badge">D3</div>
+            <h4>Diseases</h4>
+            <p class="four-d-desc">Cerebral palsy spasticity, neuromuscular dystrophies, tremors.</p>
+            <div class="four-d-status" id="statusD3">Normal</div>
+          </div>
+          <div class="four-d-card" id="cardD4">
+            <div class="four-d-badge">D4</div>
+            <h4>Developmental Delays</h4>
+            <p class="four-d-desc">Gross motor milestones, autism orienting latency &amp; gaze.</p>
+            <div class="four-d-status" id="statusD4">Normal</div>
+          </div>
+        </div>
+
+        <!-- Computed Biomechanical Metrics -->
+        <div class="metrics-summary-wrap">
+          <h4>📊 Calculated Metrics Summary</h4>
+          <div class="metrics-chips-grid" id="metricsChipsGrid"></div>
+        </div>
+
+        <!-- Step-by-Step Formula Explanations -->
+        <div class="explanations-wrap">
+          <h4>📐 Biomechanical Formula Explanations &amp; Clinical Baselines</h4>
+          <ul id="formulaExplanationsList" class="explanations-list"></ul>
+        </div>
+
+        <!-- Clinical Flags Alert Box -->
+        <div id="clinicalFlagsWrap" class="flags-alert-box" hidden>
+          <h4>⚠️ Clinical Observations &amp; Triage Flags</h4>
+          <ul id="clinicalFlagsList"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: SKIN CONDITION SCREENING (PRESERVED) -->
+    <section id="tab-skin" class="tab-content" role="tabpanel">
+      <div class="card card-skin" data-endpoint="/predict/skin">
         <span class="badge">Skin Model</span>
-        <h2>Skin Condition</h2>
-        <p class="card-desc">Upload a skin photo (JPG, PNG, or WEBP).</p>
+        <h2>Skin Condition Screening</h2>
+        <p class="card-desc">Upload a dermatological image to screen for Acne, Eczema, or Normal patterns.</p>
 
         <label class="upload-box" for="skinInput">
           <span class="upload-icon">＋</span>
           <strong>Choose a skin photo</strong>
-          <span>Click or drag &amp; drop</span>
+          <span>Click or drag &amp; drop (JPG, PNG, WEBP)</span>
         </label>
         <input type="file" id="skinInput" class="file-input" accept="image/jpeg,image/png,image/webp" />
 
@@ -48,7 +272,7 @@
 
           <div class="charts">
             <div class="chart-card">
-              <h3>Disease Probabilities (%)</h3>
+              <h3>Condition Probabilities (%)</h3>
               <div class="chart-box">
                 <canvas class="bar-canvas"></canvas>
               </div>
@@ -61,18 +285,20 @@
             </div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- Eye Card -->
-      <section class="card card-eye" data-endpoint="/predict/eye">
+    <!-- TAB 3: EYE CONDITION SCREENING (PRESERVED) -->
+    <section id="tab-eye" class="tab-content" role="tabpanel">
+      <div class="card card-eye" data-endpoint="/predict/eye">
         <span class="badge">Eye Model · Flip TTA</span>
-        <h2>Eye Condition</h2>
-        <p class="card-desc">Upload an eye photo (averages original + flipped image).</p>
+        <h2>Eye Health Screening</h2>
+        <p class="card-desc">Upload an eye photo to screen for Cataract, Conjunctivitis, Eyelid, Normal, or Uveitis.</p>
 
         <label class="upload-box" for="eyeInput">
           <span class="upload-icon">＋</span>
           <strong>Choose an eye photo</strong>
-          <span>Click or drag &amp; drop</span>
+          <span>Click or drag &amp; drop (JPG, PNG, WEBP)</span>
         </label>
         <input type="file" id="eyeInput" class="file-input" accept="image/jpeg,image/png,image/webp" />
 
@@ -92,7 +318,7 @@
 
           <div class="charts">
             <div class="chart-card">
-              <h3>Disease Probabilities (%)</h3>
+              <h3>Condition Probabilities (%)</h3>
               <div class="chart-box">
                 <canvas class="bar-canvas"></canvas>
               </div>
@@ -105,12 +331,14 @@
             </div>
           </div>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
 
-    <p class="notice">
-      Educational prototype only. Not validated for clinical or pediatric diagnosis. Always consult a qualified doctor.
-    </p>
+    <footer class="footer-notice">
+      <p class="notice">
+        <strong>Non-Diagnostic Learning &amp; Screening Prototype:</strong> This platform does not provide medical diagnoses or treatment recommendations. All scores and visual analytics are algorithmic indicators intended for educational and triage screening workflows. Always consult a qualified pediatrician or medical professional.
+      </p>
+    </footer>
   </main>
 
   <script src="script.js"></script>
