@@ -4,13 +4,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nanhe Kadam – Pediatric Biomechanical Screening</title>
+  <title>Nanhe Kadam – Real-Time Pose &amp; Biomechanical Monitoring Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
-  <!-- Chart.js for Disease Probability Visualizations -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js for Real-Time Metric Telemetry Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <!-- MediaPipe Tasks Vision ES Module Loader -->
   <script type="module">
@@ -21,18 +21,42 @@
   </script>
 </head>
 
-<body>
-  <main class="page">
-    <!-- Clean Minimalist Header with Language Switcher -->
+<body class="dark-lab-theme">
+  <main class="dashboard-page">
+    <!-- TOP HEADER: System Telemetry & Mode Switchers -->
     <header class="app-header">
       <div class="header-main">
         <div class="brand-group">
-          <span class="brand-icon">NK</span>
+          <div class="brand-badge">CV-BIO</div>
           <div>
             <div class="brand-title">
-              Nanhe Kadam <span class="brand-title-hi">नन्हे कदम</span>
+              Nanhe Kadam <span class="brand-subtitle">Biomechanical Observability Platform</span>
             </div>
-            <p class="brand-tagline" data-i18n="brand_sub">RBSK 2.0 Aligned · Pediatric Biomechanical Screening</p>
+            <p class="brand-tagline" data-i18n="brand_sub">RBSK 2.0 Aligned · Real-Time 33-Landmark Pose &amp; Kinematics</p>
+          </div>
+        </div>
+
+        <!-- Telemetry Performance HUD in Header -->
+        <div class="system-hud-bar">
+          <div class="hud-stat-item">
+            <span class="hud-stat-label">FPS</span>
+            <span class="hud-stat-val" id="hudFps">0.0</span>
+          </div>
+          <div class="hud-stat-item">
+            <span class="hud-stat-label">LATENCY</span>
+            <span class="hud-stat-val" id="hudLatency">0 ms</span>
+          </div>
+          <div class="hud-stat-item">
+            <span class="hud-stat-label">FRAME</span>
+            <span class="hud-stat-val mono" id="hudFrame">#0</span>
+          </div>
+          <div class="hud-stat-item">
+            <span class="hud-stat-label">TRACKING</span>
+            <span class="hud-badge-status ready" id="hudTrackingStatus">INITIALIZING</span>
+          </div>
+          <div class="hud-stat-item privacy-pill" title="100% Client-Side. No raw video transmitted.">
+            <span class="shield-dot"></span>
+            <span>PRIVACY: LOCAL</span>
           </div>
         </div>
 
@@ -43,17 +67,13 @@
             <span class="lang-divider">|</span>
             <span class="lang-code hi">हिंदी</span>
           </button>
-          <span class="status-indicator online">
-            <span class="status-dot"></span>
-            <span data-i18n="status_ready">Offline Ready</span>
-          </span>
         </div>
       </div>
 
       <!-- Clean Minimal Navigation Tabs -->
       <nav class="nav-tabs" role="tablist">
         <button class="nav-tab active" data-tab="tab-video" role="tab" aria-selected="true" data-i18n="tab_walking">
-          Walking Gait Analysis (चाल जाँच)
+          Pose &amp; Biomechanical Monitoring (चाल जाँच)
         </button>
         <button class="nav-tab" data-tab="tab-skin" role="tab" aria-selected="false" data-i18n="tab_skin">
           Skin Condition (त्वचा)
@@ -64,46 +84,70 @@
       </nav>
     </header>
 
-    <!-- TAB 1: WALKING GAIT & 33 3D BIOMECHANICAL ANALYSIS -->
+    <!-- TAB 1: POSE TRACKING & BIOMECHANICAL OBSERVABILITY DASHBOARD -->
     <section id="tab-video" class="tab-content active" role="tabpanel">
-      <!-- Quick Control Ribbon -->
-      <div class="action-ribbon">
-        <div class="ribbon-inputs">
-          <div class="input-item">
-            <label for="childAgeInput" data-i18n="label_age">Child Age (Months):</label>
-            <input type="number" id="childAgeInput" min="6" max="216" value="24" class="inline-input" />
-          </div>
-          <div class="input-item">
-            <label for="taskTypeSelect" data-i18n="label_task">Screening Task:</label>
-            <select id="taskTypeSelect" class="inline-select">
-              <option value="walking_gait">Walking Gait &amp; Step Symmetry</option>
-            </select>
-          </div>
+
+      <!-- MASTER TRANSPORT & CONTROL TOOLBAR -->
+      <div class="transport-ribbon">
+        <div class="ribbon-group">
+          <span class="ribbon-label">SOURCE:</span>
+          <button id="startCamBtn" class="btn btn-primary" data-i18n="btn_start_cam">Live Camera</button>
+          <label for="videoFileInputAlt" class="btn btn-secondary" data-i18n="btn_upload_video">Upload MP4</label>
+          <input type="file" id="videoFileInputAlt" accept="video/*" capture="user" style="display: none;" />
+          <button id="runDemoBtn" class="btn btn-accent" data-i18n="btn_run_demo">Run Demo Video</button>
         </div>
 
-        <div class="ribbon-buttons">
-          <button id="startCamBtn" class="btn btn-primary" data-i18n="btn_start_cam">Start Live Camera</button>
-          <label for="videoFileInputAlt" class="btn btn-secondary" data-i18n="btn_upload_video">Upload Video File</label>
-          <input type="file" id="videoFileInputAlt" accept="video/*" capture="user" style="display: none;" />
-          <button id="runDemoBtn" class="btn btn-accent" data-i18n="btn_run_demo">Run Walking Demo</button>
-          <button id="startRecordBtn" class="btn btn-record" disabled data-i18n="btn_record">Record Session</button>
+        <div class="ribbon-divider"></div>
+
+        <div class="ribbon-group">
+          <span class="ribbon-label">TRANSPORT:</span>
+          <button id="btnPlayPause" class="btn btn-icon" title="Play / Pause" disabled>Play</button>
+          <button id="btnRestartVideo" class="btn btn-icon" title="Restart Video" disabled>Restart</button>
+          <button id="btnStepBack" class="btn btn-icon" title="Step -1 Frame" disabled>&lt; 1F</button>
+          <button id="btnStepFwd" class="btn btn-icon" title="Step +1 Frame" disabled>1F &gt;</button>
+        </div>
+
+        <div class="ribbon-divider"></div>
+
+        <div class="ribbon-group">
+          <span class="ribbon-label">SCREENING:</span>
+          <div class="input-inline-wrap">
+            <label for="childAgeInput" data-i18n="label_age">Age(Mo):</label>
+            <input type="number" id="childAgeInput" min="6" max="216" value="24" class="inline-input" />
+          </div>
+          <button id="startRecordBtn" class="btn btn-record" disabled data-i18n="btn_record">Record 120F</button>
+          <button id="btnReplaySession" class="btn btn-secondary" disabled>Replay Buffer</button>
           <button id="stopRecordBtn" class="btn btn-ghost" disabled data-i18n="btn_reset">Reset</button>
         </div>
       </div>
 
-      <div class="gait-workspace-grid">
-        <!-- Left: 9:16 Portrait Viewport with 33 3D Landmarks & Foot Triangles -->
-        <div class="viewport-card">
-          <div class="viewport-header">
-            <span class="viewport-title" data-i18n="viewport_title">Live 9:16 Vision Stream</span>
-            <button type="button" id="toggleMarkersBtn" class="btn-micro" data-i18n="btn_markers_on">Markers: Active</button>
+      <!-- SECTION 1: PRIMARY VISION WORKSPACE (VIDEO OVERLAY + 33-LANDMARK INSPECTOR) -->
+      <div class="vision-grid">
+        <!-- LEFT: Real-Time Video Monitoring Panel -->
+        <div class="panel-card video-monitor-card">
+          <div class="panel-header">
+            <div class="panel-header-title">
+              <span class="status-pip live"></span>
+              <span data-i18n="viewport_title">Live Vision Stream &amp; 33-Landmark Overlay</span>
+              <span class="stream-source-tag" id="streamSourceTag">IDLE</span>
+            </div>
+
+            <!-- Canvas Visualization Toggles -->
+            <div class="canvas-controls-toolbar">
+              <button type="button" id="toggleLandmarksBtn" class="toggle-pill active" title="Toggle 33 Landmark Points">Landmarks</button>
+              <button type="button" id="toggleSkeletonBtn" class="toggle-pill active" title="Toggle Anatomical Bones">Bones</button>
+              <button type="button" id="toggleTrianglesBtn" class="toggle-pill active" title="Toggle Anatomical Foot Triangles">Foot Triangles</button>
+              <button type="button" id="toggleLabelsBtn" class="toggle-pill" title="Toggle Landmark IDs and Names">IDs/Labels</button>
+              <button type="button" id="toggleGuideBtn" class="toggle-pill active" title="Toggle 9:16 Alignment Frame">Guide</button>
+            </div>
           </div>
 
-          <div class="video-viewport-wrap portrait-9-16">
+          <!-- Video + Transparent Canvas Overlay Viewport -->
+          <div class="video-viewport-wrap">
             <video id="webcamVideo" playsinline autoplay muted></video>
             <canvas id="skeletonCanvas"></canvas>
 
-            <!-- 9:16 Proportional Alignment Target Frame -->
+            <!-- Anatomical Guide Overlays -->
             <div class="camera-guide-frame" id="cameraGuideFrame">
               <div class="guide-box guide-head-box">
                 <span class="guide-label" data-i18n="guide_head">HEAD TARGET</span>
@@ -117,93 +161,519 @@
               </div>
             </div>
 
-            <!-- HUD Overlays -->
-            <div class="hud-pill top-left" id="framingBadge">
-              <span class="hud-dot yellow"></span> <span data-i18n="status_waiting">Waiting for Input...</span>
-            </div>
-            <div class="hud-pill top-right" id="timerBadge" hidden>
-              <span id="countdownText">12.0s</span> | <span id="frameCountText">0 / 120</span>
+            <!-- Viewport HUD Floating Badges -->
+            <div class="viewport-hud-overlay">
+              <div class="hud-pill top-left" id="framingBadge">
+                <span class="hud-dot yellow"></span> <span data-i18n="status_waiting">Waiting for Input...</span>
+              </div>
+              <div class="hud-pill top-right" id="timerBadge" hidden>
+                <span id="countdownText">12.0s</span> | <span id="frameCountText">0 / 120</span>
+              </div>
+              <!-- Occlusion / Tracking Lost Alert Overlay -->
+              <div class="tracking-alert-banner" id="trackingAlertBanner" hidden>
+                <span class="alert-icon">!</span>
+                <span class="alert-text" id="trackingAlertText">POSE TRACKING LOST</span>
+              </div>
             </div>
           </div>
 
-          <p id="videoStatus" class="status-bar" role="status" data-i18n="status_ready_prompt">Camera ready. Start camera or select a video to begin tracking.</p>
+          <!-- Video Viewport Status Bar -->
+          <div class="viewport-footer">
+            <span id="videoStatus" class="status-msg-inline" data-i18n="status_ready_prompt">Camera ready. Start camera or select a video to begin tracking.</span>
+            <span class="color-legend">
+              <span class="legend-dot left-cyan"></span> Left Side
+              <span class="legend-dot right-amber"></span> Right Side
+              <span class="legend-dot center-green"></span> Axial Center
+            </span>
+          </div>
         </div>
 
-        <!-- Right: Real-time Telemetry, Second-by-Second Log Table & Math Calculations -->
-        <div class="telemetry-card">
-          <!-- Live Telemetry KPI Cards -->
-          <div class="kpi-grid">
-            <div class="kpi-box">
-              <span class="kpi-label" data-i18n="kpi_framing">Framing</span>
-              <strong class="kpi-value" id="teleFraming">Waiting...</strong>
+        <!-- RIGHT: Dedicated 33-Landmark Inspector Panel -->
+        <div class="panel-card landmark-inspector-card">
+          <div class="panel-header">
+            <div class="panel-header-title">
+              <span>33-Landmark Telemetry Inspector</span>
+              <span class="counter-badge" id="visibleLandmarksCount">0/33</span>
             </div>
-            <div class="kpi-box">
-              <span class="kpi-label" data-i18n="kpi_spine">Spine Tilt</span>
-              <strong class="kpi-value" id="teleSpine">0.0&deg;</strong>
-            </div>
-            <div class="kpi-box">
-              <span class="kpi-label" data-i18n="kpi_lknee">L-Knee Angle</span>
-              <strong class="kpi-value" id="teleLKnee">180.0&deg;</strong>
-            </div>
-            <div class="kpi-box">
-              <span class="kpi-label" data-i18n="kpi_rknee">R-Knee Angle</span>
-              <strong class="kpi-value" id="teleRKnee">180.0&deg;</strong>
-            </div>
-            <div class="kpi-box">
-              <span class="kpi-label" data-i18n="kpi_gsi">Gait Symmetry (GSI)</span>
-              <strong class="kpi-value" id="teleGSI">--</strong>
-            </div>
-            <div class="kpi-box">
-              <span class="kpi-label" data-i18n="kpi_yaw">Head Yaw / Gaze</span>
-              <strong class="kpi-value" id="teleYaw">0.0&deg;</strong>
+
+            <!-- Coordinate Mode Switcher: Image Normalized [0, 1] vs 3D World (Meters) -->
+            <div class="coord-mode-toggle">
+              <button type="button" class="coord-btn active" data-coord="normalized">Image [0,1]</button>
+              <button type="button" class="coord-btn" data-coord="world">World 3D (m)</button>
             </div>
           </div>
 
-          <!-- Per-Second Live Engineering Log Table -->
-          <div class="log-stream-section">
-            <div class="section-top">
-              <h4 data-i18n="log_stream_title">Per-Second Telemetry Stream (Live Measurements)</h4>
-              <button type="button" id="copyTelemetryBtn" class="btn-micro" data-i18n="btn_copy_json">Copy JSON</button>
-            </div>
-            <div class="table-container">
-              <table class="telemetry-table" id="telemetryTable">
-                <thead>
-                  <tr>
-                    <th data-i18n="th_sec">Sec</th>
-                    <th data-i18n="th_frame">Frame</th>
-                    <th data-i18n="th_lknee">L-Knee</th>
-                    <th data-i18n="th_rknee">R-Knee</th>
-                    <th data-i18n="th_spine">Spine</th>
-                    <th data-i18n="th_sep">Ankle Sep (s)</th>
-                    <th data-i18n="th_torso">Torso (px)</th>
-                    <th data-i18n="th_status">Framing</th>
-                  </tr>
-                </thead>
-                <tbody id="telemetryTableBody">
-                  <tr class="empty-row">
-                    <td colspan="8" data-i18n="empty_log">Live telemetry data will stream here second-by-second...</td>
-                  </tr>
-                </tbody>
-              </table>
+          <!-- Search & Anatomical Region Filter Chips -->
+          <div class="inspector-filter-bar">
+            <input type="text" id="landmarkSearchInput" placeholder="Filter by ID or Name (e.g. knee, 25)..." class="inspector-search-input" />
+            <div class="filter-chips-wrap">
+              <button type="button" class="filter-chip active" data-filter="all">ALL (33)</button>
+              <button type="button" class="filter-chip" data-filter="face">Face (0-10)</button>
+              <button type="button" class="filter-chip" data-filter="upper">Trunk (11,12,23,24)</button>
+              <button type="button" class="filter-chip" data-filter="arms">Arms (13-22)</button>
+              <button type="button" class="filter-chip" data-filter="lower">Legs/Feet (25-32)</button>
             </div>
           </div>
 
-          <!-- Step-by-Step Mathematical Calculation & Decision Breakdown Card -->
-          <div class="math-breakdown-card" id="mathBreakdownCard" hidden>
-            <div class="math-header">
-              <span class="badge-status" id="mathStatusBadge">STATUS</span>
-              <h4 id="mathResultTitle" data-i18n="math_title">Biomechanical Decision Calculation</h4>
-            </div>
-            <div class="math-steps-list" id="mathStepsList"></div>
+          <!-- 33-Landmark Data Table -->
+          <div class="inspector-table-wrap">
+            <table class="inspector-table" id="landmarkTable">
+              <thead>
+                <tr>
+                  <th style="width: 38px;">ID</th>
+                  <th>Landmark</th>
+                  <th>X</th>
+                  <th>Y</th>
+                  <th>Z</th>
+                  <th>Vis</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="landmarkTableBody">
+                <tr class="empty-state-row">
+                  <td colspan="7">Awaiting pose inference stream...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Inspector Selected Joint Details Footer -->
+          <div class="selected-joint-detail-bar" id="selectedJointDetailBar">
+            <span class="detail-label">INSPECT JOINT:</span>
+            <span class="detail-val" id="selectedJointName">Click a landmark in table to isolate &amp; trace on video</span>
           </div>
         </div>
       </div>
+
+      <!-- SECTION 2: LIVE BIOMECHANICAL PARAMETER CARDS (12 DETAILED METRICS) -->
+      <div class="panel-card biomech-parameters-card">
+        <div class="panel-header">
+          <div class="panel-header-title">
+            <span>Live Biomechanical Kinematics &amp; Joint Angles</span>
+            <span class="panel-subtext">Real-time geometric vector calculations ($\arccos$ dot-product &amp; invariant ratios)</span>
+          </div>
+          <span class="refresh-indicator">STREAMING 30-40Hz</span>
+        </div>
+
+        <div class="biomech-cards-grid">
+          <!-- Card 1: Left Knee Angle -->
+          <div class="param-card" id="card-lknee">
+            <div class="param-top">
+              <span class="param-name">Left Knee Angle</span>
+              <span class="param-badge" id="badge-lknee">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-lknee">--</span>
+              <span class="param-unit">&deg;</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-lknee">--</strong></span>
+              <span>&Delta;: <strong id="delta-lknee">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-lknee"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: #23, #25, #27</span>
+              <span class="param-category">Extension/Flexion</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Right Knee Angle -->
+          <div class="param-card" id="card-rknee">
+            <div class="param-top">
+              <span class="param-name">Right Knee Angle</span>
+              <span class="param-badge" id="badge-rknee">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-rknee">--</span>
+              <span class="param-unit">&deg;</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-rknee">--</strong></span>
+              <span>&Delta;: <strong id="delta-rknee">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-rknee"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: #24, #26, #28</span>
+              <span class="param-category">Extension/Flexion</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Spine/Trunk Tilt -->
+          <div class="param-card" id="card-spine">
+            <div class="param-top">
+              <span class="param-name">Spine / Trunk Tilt</span>
+              <span class="param-badge" id="badge-spine">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-spine">--</span>
+              <span class="param-unit">&deg;</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-spine">--</strong></span>
+              <span>&Delta;: <strong id="delta-spine">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-spine"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: S_mid, H_mid</span>
+              <span class="param-category">Baseline: &le;12&deg;</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Ankle Separation (Step Width) -->
+          <div class="param-card" id="card-anklesep">
+            <div class="param-top">
+              <span class="param-name">Ankle Separation</span>
+              <span class="param-badge" id="badge-anklesep">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-anklesep">--</span>
+              <span class="param-unit">norm</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-anklesep">--</strong></span>
+              <span>&Delta;: <strong id="delta-anklesep">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-anklesep"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: #27, #28</span>
+              <span class="param-category">Base of Support</span>
+            </div>
+          </div>
+
+          <!-- Card 5: Gait Symmetry Index (GSI) -->
+          <div class="param-card" id="card-gsi">
+            <div class="param-top">
+              <span class="param-name">Gait Symmetry (GSI)</span>
+              <span class="param-badge" id="badge-gsi">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-gsi">--</span>
+              <span class="param-unit">ratio</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-gsi">--</strong></span>
+              <span>&Delta;: <strong id="delta-gsi">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-gsi"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: Ankle Stride Series</span>
+              <span class="param-category">Baseline: &ge;0.85</span>
+            </div>
+          </div>
+
+          <!-- Card 6: Lower Limb Alignment (Varum/Valgum) -->
+          <div class="param-card" id="card-limb">
+            <div class="param-top">
+              <span class="param-name">Limb Alignment (K-A)</span>
+              <span class="param-badge" id="badge-limb">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-limb">--</span>
+              <span class="param-unit">ratio</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-limb">--</strong></span>
+              <span>&Delta;: <strong id="delta-limb">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-limb"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: #25, #26 vs #27, #28</span>
+              <span class="param-category">+Varum / -Valgum</span>
+            </div>
+          </div>
+
+          <!-- Card 7: Left Foot Flexion -->
+          <div class="param-card" id="card-lfoot">
+            <div class="param-top">
+              <span class="param-name">Left Foot Angle</span>
+              <span class="param-badge" id="badge-lfoot">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-lfoot">--</span>
+              <span class="param-unit">&deg;</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-lfoot">--</strong></span>
+              <span>&Delta;: <strong id="delta-lfoot">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-lfoot"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: #25, #27, #31</span>
+              <span class="param-category">Dorsiflexion / Plantar</span>
+            </div>
+          </div>
+
+          <!-- Card 8: Right Foot Flexion -->
+          <div class="param-card" id="card-rfoot">
+            <div class="param-top">
+              <span class="param-name">Right Foot Angle</span>
+              <span class="param-badge" id="badge-rfoot">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-rfoot">--</span>
+              <span class="param-unit">&deg;</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-rfoot">--</strong></span>
+              <span>&Delta;: <strong id="delta-rfoot">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-rfoot"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: #26, #28, #32</span>
+              <span class="param-category">Dorsiflexion / Plantar</span>
+            </div>
+          </div>
+
+          <!-- Card 9: Shoulder Horizontal Alignment -->
+          <div class="param-card" id="card-shoulder">
+            <div class="param-top">
+              <span class="param-name">Shoulder Level Tilt</span>
+              <span class="param-badge" id="badge-shoulder">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-shoulder">--</span>
+              <span class="param-unit">&deg;</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-shoulder">--</strong></span>
+              <span>&Delta;: <strong id="delta-shoulder">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-shoulder"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: #11, #12</span>
+              <span class="param-category">Coronal Tilt</span>
+            </div>
+          </div>
+
+          <!-- Card 10: Postural Sway (CoM) -->
+          <div class="param-card" id="card-sway">
+            <div class="param-top">
+              <span class="param-name">Postural Sway (&sigma;)</span>
+              <span class="param-badge" id="badge-sway">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-sway">--</span>
+              <span class="param-unit">norm</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-sway">--</strong></span>
+              <span>&Delta;: <strong id="delta-sway">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-sway"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: Mid-Hip X Time-Series</span>
+              <span class="param-category">Baseline: &le;0.04</span>
+            </div>
+          </div>
+
+          <!-- Card 11: Left Wrist Velocity (Tremor) -->
+          <div class="param-card" id="card-wrist">
+            <div class="param-top">
+              <span class="param-name">Wrist Velocity (dy/dt)</span>
+              <span class="param-badge" id="badge-wrist">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-wrist">--</span>
+              <span class="param-unit">norm/s</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-wrist">--</strong></span>
+              <span>&Delta;: <strong id="delta-wrist">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-wrist"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: #15 (L-Wrist)</span>
+              <span class="param-category">Kinematic Derivative</span>
+            </div>
+          </div>
+
+          <!-- Card 12: FFT Tremor Frequency -->
+          <div class="param-card" id="card-fft">
+            <div class="param-top">
+              <span class="param-name">Tremor / Stereotypy FFT</span>
+              <span class="param-badge" id="badge-fft">VALID</span>
+            </div>
+            <div class="param-value-wrap">
+              <span class="param-num" id="val-fft">--</span>
+              <span class="param-unit">Hz</span>
+            </div>
+            <div class="param-meta">
+              <span>Prev: <strong id="prev-fft">--</strong></span>
+              <span>&Delta;: <strong id="delta-fft">--</strong></span>
+            </div>
+            <div class="param-sparkline-box">
+              <canvas class="sparkline-canvas" id="spark-fft"></canvas>
+            </div>
+            <div class="param-footer">
+              <span class="param-inputs">Inputs: Spectral Peak 1.5-4.5Hz</span>
+              <span class="param-category">Motor Stereotypies</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: REAL-TIME METRIC CHARTS -->
+      <div class="panel-card charts-panel-card">
+        <div class="panel-header">
+          <div class="panel-header-title">
+            <span>Continuous Biomechanical Time-Series Graphs</span>
+            <span class="panel-subtext">FIFO bounded 120-sample real-time history</span>
+          </div>
+          <div class="chart-legend-controls">
+            <span class="legend-chip cyan">Left Knee</span>
+            <span class="legend-chip amber">Right Knee</span>
+            <span class="legend-chip emerald">Spine Tilt</span>
+            <span class="legend-chip purple">Ankle Separation</span>
+          </div>
+        </div>
+
+        <div class="charts-2x2-grid">
+          <!-- Graph 1: Bilateral Knee Comparison -->
+          <div class="chart-container-box">
+            <div class="chart-title-bar">Bilateral Knee Angle Comparison (Left vs Right)</div>
+            <div class="chart-canvas-wrap">
+              <canvas id="chartKneeBilateral"></canvas>
+            </div>
+          </div>
+
+          <!-- Graph 2: Spine Tilt & Postural Sway -->
+          <div class="chart-container-box">
+            <div class="chart-title-bar">Spine Coronal Tilt (&deg;) &amp; Lateral Center-of-Mass</div>
+            <div class="chart-canvas-wrap">
+              <canvas id="chartSpineSway"></canvas>
+            </div>
+          </div>
+
+          <!-- Graph 3: Ankle Separation & Step Excursions -->
+          <div class="chart-container-box">
+            <div class="chart-title-bar">Dynamic Ankle Separation / Step Width Excursions</div>
+            <div class="chart-canvas-wrap">
+              <canvas id="chartAnkleSep"></canvas>
+            </div>
+          </div>
+
+          <!-- Graph 4: Wrist Kinematics & Velocity -->
+          <div class="chart-container-box">
+            <div class="chart-title-bar">Wrist Kinematic Velocity &amp; Frequency Distribution</div>
+            <div class="chart-canvas-wrap">
+              <canvas id="chartWristVelocity"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 4: TIMELINE SCRUBBER & SYNCHRONIZED SESSION REPLAY -->
+      <div class="panel-card replay-timeline-card">
+        <div class="panel-header">
+          <div class="panel-header-title">
+            <span>Synchronized Session Timeline &amp; Replay Scrubber</span>
+            <span class="panel-subtext">Scrub timeline to inspect exact synchronized pose coordinates and kinematics at any timestamp</span>
+          </div>
+          <div class="replay-status-info">
+            <span id="replayTimeDisplay">0.00s / 0.00s</span>
+            <span class="counter-badge" id="replayFrameDisplay">Frame 0 / 0</span>
+          </div>
+        </div>
+
+        <div class="timeline-slider-wrap">
+          <input type="range" id="sessionTimelineSlider" min="0" max="0" value="0" step="1" class="timeline-range" disabled />
+        </div>
+
+        <div class="timeline-controls-bar">
+          <div class="timeline-btn-group">
+            <button type="button" id="btnTimelinePlay" class="btn btn-secondary btn-sm" disabled>Play Replay</button>
+            <button type="button" id="btnTimelineStepPrev" class="btn btn-ghost btn-sm" disabled>&lt; Prev Frame</button>
+            <button type="button" id="btnTimelineStepNext" class="btn btn-ghost btn-sm" disabled>Next Frame &gt;</button>
+          </div>
+          <div class="timeline-meta-hint">
+            * Drag slider or use frame buttons to freeze video and review landmark 3D vectors
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 5: LIVE PROCESSING EVENT TERMINAL LOG -->
+      <div class="panel-card terminal-log-card">
+        <div class="panel-header">
+          <div class="panel-header-title">
+            <span class="terminal-prompt">&gt;_</span>
+            <span>Computer Vision &amp; Inference Event Terminal</span>
+          </div>
+
+          <!-- Terminal Filter Buttons -->
+          <div class="terminal-filter-chips">
+            <button type="button" class="term-filter-chip active" data-cat="ALL">ALL</button>
+            <button type="button" class="term-filter-chip" data-cat="VIDEO">VIDEO</button>
+            <button type="button" class="term-filter-chip" data-cat="MEDIAPIPE">MEDIAPIPE</button>
+            <button type="button" class="term-filter-chip" data-cat="LANDMARKS">LANDMARKS</button>
+            <button type="button" class="term-filter-chip" data-cat="BIOMECHANICS">BIOMECH</button>
+            <button type="button" class="term-filter-chip" data-cat="BACKEND">BACKEND</button>
+            <button type="button" class="term-filter-chip" data-cat="WARN">WARNINGS</button>
+          </div>
+
+          <!-- Terminal Controls -->
+          <div class="terminal-action-buttons">
+            <label class="auto-scroll-toggle">
+              <input type="checkbox" id="terminalAutoScroll" checked />
+              <span>Auto-Scroll</span>
+            </label>
+            <button type="button" id="btnPauseTerminal" class="btn-micro">Pause</button>
+            <button type="button" id="btnClearTerminal" class="btn-micro">Clear</button>
+            <button type="button" id="btnExportLogs" class="btn-micro">Export JSON</button>
+          </div>
+        </div>
+
+        <!-- Terminal Console View -->
+        <div class="terminal-console" id="terminalConsole">
+          <div class="terminal-row info">
+            <span class="term-time">[00:00:00.000]</span>
+            <span class="term-frame">[FRAME #0]</span>
+            <span class="term-tag tag-info">[INFO]</span>
+            <span class="term-cat">[SYSTEM]</span>
+            <span class="term-msg">Observability platform initialized. Waiting for video stream...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 6: MATHEMATICAL DECISION & RBSK CLINICAL BREAKDOWN CARD -->
+      <div class="panel-card math-breakdown-card" id="mathBreakdownCard" hidden>
+        <div class="panel-header">
+          <div class="panel-header-title">
+            <span class="badge-status" id="mathStatusBadge">STATUS</span>
+            <span id="mathResultTitle" data-i18n="math_title">Biomechanical Decision Calculation &amp; Clinical Flags</span>
+          </div>
+          <span class="panel-subtext">Stage 1 Invariant Normalization &amp; Stage 2 Screening Report</span>
+        </div>
+        <div class="math-steps-list" id="mathStepsList"></div>
+      </div>
+
     </section>
 
-    <!-- TAB 2: SKIN CLASSIFICATION MODULE -->
+    <!-- TAB 2: SKIN CLASSIFICATION MODULE (PRESERVED) -->
     <section id="tab-skin" class="tab-content" role="tabpanel">
       <div class="classifier-wrap">
-        <div class="card card-skin" data-endpoint="/predict/skin">
+        <div class="panel-card card card-skin" data-endpoint="/predict/skin">
           <div class="card-top-action">
             <span class="badge">Skin Lesion Classifier</span>
             <button class="pill-btn ghost-pill demo-load-btn" type="button" data-target="skin">Load Sample Photo</button>
@@ -264,10 +734,10 @@
       </div>
     </section>
 
-    <!-- TAB 3: EYE CLASSIFICATION MODULE -->
+    <!-- TAB 3: EYE CLASSIFICATION MODULE (PRESERVED) -->
     <section id="tab-eye" class="tab-content" role="tabpanel">
       <div class="classifier-wrap">
-        <div class="card card-eye" data-endpoint="/predict/eye">
+        <div class="panel-card card card-eye" data-endpoint="/predict/eye">
           <div class="card-top-action">
             <span class="badge">Ocular AI · Flip TTA</span>
             <button class="pill-btn ghost-pill demo-load-btn" type="button" data-target="eye">Load Sample Photo</button>
@@ -330,7 +800,8 @@
 
     <!-- Minimal Engineering Footer -->
     <footer class="app-footer">
-      <span>Nanhe Kadam (RBSK 2.0) · Algorithmic Screening Prototype</span>
+      <span>Nanhe Kadam (RBSK 2.0) · Precision Computer Vision &amp; Biomechanical Screening Dashboard</span>
+      <span class="footer-privacy-text">100% Client-Side In-Browser MediaPipe Inference · No Video Recorded or Transmitted</span>
     </footer>
   </main>
 
