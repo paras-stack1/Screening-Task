@@ -149,6 +149,7 @@ document.querySelectorAll(".nav-tab").forEach((tabBtn) => {
    ========================================================================== */
 const videoEl = document.getElementById("webcamVideo");
 const canvasEl = document.getElementById("skeletonCanvas");
+const videoViewportWrap = document.querySelector(".video-viewport-wrap");
 const ctx = canvasEl.getContext("2d");
 
 const startCamBtn = document.getElementById("startCamBtn");
@@ -254,76 +255,40 @@ function drawFloatingBadge(ctx, text, x, y, bgColor = "rgba(15, 23, 42, 0.75)", 
 function drawSkeleton(ctx, landmarks, w, h) {
   ctx.clearRect(0, 0, w, h);
 
+  if (!landmarks || landmarks.length < 33) return;
+
   // Check framing status in 9:16 frame
-  const nose = landmarks ? landmarks[0] : null;
-  const lAnkle = landmarks ? landmarks[27] : null;
-  const rAnkle = landmarks ? landmarks[28] : null;
-  const headFramed = nose && (nose.visibility ?? 1) > 0.4 && nose.y > 0.04 && nose.y < 0.32;
-  const feetFramed = (lAnkle && (lAnkle.visibility ?? 1) > 0.4 && lAnkle.y > 0.68) ||
-                     (rAnkle && (rAnkle.visibility ?? 1) > 0.4 && rAnkle.y > 0.68);
+  const nose = landmarks[0];
+  const lAnkle = landmarks[27];
+  const rAnkle = landmarks[28];
+  const headFramed = nose && (nose.visibility === undefined || nose.visibility > 0.25) && nose.y > 0.04 && nose.y < 0.35;
+  const feetFramed = (lAnkle && (lAnkle.visibility === undefined || lAnkle.visibility > 0.20) && lAnkle.y > 0.65) ||
+                     (rAnkle && (rAnkle.visibility === undefined || rAnkle.visibility > 0.20) && rAnkle.y > 0.65);
   const isFramed = headFramed && feetFramed;
 
   if (cameraGuideFrame) {
     cameraGuideFrame.classList.toggle("good-frame", Boolean(isFramed));
   }
 
-  // Draw Alignment Guide Markers on Canvas if enabled
-  if (showGuideMarkers) {
-    const guideColor = isFramed ? "rgba(22, 163, 74, 0.7)" : "rgba(232, 137, 28, 0.6)";
-    ctx.save();
-    ctx.strokeStyle = guideColor;
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([4, 4]);
-
-    // Head Target Oval (9:16 proportion)
-    ctx.beginPath();
-    ctx.ellipse(w * 0.5, h * 0.14, w * 0.24, h * 0.08, 0, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Shoulder Line
-    ctx.beginPath();
-    ctx.moveTo(w * 0.14, h * 0.24);
-    ctx.lineTo(w * 0.86, h * 0.24);
-    ctx.stroke();
-
-    // Spinal Plumbline
-    ctx.beginPath();
-    ctx.moveTo(w * 0.5, h * 0.24);
-    ctx.lineTo(w * 0.5, h * 0.76);
-    ctx.stroke();
-
-    // Feet Ground Box
-    ctx.beginPath();
-    ctx.roundRect(w * 0.14, h * 0.82, w * 0.72, h * 0.12, 6);
-    ctx.stroke();
-
-    ctx.restore();
-  }
-
-  if (!landmarks || landmarks.length < 33) return;
-
-  // Complete 33 connections + Anatomical Foot Triangles (Ankles 27/28, Heels 29/30, Toes 31/32)
-  const CONNECTIONS = [
+  // Skeletal Body Connections
+  const BODY_CONNECTIONS = [
     [11, 12], [11, 23], [12, 24], [23, 24], // Torso
     [11, 13], [13, 15],                     // Left Arm
     [12, 14], [14, 16],                     // Right Arm
     [23, 25], [25, 27],                     // Left Leg
     [24, 26], [26, 28],                     // Right Leg
-    [27, 29], [29, 31], [27, 31],           // Left Foot Triangle (Ankle 27, Heel 29, Toe 31)
-    [28, 30], [30, 32], [28, 32],           // Right Foot Triangle (Ankle 28, Heel 30, Toe 32)
     [0, 1], [1, 2], [2, 3], [3, 7],         // Left Face
     [0, 4], [4, 5], [5, 6], [6, 8],         // Right Face
     [9, 10]                                 // Mouth
   ];
 
-  ctx.lineWidth = 1.4;
-  ctx.strokeStyle = "rgba(16, 185, 129, 0.85)";
-  ctx.shadowBlur = 0;
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = "rgba(16, 185, 129, 0.88)"; // Crisp emerald
 
-  for (const [i, j] of CONNECTIONS) {
+  for (const [i, j] of BODY_CONNECTIONS) {
     const p1 = landmarks[i];
     const p2 = landmarks[j];
-    if (p1 && p2 && (p1.visibility ?? 1) > 0.4 && (p2.visibility ?? 1) > 0.4) {
+    if (p1 && p2 && (p1.visibility === undefined || p1.visibility > 0.20) && (p2.visibility === undefined || p2.visibility > 0.20)) {
       ctx.beginPath();
       ctx.moveTo(p1.x * w, p1.y * h);
       ctx.lineTo(p2.x * w, p2.y * h);
@@ -331,45 +296,65 @@ function drawSkeleton(ctx, landmarks, w, h) {
     }
   }
 
-  // Small refined landmark dots (1.4px for face, 2.2px for body, 2.6px for feet)
-  landmarks.forEach((p, idx) => {
-    if (p && (p.visibility ?? 1) > 0.35) {
+  // Dedicated Anatomical Foot Triangles: Ankles (27, 28), Heels (29, 30), Foot Index / Toes (31, 32)
+  const FOOT_CONNECTIONS = [
+    [27, 29], [29, 31], [31, 27], // Left Foot Triangle
+    [28, 30], [30, 32], [32, 28], // Right Foot Triangle
+  ];
+
+  ctx.lineWidth = 2.0;
+  ctx.strokeStyle = "rgba(245, 158, 11, 0.95)"; // Vibrant amber for foot mechanics
+
+  for (const [i, j] of FOOT_CONNECTIONS) {
+    const p1 = landmarks[i];
+    const p2 = landmarks[j];
+    if (p1 && p2 && (p1.visibility === undefined || p1.visibility > 0.15) && (p2.visibility === undefined || p2.visibility > 0.15)) {
       ctx.beginPath();
-      const r = idx <= 10 ? 1.4 : (idx >= 27 ? 2.6 : 2.2);
+      ctx.moveTo(p1.x * w, p1.y * h);
+      ctx.lineTo(p2.x * w, p2.y * h);
+      ctx.stroke();
+    }
+  }
+
+  // Small refined landmark dots (face: 1.4px, body: 2.0px, feet: 2.4px)
+  landmarks.forEach((p, idx) => {
+    if (p && (p.visibility === undefined || p.visibility > 0.20)) {
+      ctx.beginPath();
+      const r = idx <= 10 ? 1.4 : (idx >= 27 ? 2.4 : 2.0);
       ctx.arc(p.x * w, p.y * h, r, 0, 2 * Math.PI);
       ctx.fillStyle = idx >= 27 ? "#F59E0B" : idx >= 23 ? "#10B981" : idx >= 11 ? "#38BDF8" : "#94A3B8";
       ctx.fill();
     }
   });
 
-  // Floating Joint Badges for Walking Biomechanics
+  // Floating Micro-Badges for Biomechanics (Knee angles, foot angles, spine tilt)
   if (showGuideMarkers) {
     const lkAngle = compute3DAngle(landmarks[23], landmarks[25], landmarks[27]);
     const rkAngle = compute3DAngle(landmarks[24], landmarks[26], landmarks[28]);
     const pLK = landmarks[25];
     const pRK = landmarks[26];
 
-    if (pLK && (pLK.visibility ?? 1) > 0.4) {
-      drawFloatingBadge(ctx, `L: ${lkAngle.toFixed(0)}°`, pLK.x * w - 32, pLK.y * h);
+    if (pLK && (pLK.visibility === undefined || pLK.visibility > 0.25)) {
+      drawFloatingBadge(ctx, `L: ${lkAngle.toFixed(0)}°`, pLK.x * w - 30, pLK.y * h);
     }
-    if (pRK && (pRK.visibility ?? 1) > 0.4) {
-      drawFloatingBadge(ctx, `R: ${rkAngle.toFixed(0)}°`, pRK.x * w + 32, pRK.y * h);
+    if (pRK && (pRK.visibility === undefined || pRK.visibility > 0.25)) {
+      drawFloatingBadge(ctx, `R: ${rkAngle.toFixed(0)}°`, pRK.x * w + 30, pRK.y * h);
     }
 
     // Foot angles (Ankle flexion)
     const lFootFlex = compute3DAngle(landmarks[25], landmarks[27], landmarks[31]);
     const pLAnkle = landmarks[27];
-    if (pLAnkle && (pLAnkle.visibility ?? 1) > 0.4) {
-      drawFloatingBadge(ctx, `L-Foot: ${lFootFlex.toFixed(0)}°`, pLAnkle.x * w - 36, pLAnkle.y * h + 14, "rgba(217, 119, 6, 0.85)");
+    if (pLAnkle && (pLAnkle.visibility === undefined || pLAnkle.visibility > 0.20)) {
+      drawFloatingBadge(ctx, `L-Foot: ${lFootFlex.toFixed(0)}°`, pLAnkle.x * w - 36, pLAnkle.y * h + 16, "rgba(217, 119, 6, 0.85)");
     }
 
     const rFootFlex = compute3DAngle(landmarks[26], landmarks[28], landmarks[32]);
     const pRAnkle = landmarks[28];
-    if (pRAnkle && (pRAnkle.visibility ?? 1) > 0.4) {
-      drawFloatingBadge(ctx, `R-Foot: ${rFootFlex.toFixed(0)}°`, pRAnkle.x * w + 36, pRAnkle.y * h + 14, "rgba(217, 119, 6, 0.85)");
+    if (pRAnkle && (pRAnkle.visibility === undefined || pRAnkle.visibility > 0.20)) {
+      drawFloatingBadge(ctx, `R-Foot: ${rFootFlex.toFixed(0)}°`, pRAnkle.x * w + 36, pRAnkle.y * h + 16, "rgba(217, 119, 6, 0.85)");
     }
 
-    // Mid-Spine Marker
+    // Mid-Spine Marker & Tilt
     const sMidX = (landmarks[11].x + landmarks[12].x) / 2;
     const sMidY = (landmarks[11].y + landmarks[12].y) / 2;
     const hMidX = (landmarks[23].x + landmarks[24].x) / 2;
@@ -379,7 +364,7 @@ function drawSkeleton(ctx, landmarks, w, h) {
     const dx = sMidX - hMidX;
     const dy = sMidY - hMidY;
     const spineTilt = Math.abs((Math.atan2(dx, dy) * 180.0) / Math.PI);
-    drawFloatingBadge(ctx, `Spine: ${spineTilt.toFixed(1)}°`, spineX * w + 40, spineY * h, "rgba(15, 92, 92, 0.85)");
+    drawFloatingBadge(ctx, `Spine: ${spineTilt.toFixed(1)}°`, spineX * w + 38, spineY * h, "rgba(15, 92, 92, 0.85)");
   }
 }
 
@@ -394,8 +379,9 @@ function updateLiveTelemetry(pose, world, face, currentSecond = 0, currentFrame 
   const nose = pose[0];
   const lAnkle = pose[27];
   const rAnkle = pose[28];
-  const headOk = nose && (nose.visibility ?? 1) > 0.4;
-  const feetOk = (lAnkle && (lAnkle.visibility ?? 1) > 0.4) || (rAnkle && (rAnkle.visibility ?? 1) > 0.4);
+  const headOk = nose && (nose.visibility === undefined || nose.visibility > 0.25);
+  const feetOk = (lAnkle && (lAnkle.visibility === undefined || lAnkle.visibility > 0.20)) ||
+                 (rAnkle && (rAnkle.visibility === undefined || rAnkle.visibility > 0.20));
   const isFramed = headOk && feetOk;
 
   if (isFramed) {
@@ -443,6 +429,9 @@ function updateLiveTelemetry(pose, world, face, currentSecond = 0, currentFrame 
 
   // Per-Second Logging into Engineering Table
   const secInt = Math.floor(currentSecond);
+  if (secInt < lastLoggedSecond) {
+    lastLoggedSecond = -1; // Reset on video loop
+  }
   if (secInt > lastLoggedSecond && secInt >= 0) {
     lastLoggedSecond = secInt;
 
@@ -573,6 +562,12 @@ if (startCamBtn) {
       videoStatus.textContent = "Accessing live camera stream...";
       clearLogTable();
       if (mathBreakdownCard) mathBreakdownCard.hidden = true;
+      if (sampleTimer) clearInterval(sampleTimer);
+
+      if (videoViewportWrap) {
+        videoViewportWrap.classList.add("video-active");
+        videoViewportWrap.classList.add("selfie-mirrored");
+      }
 
       cameraStream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -592,9 +587,6 @@ if (startCamBtn) {
       startRecordBtn.disabled = false;
       stopRecordBtn.disabled = false;
       videoStatus.textContent = "Live camera active. Position child inside the 9:16 target markers.";
-
-      canvasEl.width = videoEl.videoWidth || 360;
-      canvasEl.height = videoEl.videoHeight || 640;
 
       startTrackingLoop();
     } catch (err) {
@@ -616,6 +608,12 @@ function handleVideoFile(file) {
 
   clearLogTable();
   if (mathBreakdownCard) mathBreakdownCard.hidden = true;
+  if (sampleTimer) clearInterval(sampleTimer);
+
+  if (videoViewportWrap) {
+    videoViewportWrap.classList.add("video-active");
+    videoViewportWrap.classList.remove("selfie-mirrored");
+  }
 
   videoEl.srcObject = null;
   videoEl.src = URL.createObjectURL(file);
@@ -626,7 +624,7 @@ function handleVideoFile(file) {
   startCamBtn.disabled = false;
   startRecordBtn.disabled = false;
   stopRecordBtn.disabled = false;
-  videoStatus.textContent = `Video "${file.name}" loaded. Extracting 33 landmarks and per-second metrics...`;
+  videoStatus.textContent = `Video "${file.name}" loaded. Extracting 33 landmarks in lockstep with body...`;
   videoStatus.classList.remove("error");
 
   startTrackingLoop();
@@ -637,6 +635,7 @@ if (fileInputAlt) fileInputAlt.addEventListener("change", (e) => handleVideoFile
 
 // Tracking Loop for Both Live Camera & Pre-Recorded Video
 let lastVideoTime = -1;
+let lastDetectionTime = 0;
 let currentPoseLandmarks = null;
 let currentWorldLandmarks = null;
 let currentFaceMetrics = null;
@@ -647,13 +646,23 @@ function startTrackingLoop() {
 
   function renderFrame() {
     if (videoEl && videoEl.readyState >= 2) {
+      if (videoViewportWrap && !videoViewportWrap.classList.contains("video-active")) {
+        videoViewportWrap.classList.add("video-active");
+      }
+
       if (canvasEl.width !== videoEl.videoWidth || canvasEl.height !== videoEl.videoHeight) {
         canvasEl.width = videoEl.videoWidth || 360;
         canvasEl.height = videoEl.videoHeight || 640;
       }
 
       const nowMs = performance.now();
-      if (poseLandmarker && videoEl.currentTime !== lastVideoTime) {
+      const isLive = Boolean(videoEl.srcObject);
+      const shouldDetect = poseLandmarker && (
+        isLive ? (nowMs - lastDetectionTime >= 33) : (videoEl.currentTime !== lastVideoTime)
+      );
+
+      if (shouldDetect) {
+        lastDetectionTime = nowMs;
         lastVideoTime = videoEl.currentTime;
         frameCounter++;
 
@@ -662,11 +671,10 @@ function startTrackingLoop() {
           if (poseRes.landmarks && poseRes.landmarks.length > 0) {
             currentPoseLandmarks = poseRes.landmarks[0];
             currentWorldLandmarks = poseRes.worldLandmarks ? poseRes.worldLandmarks[0] : currentPoseLandmarks;
-          } else {
-            currentPoseLandmarks = null;
-            currentWorldLandmarks = null;
           }
-        } catch (e) {}
+        } catch (e) {
+          // Monotonic timestamp protection on video loop
+        }
 
         if (faceLandmarker) {
           try {
@@ -784,73 +792,68 @@ async function finishRecordingSession() {
   }
 }
 
-// Instant Demo Simulation Runner (Pre-Recorded Walking Gait Benchmark)
+// Instant Demo Runner (Real Live MediaPipe Inference on Benchmark Walking Video)
 async function runDemoWalking() {
   clearLogTable();
   if (mathBreakdownCard) mathBreakdownCard.hidden = true;
-  videoStatus.textContent = "Loading benchmark walking gait video and 120-frame landmark stream...";
-
   if (animationFrameId) cancelAnimationFrame(animationFrameId);
+  if (sampleTimer) clearInterval(sampleTimer);
+
+  videoStatus.textContent = "Loading AI Vision model & benchmark walking gait video...";
+
+  if (videoViewportWrap) {
+    videoViewportWrap.classList.add("video-active");
+    videoViewportWrap.classList.remove("selfie-mirrored");
+  }
+
+  if (!poseLandmarker) {
+    await initMediaPipeVision();
+  }
 
   videoEl.srcObject = null;
   videoEl.src = "assets/tutorial_walking.mp4";
   videoEl.loop = true;
   videoEl.muted = true;
-  videoEl.play().catch(() => {});
+  await videoEl.play().catch((e) => console.warn("Video play error:", e));
 
-  try {
-    const resp = await fetch("assets/demo_walk_landmarks.json");
-    if (!resp.ok) throw new Error("Could not load walk demo data");
-    const demoPayload = await resp.json();
+  startCamBtn.disabled = false;
+  startRecordBtn.disabled = false;
+  stopRecordBtn.disabled = false;
+  videoStatus.textContent = "Live AI tracking active on walking video. 33 landmarks moving in lockstep with child.";
 
-    timerBadge.hidden = false;
-    let frameIdx = 0;
-    const totalDemoFrames = demoPayload.frames.length;
+  startTrackingLoop();
 
-    canvasEl.width = 360;
-    canvasEl.height = 640;
+  // Benchmark automated 120-frame collection
+  isRecording = true;
+  capturedFrames = [];
+  sessionStartTime = performance.now();
+  timerBadge.hidden = false;
 
-    const demoInterval = setInterval(() => {
-      if (frameIdx >= totalDemoFrames) {
-        clearInterval(demoInterval);
-        timerBadge.hidden = true;
-        videoStatus.textContent = "Transmitting landmark stream to backend...";
+  sampleTimer = setInterval(() => {
+    const elapsedSec = (performance.now() - sessionStartTime) / 1000.0;
+    const remainingSec = Math.max(0.0, SESSION_DURATION_SEC - elapsedSec);
+    countdownText.textContent = `${remainingSec.toFixed(1)}s`;
+    frameCountText.textContent = `${capturedFrames.length} / ${TARGET_FRAMES}`;
 
-        fetch(`${API_URL}/analyze-video-landmarks`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(demoPayload),
-        })
-          .then((r) => r.json())
-          .then((data) => {
-            displayMathematicalBreakdown(data);
-            videoStatus.textContent = "Benchmark Walking Gait Evaluation Complete.";
-          })
-          .catch((e) => {
-            videoStatus.textContent = e.message;
-            videoStatus.classList.add("error");
-          });
-        return;
-      }
+    if (currentWorldLandmarks && currentWorldLandmarks.length >= 33) {
+      const frameLms = currentWorldLandmarks.map((lm) => ({
+        x: Number(lm.x.toFixed(4)),
+        y: Number(lm.y.toFixed(4)),
+        z: Number((lm.z || 0).toFixed(4)),
+        visibility: Number((lm.visibility ?? 1).toFixed(2)),
+      }));
 
-      const f = demoPayload.frames[frameIdx];
-      const lms = f.pose_world_landmarks;
-      const face = f.face_metrics;
+      capturedFrames.push({
+        timestamp_ms: Math.round(elapsedSec * 1000),
+        pose_world_landmarks: frameLms,
+        face_metrics: currentFaceMetrics || { head_yaw: 0.0, iris_center_ratio: 0.5, face_detected: true },
+      });
+    }
 
-      drawSkeleton(ctx, lms, canvasEl.width, canvasEl.height);
-      const curSec = frameIdx * 0.1;
-      updateLiveTelemetry(lms, lms, face, curSec, frameIdx);
-
-      const remain = Math.max(0, 12.0 - curSec);
-      countdownText.textContent = `${remain.toFixed(1)}s`;
-      frameCountText.textContent = `${frameIdx + 1} / ${totalDemoFrames}`;
-
-      frameIdx++;
-    }, 100);
-  } catch (err) {
-    videoStatus.textContent = err.message;
-    videoStatus.classList.add("error");
-  }
+    if (elapsedSec >= SESSION_DURATION_SEC || capturedFrames.length >= TARGET_FRAMES) {
+      finishRecordingSession();
+    }
+  }, 1000 / TARGET_FPS);
 }
 
 if (runDemoBtn) runDemoBtn.addEventListener("click", runDemoWalking);
