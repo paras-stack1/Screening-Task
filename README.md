@@ -1,0 +1,201 @@
+# BalSwasthya AI
+
+AI-assisted **child health screening support** platform for the RBSK programme,
+Government of Uttar Pradesh. Built for ASHA and Anganwadi workers: simple,
+bilingual (Hindi / English), mobile-first.
+
+> ⚠️ **Screening support, not diagnosis.** This software helps workers screen and refer
+> children. It does not diagnose and makes no claim of clinical accuracy.
+> Use **synthetic data only** during development.
+
+| Part                          | Tech                                          | Owner     |
+|-------------------------------|-----------------------------------------------|-----------|
+| `apps/worker-app`             | React Native, Expo SDK 58, expo-router, TS    | App team  |
+| `services/api`                | Node.js 22, Express 5, TypeScript, Prisma 6, Zod | App team  |
+| `packages/shared-contracts`   | Zod schemas + TS types shared by app and API  | App team  |
+| `services/ai-service`         | Python, FastAPI (**placeholder only**)        | AI team   |
+| `infrastructure`              | Docker Compose - PostgreSQL 17                | App team  |
+
+Architecture and design decisions: [docs/architecture.md](docs/architecture.md).
+
+---
+
+## Prerequisites
+
+| Tool            | Version            | Check                    |
+|-----------------|--------------------|--------------------------|
+| Node.js         | 22 LTS             | `node -v`                |
+| npm             | 10+                | `npm -v`                 |
+| Docker Desktop  | running            | `docker info`            |
+| Git             | any recent         | `git --version`          |
+| Python          | 3.13 (AI placeholder only) | `py -3.13 --version` |
+| Expo Go app     | on your phone (optional) | -                  |
+
+---
+
+## First-time setup (PowerShell)
+
+Run from the repository root (`balswasthya-ai`):
+
+```powershell
+# 1. Install all JavaScript dependencies (app + API + shared contracts).
+#    This also runs "prisma generate" for the API.
+npm install
+
+# 2. Create your local env files from the examples.
+Copy-Item .env.example .env
+Copy-Item services\api\.env.example services\api\.env
+Copy-Item apps\worker-app\.env.example apps\worker-app\.env
+```
+
+3. **Edit the secrets** (use a text editor):
+   - In `.env`, set `POSTGRES_PASSWORD` to a new random value.
+   - In `services\api\.env`, put the **same** password inside `DATABASE_URL`, and set
+     `JWT_SECRET`. You can generate a secure value with:
+
+   ```powershell
+   $b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
+   ```
+
+```powershell
+# 4. Build the shared contracts package (the app and API import its compiled output).
+npm run build:contracts
+```
+
+---
+
+## Run locally (PowerShell)
+
+Use a separate terminal for each service.
+
+### Terminal 1 - PostgreSQL (Docker)
+
+```powershell
+npm run db:up
+docker ps --filter name=balswasthya-postgres   # STATUS should show "(healthy)"
+```
+
+### Terminal 2 - API
+
+```powershell
+npm run dev:api
+```
+
+Check it (in another terminal):
+
+```powershell
+Invoke-RestMethod http://localhost:4000/api/v1/health
+Invoke-RestMethod http://localhost:4000/api/v1/health/ready
+```
+
+`/health/ready` reports `database: up`. `aiService` is `down` if the AI placeholder is not
+running - the API then reports `degraded`, which is expected and harmless.
+
+### Terminal 3 - AI service placeholder (optional)
+
+```powershell
+cd services\ai-service
+py -3.13 -m venv .venv          # first time only
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt  # first time only
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+If PowerShell blocks `Activate.ps1`, run once:
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+### Terminal 4 - Mobile app (Expo)
+
+```powershell
+npm run dev:app
+```
+
+Then press `a` for an Android emulator, or scan the QR code with **Expo Go**.
+
+**Phone on Wi-Fi:** `localhost` on a phone means the phone itself. Set
+`EXPO_PUBLIC_API_BASE_URL=http://<your-PC-IP>:4000/api/v1` in `apps\worker-app\.env`
+(find the IP with `ipconfig`), restart Expo, and allow Node.js through Windows Firewall
+on private networks. Android emulator: use `http://10.0.2.2:4000/api/v1`.
+
+### Run the app in a web browser
+
+Fastest way to try the app on a PC - no phone or emulator needed.
+
+```powershell
+npm run db:up      # Terminal 1 (if not already running)
+npm run dev:api    # Terminal 2
+npm run dev:web    # Terminal 3
+```
+
+Open **http://localhost:8081** (or press `w` in the Expo terminal). The "Server connection"
+card should show **Connected**. To preview at phone size, press `F12` in the browser and turn on
+the device toolbar (`Ctrl+Shift+M`).
+
+Notes:
+- Keep `EXPO_PUBLIC_API_BASE_URL=http://localhost:4000/api/v1` for the browser.
+- `http://localhost:8081` must be listed in `CORS_ORIGINS` in `services\api\.env` (it is by default).
+  If you change the Expo port, add the new origin there and restart the API.
+- The web build is for development and demos. The product target is the Android/iOS app; some
+  native features added later (camera, offline storage) may behave differently on web.
+
+### Stop everything
+
+`Ctrl+C` in each terminal, then:
+
+```powershell
+npm run db:down        # stops the container; data stays in the named volume
+```
+
+To **delete** all local database data: `docker volume rm balswasthya_pgdata` (irreversible).
+
+---
+
+## Useful commands
+
+| Command (from repo root)                                   | What it does                                     |
+|------------------------------------------------------------|--------------------------------------------------|
+| `npm run typecheck`                                        | Builds contracts, type-checks app + API          |
+| `npm run build --workspace @balswasthya/api`               | Compiles the API to `services/api/dist`          |
+| `npm run prisma:validate --workspace @balswasthya/api`     | Checks `schema.prisma`                           |
+| `npm run prisma:migrate --workspace @balswasthya/api`      | Creates/applies migrations (once models exist)   |
+| `npm run prisma:studio --workspace @balswasthya/api`       | Opens Prisma Studio database browser             |
+| `cd apps\worker-app; npx expo install <pkg>`               | Adds an Expo package with an SDK-compatible version |
+| `cd apps\worker-app; npx expo-doctor`                      | Diagnoses Expo dependency problems               |
+
+---
+
+## Environment variables & secrets
+
+| File                         | Contains                                | Committed? |
+|------------------------------|-----------------------------------------|------------|
+| `.env`                       | Docker Postgres user/password/port      | **No**     |
+| `services/api/.env`          | `DATABASE_URL`, `JWT_SECRET`, AI key    | **No**     |
+| `apps/worker-app/.env`       | `EXPO_PUBLIC_API_BASE_URL` only         | **No**     |
+| `*.env.example`              | Placeholder values, documentation       | Yes        |
+
+**Rule:** anything named `EXPO_PUBLIC_*` is compiled into the app and readable by anyone.
+Never put passwords, database URLs, JWT secrets or API keys there.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `npm install` fails with `EPERM ... query_engine-windows.dll.node` | The API is running and Windows has locked Prisma's engine file. Stop the API (`Ctrl+C`), then run `npm install` again. |
+| `failed to connect to the docker API` | Start Docker Desktop and wait until it says "Engine running". |
+| Port 5433 already in use | Change `POSTGRES_HOST_PORT` in `.env` **and** the port in `DATABASE_URL`. |
+| API exits with `Invalid environment configuration` | The message lists which variables are missing/invalid in `services/api/.env`. |
+| App shows "Not connected" on a phone | See "Phone on Wi-Fi" above. |
+| `expo-doctor` reports duplicate `react` | Keep the root `overrides.react` equal to the app's `react` version, then delete `package-lock.json` and `node_modules` and run `npm install`. |
+
+---
+
+## Project status
+
+**Step 1 - Foundation: done.** Monorepo, app shell (routing, theme, Hindi/English,
+API health card), API skeleton (config, middleware, error handling, health/readiness),
+Prisma 6 connection, Docker PostgreSQL, AI placeholder, shared contracts, docs.
+
+Not implemented yet (by design): login, users, children, guardians, consent,
+screening forms, referrals, dashboards, database models.

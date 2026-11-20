@@ -1,0 +1,34 @@
+{
+  "name": "@balswasthya/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BalSwasthya AI backend API (Express + TypeScript + Prisma 6).",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --env-file=.env dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@balswasthya/shared-contracts": "0.1.0",
+    "@prisma/client": "^6.19.3",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.5",
+    "prisma": "^6.19.3",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3"
+  }
+}

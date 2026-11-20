@@ -1,0 +1,27 @@
+{
+  "name": "balswasthya-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BalSwasthya AI - child health screening support platform for the RBSK programme (Uttar Pradesh). Screening support only, not diagnosis.",
+  "workspaces": [
+    "apps/worker-app",
+    "services/api",
+    "packages/shared-contracts"
+  ],
+  "overrides": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "engines": {
+    "node": ">=22.0.0 <23"
+  },
+  "scripts": {
+    "build:contracts": "npm run build --workspace @balswasthya/shared-contracts",
+    "dev:api": "npm run dev --workspace @balswasthya/api",
+    "dev:app": "npm run start --workspace @balswasthya/worker-app",
+    "dev:web": "npm run web --workspace @balswasthya/worker-app",
+    "typecheck": "npm run build:contracts && npm run typecheck --workspaces --if-present",
+    "db:up": "docker compose -f infrastructure/docker-compose.yml --env-file .env up -d",
+    "db:down": "docker compose -f infrastructure/docker-compose.yml --env-file .env down"
+  }
+}

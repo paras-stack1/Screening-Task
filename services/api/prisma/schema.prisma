@@ -1,0 +1,20 @@
+// BalSwasthya AI - Prisma schema (Prisma ORM 6)
+//
+// Step 1 sets up only the datasource and client generator. Domain models
+// (User, Facility, Child, Guardian, Consent, Screening, Referral) will be
+// designed and migrated in a later step.
+//
+// Data-protection conventions for future models:
+//  - Use UUID primary keys (no guessable sequential ids exposed via the API).
+//  - Store consent as an explicit, timestamped, versioned record.
+//  - Keep createdAt/updatedAt on every table; prefer soft-delete for health records.
+//  - Development and test data must be synthetic only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
