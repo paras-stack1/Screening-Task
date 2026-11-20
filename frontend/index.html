@@ -40,11 +40,45 @@
         <button class="nav-tab" data-tab="tab-eye" role="tab" aria-selected="false">
           <span class="tab-icon">👁️</span> Eye Condition
         </button>
+        <button class="nav-tab" data-tab="tab-tutorials" role="tab" aria-selected="false">
+          <span class="tab-icon">📖</span> Capture Tutorials &amp; Demos
+        </button>
       </nav>
     </header>
 
     <!-- TAB 1: VIDEO 4Ds SCREENING MODULE -->
     <section id="tab-video" class="tab-content active" role="tabpanel">
+      <!-- Camera Security & Alternative Input Banner -->
+      <div class="camera-notice-banner" id="cameraNoticeBanner">
+        <div class="notice-icon">💡</div>
+        <div class="notice-content">
+          <strong>Browser Camera Access &amp; Alternative Input Options:</strong>
+          <p>
+            Modern browsers require a secure origin (HTTPS or localhost) for live webcam streaming.
+            If your camera is blocked on this IP address, you can:
+            <strong>(1) Upload a recorded video</strong>,
+            <strong>(2) Run our instant sample demo walk</strong>, or
+            <strong>(3) Enable camera in Chrome settings</strong>.
+          </p>
+          <div class="notice-quick-links">
+            <button id="quickDemoBtn" class="pill-btn primary-pill">⚡ Test With Sample Demo Walk</button>
+            <label for="videoFileInput" class="pill-btn secondary-pill">📁 Choose Video File or Phone Camera</label>
+            <input type="file" id="videoFileInput" accept="video/*" capture="user" style="display: none;" />
+            <button id="toggleHttpGuideBtn" class="pill-btn ghost-pill">🔧 10-Second Chrome Camera Fix</button>
+          </div>
+          <!-- Collapsible 10-second Chrome Fix Guide -->
+          <div id="httpGuideBox" class="http-guide-box" hidden>
+            <h5>How to enable live webcam in Google Chrome for this server:</h5>
+            <ol>
+              <li>Open a new tab in Chrome and enter: <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code></li>
+              <li>Add this exact server URL to the text box: <code>http://16.179.162.6:8000</code></li>
+              <li>Change the dropdown from <em>Disabled</em> to <strong>Enabled</strong>.</li>
+              <li>Click <strong>Relaunch</strong> at the bottom. Your live camera will now work directly!</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
       <!-- "How It Works" Privacy-First Explainability Banner -->
       <div class="explainability-card">
         <div class="explain-header" id="toggleExplainBtn">
@@ -114,7 +148,7 @@
 
             <!-- Live HUD Overlays -->
             <div class="hud-overlay top-left" id="framingBadge">
-              <span class="hud-dot yellow"></span> Waiting for Camera...
+              <span class="hud-dot yellow"></span> Waiting for Input...
             </div>
             <div class="hud-overlay top-right" id="timerBadge" hidden>
               ⏱️ <span id="countdownText">12.0s</span> | <span id="frameCountText">0 / 120</span>
@@ -127,13 +161,20 @@
           <!-- Action Buttons & Status -->
           <div class="camera-actions">
             <button id="startCamBtn" class="action-btn primary-btn">
-              📷 Start Camera
+              📷 Start Live Camera
             </button>
+            <label for="videoFileInputAlt" class="action-btn upload-video-btn">
+              📁 Choose Video
+            </label>
+            <input type="file" id="videoFileInputAlt" accept="video/*" capture="user" style="display: none;" />
             <button id="startRecordBtn" class="action-btn record-btn" disabled>
-              ▶️ Start 12s Guided Screening
+              ▶️ Record Session
+            </button>
+            <button id="runDemoBtn" class="action-btn demo-btn">
+              ⚡ Test With Demo
             </button>
             <button id="stopRecordBtn" class="action-btn secondary-btn" disabled>
-              ⏹️ Stop / Reset
+              ⏹️ Reset
             </button>
           </div>
           <p id="videoStatus" class="status-msg" role="status"></p>
@@ -150,7 +191,7 @@
           <div class="telemetry-grid">
             <div class="telemetry-item">
               <span class="telemetry-label">Full-Body Framing</span>
-              <strong class="telemetry-val" id="teleFraming">Checking...</strong>
+              <strong class="telemetry-val" id="teleFraming">Waiting...</strong>
             </div>
             <div class="telemetry-item">
               <span class="telemetry-label">Spine Tilt Angle</span>
@@ -178,7 +219,7 @@
           <div class="task-instruction-box" id="taskInstructionBox">
             <h4>📋 Guided Protocol</h4>
             <p id="taskInstructionText">
-              Position the camera 2–3 meters away. Ensure the child's entire body from head to feet is visible inside the frame.
+              Position the camera 2.5–3 meters away. Ensure the child's entire body from head to feet is visible inside the frame.
             </p>
           </div>
         </div>
@@ -242,10 +283,13 @@
       </div>
     </section>
 
-    <!-- TAB 2: SKIN CONDITION SCREENING (PRESERVED) -->
+    <!-- TAB 2: SKIN CONDITION SCREENING (PRESERVED + DEMO BUTTON) -->
     <section id="tab-skin" class="tab-content" role="tabpanel">
       <div class="card card-skin" data-endpoint="/predict/skin">
-        <span class="badge">Skin Model</span>
+        <div class="card-top-action">
+          <span class="badge">Skin Model</span>
+          <button class="pill-btn primary-pill demo-load-btn" data-target="skin">⚡ Load Sample Skin Photo</button>
+        </div>
         <h2>Skin Condition Screening</h2>
         <p class="card-desc">Upload a dermatological image to screen for Acne, Eczema, or Normal patterns.</p>
 
@@ -288,10 +332,13 @@
       </div>
     </section>
 
-    <!-- TAB 3: EYE CONDITION SCREENING (PRESERVED) -->
+    <!-- TAB 3: EYE CONDITION SCREENING (PRESERVED + DEMO BUTTON) -->
     <section id="tab-eye" class="tab-content" role="tabpanel">
       <div class="card card-eye" data-endpoint="/predict/eye">
-        <span class="badge">Eye Model · Flip TTA</span>
+        <div class="card-top-action">
+          <span class="badge">Eye Model · Flip TTA</span>
+          <button class="pill-btn primary-pill demo-load-btn" data-target="eye">⚡ Load Sample Eye Photo</button>
+        </div>
         <h2>Eye Health Screening</h2>
         <p class="card-desc">Upload an eye photo to screen for Cataract, Conjunctivitis, Eyelid, Normal, or Uveitis.</p>
 
@@ -329,6 +376,124 @@
                 <canvas class="doughnut-canvas"></canvas>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: COMPREHENSIVE CAPTURE TUTORIALS & DEMOS -->
+    <section id="tab-tutorials" class="tab-content" role="tabpanel">
+      <div class="card tutorial-main-card">
+        <h2>📖 Pediatric Screening Capture Tutorial &amp; Standards</h2>
+        <p class="subtitle">
+          Clinical best practices for capturing optimal video and photos to achieve accurate algorithmic triage.
+        </p>
+
+        <div class="tutorial-grid">
+          <!-- Tutorial 1: Video Capture -->
+          <div class="tutorial-card">
+            <div class="tutorial-badge">🎥 Video Screening Protocol (4Ds)</div>
+            <h3>How to Capture Child Video</h3>
+            <div class="tutorial-media-preview">
+              <video src="assets/demo_child_gait.mp4" autoplay loop muted playsinline class="tutorial-video-player"></video>
+            </div>
+            <div class="guideline-list">
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Distance &amp; Height:</strong>
+                  <p>Place camera 2.5–3 meters away at waist/chest level so the child from head to ankles stays visible.</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Lighting &amp; Background:</strong>
+                  <p>Well-lit room with front lighting. Avoid backlit windows which turn the child into a dark silhouette.</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Clothing &amp; Posture:</strong>
+                  <p>Wear fitted shorts/pants so knee and ankle joints are unhindered by loose garments or blankets.</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon cross">✗</span>
+                <div>
+                  <strong>Common Error:</strong>
+                  <p>Holding camera from high adult eye level or cutting off the child's feet prevents lower-limb biomechanics.</p>
+                </div>
+              </div>
+            </div>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestVideoBtn">▶️ Test Video Module With This Sample Walk</button>
+          </div>
+
+          <!-- Tutorial 2: Skin Capture -->
+          <div class="tutorial-card">
+            <div class="tutorial-badge">📸 Skin Condition Photography</div>
+            <h3>How to Capture Skin Photos</h3>
+            <div class="tutorial-media-preview">
+              <img src="assets/demo_skin.jpg" alt="Optimal Skin Capture Example" class="tutorial-img-preview" />
+            </div>
+            <div class="guideline-list">
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Angle &amp; Framing:</strong>
+                  <p>Hold camera perpendicular (90°) to the rash, 15–25 cm away, with lesion filling the central frame.</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Focus &amp; Lighting:</strong>
+                  <p>Tap screen to ensure razor-sharp focus on skin texture. Use diffused daylight; avoid harsh flash glare.</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon cross">✗</span>
+                <div>
+                  <strong>Common Error:</strong>
+                  <p>Blurry macro focus, cast shadows, or yellowish night lamps alter erythema color detection.</p>
+                </div>
+              </div>
+            </div>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSkinBtn">▶️ Test Skin Classifier With This Sample Photo</button>
+          </div>
+
+          <!-- Tutorial 3: Eye Capture -->
+          <div class="tutorial-card">
+            <div class="tutorial-badge">👁️ Eye Health Photography</div>
+            <h3>How to Capture Eye Photos</h3>
+            <div class="tutorial-media-preview">
+              <img src="assets/demo_eye.jpg" alt="Optimal Eye Capture Example" class="tutorial-img-preview" />
+            </div>
+            <div class="guideline-list">
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Gaze &amp; Opening:</strong>
+                  <p>Have child look straight forward into camera with eye wide open to reveal sclera, cornea, and iris.</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Flash Safety &amp; Illumination:</strong>
+                  <p>NEVER use direct bright flash in a dark room. Soft side illumination prevents painful corneal reflections.</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon cross">✗</span>
+                <div>
+                  <strong>Common Error:</strong>
+                  <p>Motion blur from squinting or white flash washout obscuring cataract / conjunctival redness.</p>
+                </div>
+              </div>
+            </div>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestEyeBtn">▶️ Test Eye Classifier With This Sample Photo</button>
           </div>
         </div>
       </div>

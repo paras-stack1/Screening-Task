@@ -17,20 +17,19 @@ const CHART_COLORS = [
 /* ==========================================================================
    1. Tab Navigation & Explainability Dropdown
    ========================================================================== */
-document.querySelectorAll(".nav-tab").forEach((tabBtn) => {
-  tabBtn.addEventListener("click", () => {
-    document.querySelectorAll(".nav-tab").forEach((b) => {
-      b.classList.remove("active");
-      b.setAttribute("aria-selected", "false");
-    });
-    document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
-
-    tabBtn.classList.add("active");
-    tabBtn.setAttribute("aria-selected", "true");
-    const targetId = tabBtn.dataset.tab;
-    const targetTab = document.getElementById(targetId);
-    if (targetTab) targetTab.classList.add("active");
+function switchTab(tabId) {
+  document.querySelectorAll(".nav-tab").forEach((b) => {
+    const isTarget = b.dataset.tab === tabId;
+    b.classList.toggle("active", isTarget);
+    b.setAttribute("aria-selected", isTarget ? "true" : "false");
   });
+  document.querySelectorAll(".tab-content").forEach((c) => {
+    c.classList.toggle("active", c.id === tabId);
+  });
+}
+
+document.querySelectorAll(".nav-tab").forEach((tabBtn) => {
+  tabBtn.addEventListener("click", () => switchTab(tabBtn.dataset.tab));
 });
 
 const toggleExplainBtn = document.getElementById("toggleExplainBtn");
@@ -41,8 +40,16 @@ if (toggleExplainBtn && explainCard) {
   });
 }
 
+const toggleHttpGuideBtn = document.getElementById("toggleHttpGuideBtn");
+const httpGuideBox = document.getElementById("httpGuideBox");
+if (toggleHttpGuideBtn && httpGuideBox) {
+  toggleHttpGuideBtn.addEventListener("click", () => {
+    httpGuideBox.hidden = !httpGuideBox.hidden;
+  });
+}
+
 /* ==========================================================================
-   2. Existing Skin & Eye Image Classification Setup (Preserved)
+   2. Existing Skin & Eye Image Classification Setup (Preserved + Demo Loaders)
    ========================================================================== */
 document.querySelectorAll(".card[data-endpoint]").forEach(setupClassifierCard);
 
@@ -215,6 +222,38 @@ function setupClassifierCard(card) {
   });
 }
 
+// Demo Photo Loader for Skin and Eye Cards
+async function loadDemoPhoto(target) {
+  const card = document.querySelector(`.card-${target}`);
+  if (!card) return;
+  const imgUrl = `assets/demo_${target}.jpg`;
+
+  try {
+    const resp = await fetch(imgUrl);
+    if (!resp.ok) throw new Error(`Could not load ${imgUrl}`);
+    const blob = await resp.blob();
+    const file = new File([blob], `demo_${target}.jpg`, { type: "image/jpeg" });
+
+    const fileInput = card.querySelector(".file-input");
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event("change"));
+
+    setTimeout(() => {
+      const predictBtn = card.querySelector(".predict-btn");
+      if (predictBtn && !predictBtn.disabled) predictBtn.click();
+    }, 350);
+  } catch (err) {
+    console.error(`Demo load error for ${target}:`, err);
+    alert(`Could not load demo image: ${err.message}`);
+  }
+}
+
+document.querySelectorAll(".demo-load-btn").forEach((btn) => {
+  btn.addEventListener("click", () => loadDemoPhoto(btn.dataset.target));
+});
+
 /* ==========================================================================
    3. Real-Time Video-Based 4Ds Screening Module (Zero Video Storage)
    ========================================================================== */
@@ -225,6 +264,8 @@ const ctx = canvasEl.getContext("2d");
 const startCamBtn = document.getElementById("startCamBtn");
 const startRecordBtn = document.getElementById("startRecordBtn");
 const stopRecordBtn = document.getElementById("stopRecordBtn");
+const runDemoBtn = document.getElementById("runDemoBtn");
+const quickDemoBtn = document.getElementById("quickDemoBtn");
 const videoStatus = document.getElementById("videoStatus");
 
 const framingBadge = document.getElementById("framingBadge");
@@ -315,11 +356,11 @@ async function initMediaPipeVision() {
       console.warn("FaceLandmarker optional model loaded with pose fallback:", faceErr);
     }
 
-    videoStatus.textContent = "AI models loaded! Click 'Start Camera' to begin.";
+    videoStatus.textContent = "AI models loaded! Start live camera or choose video file.";
     startCamBtn.disabled = false;
   } catch (err) {
     console.error("MediaPipe load error:", err);
-    videoStatus.textContent = "Notice: MediaPipe vision initialized. Ready for camera stream.";
+    videoStatus.textContent = "MediaPipe ready. Click 'Start Live Camera' or 'Choose Video'.";
     startCamBtn.disabled = false;
   }
 }
@@ -327,10 +368,19 @@ async function initMediaPipeVision() {
 window.addEventListener("mediapipe-ready", initMediaPipeVision);
 if (window.MediaPipeVision) initMediaPipeVision();
 
-// Camera Start
+// Camera Start with Insecure Origin Fallback
 startCamBtn.addEventListener("click", async () => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    videoStatus.innerHTML = `⚠️ <strong>Browser Camera Blocked:</strong> Browsers require HTTPS or localhost for live webcam.<br/>Use <strong>'Choose Video'</strong> or <strong>'Test With Demo'</strong>, or check the 10-Second Chrome Fix above.`;
+    videoStatus.classList.add("error");
+    if (httpGuideBox) httpGuideBox.hidden = false;
+    return;
+  }
+
   try {
     videoStatus.textContent = "Requesting webcam access...";
+    videoStatus.classList.remove("error");
+
     cameraStream = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 640 },
@@ -341,24 +391,55 @@ startCamBtn.addEventListener("click", async () => {
     });
 
     videoEl.srcObject = cameraStream;
+    videoEl.src = "";
+    videoEl.loop = false;
     await videoEl.play();
 
     startCamBtn.disabled = true;
     startRecordBtn.disabled = false;
     stopRecordBtn.disabled = false;
-    videoStatus.textContent = "Camera active. Step back until full body is inside frame.";
+    videoStatus.textContent = "Camera active! Step back until full body is inside frame.";
 
-    // Match canvas display resolution
     canvasEl.width = videoEl.videoWidth || 640;
     canvasEl.height = videoEl.videoHeight || 480;
 
     startTrackingLoop();
   } catch (err) {
     console.error("Webcam error:", err);
-    videoStatus.textContent = "Could not open camera. Please grant webcam permissions.";
+    videoStatus.innerHTML = `⚠️ <strong>Camera Access Blocked (${err.name}):</strong> ${err.message}.<br/>Tip: You can use <strong>'Choose Video'</strong> or <strong>'Test With Demo'</strong> without camera permission!`;
     videoStatus.classList.add("error");
+    if (httpGuideBox) httpGuideBox.hidden = false;
   }
 });
+
+// Video File Upload Handler (Works everywhere without camera restrictions!)
+function handleVideoFile(file) {
+  if (!file) return;
+
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((t) => t.stop());
+    cameraStream = null;
+  }
+
+  videoEl.srcObject = null;
+  videoEl.src = URL.createObjectURL(file);
+  videoEl.loop = true;
+  videoEl.muted = true;
+  videoEl.play();
+
+  startCamBtn.disabled = false;
+  startRecordBtn.disabled = false;
+  stopRecordBtn.disabled = false;
+  videoStatus.textContent = `Video "${file.name}" loaded! Click 'Record Session' to extract 33 landmarks.`;
+  videoStatus.classList.remove("error");
+
+  startTrackingLoop();
+}
+
+const fileInput1 = document.getElementById("videoFileInput");
+const fileInput2 = document.getElementById("videoFileInputAlt");
+if (fileInput1) fileInput1.addEventListener("change", (e) => handleVideoFile(e.target.files[0]));
+if (fileInput2) fileInput2.addEventListener("change", (e) => handleVideoFile(e.target.files[0]));
 
 // Real-Time Frame Processing & Live Overlay Loop
 let lastVideoTime = -1;
@@ -367,11 +448,13 @@ let currentWorldLandmarks = null;
 let currentFaceMetrics = null;
 
 function startTrackingLoop() {
+  if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
   function renderFrame() {
     if (videoEl.readyState >= 2) {
       if (canvasEl.width !== videoEl.videoWidth || canvasEl.height !== videoEl.videoHeight) {
-        canvasEl.width = videoEl.videoWidth;
-        canvasEl.height = videoEl.videoHeight;
+        canvasEl.width = videoEl.videoWidth || 640;
+        canvasEl.height = videoEl.videoHeight || 480;
       }
 
       const nowMs = performance.now();
@@ -387,9 +470,7 @@ function startTrackingLoop() {
             currentPoseLandmarks = null;
             currentWorldLandmarks = null;
           }
-        } catch (e) {
-          // Frame drop safe
-        }
+        } catch (e) {}
 
         // Face Metrics Extraction
         if (faceLandmarker) {
@@ -397,7 +478,6 @@ function startTrackingLoop() {
             const faceRes = faceLandmarker.detectForVideo(videoEl, nowMs);
             if (faceRes.faceLandmarks && faceRes.faceLandmarks.length > 0) {
               const fl = faceRes.faceLandmarks[0];
-              // Landmark 1: nose tip, 33: left eye outer, 263: right eye outer
               const leftEye = fl[33];
               const rightEye = fl[263];
               const nose = fl[1];
@@ -412,7 +492,6 @@ function startTrackingLoop() {
             }
           } catch (fe) {}
         } else if (currentPoseLandmarks) {
-          // Fallback from 33 Pose landmarks (0: nose, 7: left ear, 8: right ear)
           const nose = currentPoseLandmarks[0];
           const lEar = currentPoseLandmarks[7];
           const rEar = currentPoseLandmarks[8];
@@ -428,10 +507,7 @@ function startTrackingLoop() {
         }
       }
 
-      // Draw skeleton on canvas overlay
       drawSkeleton(ctx, currentPoseLandmarks, canvasEl.width, canvasEl.height);
-
-      // Compute & Update Live Telemetry
       updateLiveTelemetry(currentPoseLandmarks, currentWorldLandmarks, currentFaceMetrics);
     }
 
@@ -527,14 +603,12 @@ function updateLiveTelemetry(poseLm, worldLm, faceMet) {
     teleFraming.style.color = "#ca8a04";
   }
 
-  // Live Angles (using world landmarks if available)
   const pts = worldLm || poseLm;
   const lk = calcAngle(pts[23], pts[25], pts[27]);
   const rk = calcAngle(pts[24], pts[26], pts[28]);
   teleLKnee.textContent = `${lk.toFixed(1)}°`;
   teleRKnee.textContent = `${rk.toFixed(1)}°`;
 
-  // Spine Tilt: Mid-shoulder to Mid-hip
   const sMid = { x: (pts[11].x + pts[12].x) / 2, y: (pts[11].y + pts[12].y) / 2, z: ((pts[11].z || 0) + (pts[12].z || 0)) / 2 };
   const hMid = { x: (pts[23].x + pts[24].x) / 2, y: (pts[23].y + pts[24].y) / 2, z: ((pts[23].z || 0) + (pts[24].z || 0)) / 2 };
   const torso = [sMid.x - hMid.x, sMid.y - hMid.y, sMid.z - hMid.z];
@@ -544,11 +618,9 @@ function updateLiveTelemetry(poseLm, worldLm, faceMet) {
     teleSpine.textContent = `${spineTilt.toFixed(1)}°`;
   }
 
-  // Ankle Separation
   const ankleSep = Math.abs(pts[27].x - pts[28].x);
   teleAnkle.textContent = ankleSep.toFixed(2);
 
-  // Head Yaw & Gaze
   if (faceMet && faceMet.head_yaw !== undefined) {
     const yawDeg = (faceMet.head_yaw * 57.3).toFixed(1);
     const facing = Math.abs(faceMet.head_yaw) < 0.15 ? "Facing Camera" : (faceMet.head_yaw > 0 ? "Turned Left" : "Turned Right");
@@ -563,7 +635,7 @@ function playAudioChime() {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = "sine";
-    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 chime
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
     gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
     osc.connect(gain);
@@ -571,7 +643,7 @@ function playAudioChime() {
     osc.start();
     osc.stop(audioCtx.currentTime + 0.6);
   } catch (e) {
-    console.log("Audio cue played:", e);
+    console.log("Audio cue error:", e);
   }
 }
 
@@ -598,7 +670,6 @@ startRecordBtn.addEventListener("click", () => {
     countdownText.textContent = `${remainingSec.toFixed(1)}s`;
     frameCountText.textContent = `${capturedFrames.length} / ${TARGET_FRAMES}`;
 
-    // Auditory Cue at 3.0s for Social Response task
     if (isSocialTask && !cueFired && elapsedSec >= AUDIO_CUE_SEC) {
       cueFired = true;
       cueAlert.hidden = false;
@@ -606,7 +677,6 @@ startRecordBtn.addEventListener("click", () => {
       setTimeout(() => { cueAlert.hidden = true; }, 1800);
     }
 
-    // Capture current frame landmarks
     if (currentWorldLandmarks && currentWorldLandmarks.length >= 33) {
       const frameLms = currentWorldLandmarks.map((lm) => ({
         x: Number(lm.x.toFixed(4)),
@@ -634,7 +704,7 @@ stopRecordBtn.addEventListener("click", () => {
   isRecording = false;
   startRecordBtn.disabled = false;
   startRecordBtn.classList.remove("recording");
-  startRecordBtn.textContent = "▶️ Start 12s Guided Screening";
+  startRecordBtn.textContent = "▶️ Record Session";
   timerBadge.hidden = true;
   cueAlert.hidden = true;
   videoStatus.textContent = "Session reset. Ready for next screening.";
@@ -646,7 +716,7 @@ async function finishRecordingSession() {
   isRecording = false;
   startRecordBtn.disabled = false;
   startRecordBtn.classList.remove("recording");
-  startRecordBtn.textContent = "▶️ Start 12s Guided Screening";
+  startRecordBtn.textContent = "▶️ Record Session";
   timerBadge.hidden = true;
 
   videoStatus.textContent = `Analyzing ${capturedFrames.length} normalized coordinate frames (~45 KB payload)...`;
@@ -680,39 +750,128 @@ async function finishRecordingSession() {
   }
 }
 
+// Instant Demo Simulation Runner (Works on ANY device in 1 click!)
+async function runDemoSession() {
+  switchTab("tab-video");
+
+  try {
+    videoStatus.textContent = "Loading demo child walk dataset (120 frames)...";
+    videoStatus.classList.remove("error");
+
+    // Load sample video into player
+    videoEl.srcObject = null;
+    videoEl.src = "assets/demo_child_gait.mp4";
+    videoEl.loop = true;
+    videoEl.muted = true;
+    videoEl.play();
+
+    // Fetch pre-computed 120-frame landmark stream
+    const resp = await fetch("assets/demo_walk_landmarks.json");
+    if (!resp.ok) throw new Error("Could not load assets/demo_walk_landmarks.json");
+    const demoPayload = await resp.json();
+
+    timerBadge.hidden = false;
+    let frameIdx = 0;
+    const totalDemoFrames = demoPayload.frames.length;
+
+    canvasEl.width = 480;
+    canvasEl.height = 480;
+
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+    const demoInterval = setInterval(() => {
+      if (frameIdx >= totalDemoFrames) {
+        clearInterval(demoInterval);
+        timerBadge.hidden = true;
+        videoStatus.textContent = "Transmitting demo landmark frames to backend...";
+
+        // Send to API
+        fetch(`${API_URL}/analyze-video-landmarks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(demoPayload),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            displayVideoResults(data);
+            videoStatus.textContent = "Demo analysis complete! See the 4Ds breakdown below.";
+          })
+          .catch((err) => {
+            videoStatus.textContent = err.message || "Demo submission failed.";
+            videoStatus.classList.add("error");
+          });
+        return;
+      }
+
+      const f = demoPayload.frames[frameIdx];
+      const lms = f.pose_world_landmarks;
+      const face = f.face_metrics;
+
+      // Animate skeleton and telemetry
+      drawSkeleton(ctx, lms, canvasEl.width, canvasEl.height);
+      updateLiveTelemetry(lms, lms, face);
+
+      const remain = Math.max(0, 12.0 - (frameIdx * 0.1));
+      countdownText.textContent = `${remain.toFixed(1)}s`;
+      frameCountText.textContent = `${frameIdx + 1} / ${totalDemoFrames}`;
+
+      frameIdx++;
+    }, 100);
+  } catch (err) {
+    console.error("Demo run error:", err);
+    videoStatus.textContent = `Could not run demo: ${err.message}`;
+    videoStatus.classList.add("error");
+  }
+}
+
+if (runDemoBtn) runDemoBtn.addEventListener("click", runDemoSession);
+if (quickDemoBtn) quickDemoBtn.addEventListener("click", runDemoSession);
+
+// Tutorial Action Button Triggers
+const tutorialTestVideoBtn = document.getElementById("tutorialTestVideoBtn");
+if (tutorialTestVideoBtn) tutorialTestVideoBtn.addEventListener("click", runDemoSession);
+
+const tutorialTestSkinBtn = document.getElementById("tutorialTestSkinBtn");
+if (tutorialTestSkinBtn) {
+  tutorialTestSkinBtn.addEventListener("click", () => {
+    switchTab("tab-skin");
+    loadDemoPhoto("skin");
+  });
+}
+
+const tutorialTestEyeBtn = document.getElementById("tutorialTestEyeBtn");
+if (tutorialTestEyeBtn) {
+  tutorialTestEyeBtn.addEventListener("click", () => {
+    switchTab("tab-eye");
+    loadDemoPhoto("eye");
+  });
+}
+
 // Display Video Results & The 4Ds Categorization
 function displayVideoResults(data) {
   videoResultsPanel.hidden = false;
 
-  // Banner status
   const st = data.screening_status || "YELLOW";
   videoStatusBanner.className = `results-banner ${st}`;
   videoStatusPill.textContent = st;
   videoResultHeading.textContent = `Pediatric Screening Status: ${st}`;
   videoAdviceText.textContent = data.advice;
 
-  // Map to The 4Ds
-  const task = data.task_type;
   const flags = data.clinical_flags || [];
   const flagsText = flags.join(" ");
 
-  // D1: Defects at Birth
   const d1Flagged = flagsText.includes("D1") || flagsText.includes("hip dysplasia") || flagsText.includes("scoliosis");
   update4DCard("cardD1", "statusD1", d1Flagged ? (st === "RED" ? "RED" : "YELLOW") : "GREEN", d1Flagged ? "Flagged" : "Normal");
 
-  // D2: Deficiencies
   const d2Flagged = flagsText.includes("D2") || flagsText.includes("Rickets") || flagsText.includes("bowing");
   update4DCard("cardD2", "statusD2", d2Flagged ? (st === "RED" ? "RED" : "YELLOW") : "GREEN", d2Flagged ? "Flagged" : "Normal");
 
-  // D3: Diseases
   const d3Flagged = flagsText.includes("D3") || flagsText.includes("CP") || flagsText.includes("spasticity") || flagsText.includes("ataxia") || flagsText.includes("tremor");
   update4DCard("cardD3", "statusD3", d3Flagged ? (st === "RED" ? "RED" : "YELLOW") : "GREEN", d3Flagged ? "Flagged" : "Normal");
 
-  // D4: Developmental Delays
   const d4Flagged = flagsText.includes("D4") || flagsText.includes("delayed") || flagsText.includes("ASD") || flagsText.includes("stereotypy") || flagsText.includes("engagement");
   update4DCard("cardD4", "statusD4", d4Flagged ? (st === "RED" ? "RED" : "YELLOW") : "GREEN", d4Flagged ? "Flagged" : "Normal");
 
-  // Render Metrics Chips
   metricsChipsGrid.innerHTML = "";
   const m = data.metrics || {};
   const metricLabels = {
@@ -742,7 +901,6 @@ function displayVideoResults(data) {
     }
   }
 
-  // Render Formula Explanations
   formulaExplanationsList.innerHTML = "";
   (data.formula_explanations || []).forEach((exp) => {
     const li = document.createElement("li");
@@ -750,7 +908,6 @@ function displayVideoResults(data) {
     formulaExplanationsList.appendChild(li);
   });
 
-  // Render Clinical Flags
   if (flags.length > 0) {
     clinicalFlagsWrap.hidden = false;
     clinicalFlagsList.innerHTML = "";
