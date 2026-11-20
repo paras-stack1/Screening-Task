@@ -30,11 +30,11 @@
             <span class="brand-badge-circle">न</span>
             <div>
               <div class="brand-name">Nanhe Kadam <span class="brand-name-hi">नन्हे कदम</span></div>
-              <p class="brand-subtitle">राष्ट्रीय बाल स्वास्थ्य कार्यक्रम (RBSK 2.0) · Multi-Modal AI Child Screening Suite</p>
+              <p class="brand-subtitle">Rashtriya Bal Swasthya Karyakram (RBSK 2.0) · Multi-Modal Child Health Screening Suite</p>
             </div>
           </div>
           <div class="status-badges-group">
-            <span class="badge-status-pill online"><span class="pulse-dot"></span> ऑफ़लाइन चालू (Offline Ready)</span>
+            <span class="badge-status-pill online"><span class="pulse-dot"></span> Offline Ready</span>
             <span class="badge-status-pill info">RBSK 2.0 Aligned</span>
           </div>
         </div>
@@ -45,7 +45,7 @@
             <span class="d-circle d1">D1</span>
             <div>
               <strong>Defects at Birth</strong>
-              <span>जन्म दोष (Club foot, Dysplasia)</span>
+              <span>जन्म दोष (Clubfoot, Dysplasia)</span>
             </div>
           </div>
           <div class="banner-d-item">
@@ -72,19 +72,37 @@
         </div>
       </div>
 
-      <!-- Navigation Tabs -->
+      <!-- Navigation Tabs with Clean SVG Icons -->
       <nav class="nav-tabs" role="tablist">
         <button class="nav-tab active" data-tab="tab-video" role="tab" aria-selected="true">
-          <span class="tab-icon">🎥</span> Video Screening 4Ds (वीडियो जाँच)
+          <svg class="tab-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 7l-7 5 7 5V7z" />
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+          </svg>
+          Video Screening 4Ds (वीडियो जाँच)
         </button>
         <button class="nav-tab" data-tab="tab-skin" role="tab" aria-selected="false">
-          <span class="tab-icon">📸</span> Skin Condition (त्वचा जाँच)
+          <svg class="tab-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="20" rx="3" ry="3" />
+            <circle cx="12" cy="12" r="4" />
+            <line x1="12" y1="2" x2="12" y2="5" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+          Skin Condition (त्वचा जाँच)
         </button>
         <button class="nav-tab" data-tab="tab-eye" role="tab" aria-selected="false">
-          <span class="tab-icon">👁️</span> Eye Condition (नेत्र जाँच)
+          <svg class="tab-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          Eye Condition (नेत्र जाँच)
         </button>
         <button class="nav-tab" data-tab="tab-tutorials" role="tab" aria-selected="false">
-          <span class="tab-icon">📖</span> Real Video Tutorials &amp; Guides (ट्यूटोरियल)
+          <svg class="tab-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          </svg>
+          Clinical Protocols &amp; Guides (ट्यूटोरियल)
         </button>
       </nav>
     </header>
@@ -93,46 +111,49 @@
     <section id="tab-video" class="tab-content active" role="tabpanel">
       <!-- Camera Security & Alternative Input Banner -->
       <div class="camera-notice-banner" id="cameraNoticeBanner">
-        <div class="notice-icon">💡</div>
+        <div class="notice-icon-svg-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="notice-svg">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+        </div>
         <div class="notice-content">
-          <strong>Browser Camera Access &amp; Alternative Input Options (कैमरा व वीडियो विकल्प):</strong>
+          <strong>Camera Access &amp; Input Methods (कैमरा व वीडियो विकल्प):</strong>
           <p>
-            Modern browsers require HTTPS or localhost for live webcam streaming.
-            On this server, you can:
-            <strong>(1) Start Live Camera</strong> (accept the one-time SSL prompt),
-            <strong>(2) Upload a video or capture with phone camera</strong>, or
-            <strong>(3) Test any of our 5 real video tutorials with 1 click</strong>.
+            Capture live via browser camera or upload a recorded video. You can also benchmark immediately with authentic clinical demo videos.
           </p>
           <div class="notice-quick-links">
-            <button id="quickDemoBtn" class="pill-btn primary-pill">⚡ Test With Real Walk Gait Video</button>
-            <label for="videoFileInput" class="pill-btn secondary-pill">📁 Choose Video File or Phone Camera</label>
+            <button id="quickDemoBtn" class="pill-btn primary-pill">Run Walking Gait Demo</button>
+            <label for="videoFileInput" class="pill-btn secondary-pill">Choose Video File</label>
             <input type="file" id="videoFileInput" accept="video/*" capture="user" style="display: none;" />
-            <button id="toggleHttpGuideBtn" class="pill-btn ghost-pill">🔧 10-Second Chrome Camera Fix</button>
+            <button id="toggleHttpGuideBtn" class="pill-btn ghost-pill">Camera Permission Guide</button>
           </div>
-          <!-- Collapsible 10-second Chrome Fix Guide -->
+          <!-- Collapsible Chrome Guide -->
           <div id="httpGuideBox" class="http-guide-box" hidden>
-            <h5>How to enable live webcam in Google Chrome for this server:</h5>
+            <h5>How to enable live webcam in Google Chrome:</h5>
             <ol>
-              <li>Open a new tab in Chrome and enter: <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code></li>
-              <li>Add this exact server URL to the text box: <code>http://16.179.162.6:8000</code></li>
-              <li>Change the dropdown from <em>Disabled</em> to <strong>Enabled</strong>.</li>
-              <li>Click <strong>Relaunch</strong> at the bottom. Your live camera will now work directly!</li>
+              <li>Open a new tab in Chrome: <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code></li>
+              <li>Add this server address: <code>http://16.179.162.6:8000</code></li>
+              <li>Set dropdown to <strong>Enabled</strong> and click <strong>Relaunch</strong>.</li>
             </ol>
           </div>
         </div>
       </div>
 
-      <!-- "How It Works" Privacy-First Explainability Banner -->
+      <!-- Privacy-First Architecture Breakdown -->
       <div class="explainability-card">
         <div class="explain-header" id="toggleExplainBtn">
           <div class="explain-title">
-            <span class="shield-icon">🛡️</span>
+            <svg class="shield-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
             <div>
-              <strong>Privacy-First Architecture (Zero Video Storage) &amp; How It Works</strong>
-              <p>सुरक्षित जाँच: वीडियो कभी सर्वर पर सेव नहीं होता। 33 लैंडमार्क्स ब्राउज़र में ही निकलते हैं।</p>
+              <strong>Privacy-First Architecture (Zero Video Storage)</strong>
+              <p>सुरक्षित जाँच: वीडियो कभी सर्वर पर सेव नहीं होता। 33 लैंडमार्क्स ब्राउज़र में ही प्रोसेस होते हैं।</p>
             </div>
           </div>
-          <span class="chevron">▼</span>
+          <span class="chevron">&#9662;</span>
         </div>
         <div class="explain-body" id="explainBody">
           <div class="explain-grid">
@@ -141,23 +162,23 @@
               <h4>Browser-Side 33 Landmarks</h4>
               <p>
                 Video streams never touch the server. MediaPipe Tasks Vision runs entirely inside your browser,
-                extracting 33 3D skeletal coordinates and head yaw metrics at 10 FPS over 10–15 seconds (~50 KB JSON payload).
+                extracting 33 normalized skeletal coordinates and gaze metrics at 10 FPS over 10–15 seconds (~50 KB JSON payload).
               </p>
             </div>
             <div class="explain-step">
               <span class="step-badge">Stage 2</span>
-              <h4>Invariant Biomechanical Normalization</h4>
+              <h4>Invariant Torso Normalization</h4>
               <p>
-                The server subtracts Mid-Hip $H_{mid} = (P_{23} + P_{24})/2$ and scales coordinates by Torso Length
-                $L_{torso} = \|S_{mid} - H_{mid}\|_2$, eliminating camera distance and child size variations.
+                The server subtracts Mid-Hip and scales coordinates by Torso Length,
+                ensuring scale invariance regardless of camera distance or child height.
               </p>
             </div>
             <div class="explain-step">
               <span class="step-badge">Stage 3</span>
               <h4>The 4Ds Clinical Mapping</h4>
               <p>
-                Analyzes Gait Symmetry Index (GSI), Spine Tilt ($\theta_{spine}$), Knee-Ankle alignment, FFT Tremor frequencies,
-                and Auditory Orienting Latency mapped to non-diagnostic Green/Yellow/Red triage flags.
+                Calculates Gait Symmetry Index (GSI), Coronal Spine Tilt, Knee-Ankle alignment, FFT tremor frequencies,
+                and orienting latency mapped to non-diagnostic Green / Yellow / Red triage flags.
               </p>
             </div>
           </div>
@@ -165,41 +186,41 @@
       </div>
 
       <div class="video-screening-layout">
-        <!-- Left: Camera & Live Canvas View -->
+        <!-- Left: Camera & Live Canvas View (9:16 Portrait Box) -->
         <div class="camera-panel card">
           <div class="camera-controls-bar">
             <div class="control-group">
-              <label for="childAgeInput">Child Age / उम्र (Months):</label>
+              <label for="childAgeInput">Child Age (Months):</label>
               <input type="number" id="childAgeInput" min="6" max="216" value="24" class="num-input" />
             </div>
             <div class="control-group">
-              <label for="taskTypeSelect">Screening Task / जाँच प्रकार:</label>
+              <label for="taskTypeSelect">Screening Task:</label>
               <select id="taskTypeSelect" class="select-input">
-                <option value="walking_gait">🚶 Walking Gait (चलने की चाल व समरूपता)</option>
-                <option value="sitting_posture">🪑 Sitting Posture (बैठने की मुद्रा व रीढ़ की सीधी स्थिति)</option>
-                <option value="standing_alignment">🧍 Standing Alignment (खड़े होने में पैर का मुड़ाव / रिकेट्स)</option>
-                <option value="balance_sway">⚖️ Balance &amp; Sway (संतुलन व स्थिरता)</option>
-                <option value="social_response">🤝 Social Response (आवाज़ पर मुड़ना व आँख मिलाना)</option>
+                <option value="walking_gait">Walking Gait (Symmetry &amp; Limp)</option>
+                <option value="sitting_posture">Sitting Posture (Spine Alignment &amp; Support)</option>
+                <option value="standing_alignment">Standing Alignment (Genu Varum / Valgum)</option>
+                <option value="balance_sway">Balance &amp; Sway (Postural Stability)</option>
+                <option value="social_response">Social Response (Auditory Orienting &amp; Eye Contact)</option>
               </select>
             </div>
           </div>
 
-          <!-- Video Container with Live Canvas Overlay & Alignment Guide Markers -->
-          <div class="video-viewport-wrap">
+          <!-- Video Container (9:16 Portrait Aspect Ratio) -->
+          <div class="video-viewport-wrap portrait-9-16">
             <video id="webcamVideo" playsinline autoplay muted></video>
             <canvas id="skeletonCanvas"></canvas>
 
-            <!-- Guide Frame Markers Overlay (Visual alignment target for head, spine, feet) -->
+            <!-- Alignment Guide Target Markers Overlay -->
             <div class="camera-guide-frame" id="cameraGuideFrame">
               <div class="guide-box guide-head-box">
-                <span class="guide-label">🎯 सिर / HEAD</span>
+                <span class="guide-label">HEAD TARGET</span>
               </div>
               <div class="guide-line guide-shoulder-line">
-                <span class="guide-label-center">कंधे / SHOULDERS</span>
+                <span class="guide-label-center">SHOULDERS</span>
               </div>
               <div class="guide-line guide-spine-line"></div>
               <div class="guide-box guide-feet-box">
-                <span class="guide-label">👣 पैर / FEET GROUNDED</span>
+                <span class="guide-label">FEET GROUNDED</span>
               </div>
             </div>
 
@@ -208,44 +229,44 @@
               <span class="hud-dot yellow"></span> Waiting for Input...
             </div>
             <div class="hud-overlay top-right" id="timerBadge" hidden>
-              ⏱️ <span id="countdownText">12.0s</span> | <span id="frameCountText">0 / 120</span>
+              TIME: <span id="countdownText">12.0s</span> | <span id="frameCountText">0 / 120</span>
             </div>
             <div class="hud-cue-alert" id="cueAlert" hidden>
-              🔔 AUDIO NAME CUE PROMPT!
+              AUDIO NAME CUE ACTIVE
             </div>
             <button type="button" id="toggleMarkersBtn" class="hud-overlay bottom-right marker-toggle-btn" title="Toggle Alignment Target Markers">
-              🎯 Guide Markers: ON
+              Guide Markers: Active
             </button>
           </div>
 
-          <!-- Action Buttons & Status -->
+          <!-- Action Buttons -->
           <div class="camera-actions">
             <button id="startCamBtn" class="action-btn primary-btn">
-              📷 Start Live Camera
+              Start Live Camera
             </button>
             <label for="videoFileInputAlt" class="action-btn upload-video-btn">
-              📁 Choose Video
+              Upload Video
             </label>
             <input type="file" id="videoFileInputAlt" accept="video/*" capture="user" style="display: none;" />
             <button id="startRecordBtn" class="action-btn record-btn" disabled>
-              ▶️ Record Session
+              Record Session
             </button>
             <button id="runDemoBtn" class="action-btn demo-btn">
-              ⚡ Test With Demo
+              Run Demo Video
             </button>
             <button id="stopRecordBtn" class="action-btn secondary-btn" disabled>
-              ⏹️ Reset
+              Reset
             </button>
           </div>
 
           <!-- 1-Click Interactive Demos Selector -->
           <div class="demo-pills-bar">
-            <span class="demo-pills-label">⚡ 1-Click Real Video Demos:</span>
-            <button type="button" class="demo-pill-btn active" data-task="walking_gait">🚶 चलना (Walk Gait)</button>
-            <button type="button" class="demo-pill-btn" data-task="sitting_posture">🪑 बैठना (Sitting Posture)</button>
-            <button type="button" class="demo-pill-btn" data-task="standing_alignment">🧍 खड़ा होना (Standing)</button>
-            <button type="button" class="demo-pill-btn" data-task="balance_sway">⚖️ संतुलन (Balance &amp; Sway)</button>
-            <button type="button" class="demo-pill-btn" data-task="social_response">🤝 सामाजिक प्रतिक्रिया (Social)</button>
+            <span class="demo-pills-label">Benchmark Demos:</span>
+            <button type="button" class="demo-pill-btn active" data-task="walking_gait">Walking Gait</button>
+            <button type="button" class="demo-pill-btn" data-task="sitting_posture">Sitting Posture</button>
+            <button type="button" class="demo-pill-btn" data-task="standing_alignment">Standing Alignment</button>
+            <button type="button" class="demo-pill-btn" data-task="balance_sway">Balance &amp; Sway</button>
+            <button type="button" class="demo-pill-btn" data-task="social_response">Social Response</button>
           </div>
           <p id="videoStatus" class="status-msg" role="status"></p>
         </div>
@@ -265,78 +286,43 @@
             </div>
             <div class="telemetry-item">
               <span class="telemetry-label">Spine Tilt Angle</span>
-              <strong class="telemetry-val" id="teleSpine">0.0°</strong>
+              <strong class="telemetry-val" id="teleSpine">0.0&deg;</strong>
             </div>
             <div class="telemetry-item">
               <span class="telemetry-label">Left Knee Angle</span>
-              <strong class="telemetry-val" id="teleLKnee">180.0°</strong>
+              <strong class="telemetry-val" id="teleLKnee">180.0&deg;</strong>
             </div>
             <div class="telemetry-item">
               <span class="telemetry-label">Right Knee Angle</span>
-              <strong class="telemetry-val" id="teleRKnee">180.0°</strong>
+              <strong class="telemetry-val" id="teleRKnee">180.0&deg;</strong>
             </div>
             <div class="telemetry-item">
-              <span class="telemetry-label">Ankle Separation</span>
-              <strong class="telemetry-val" id="teleAnkle">0.00</strong>
+              <span class="telemetry-label">Gait Symmetry (GSI)</span>
+              <strong class="telemetry-val" id="teleGSI">--</strong>
             </div>
             <div class="telemetry-item">
-              <span class="telemetry-label">Head Yaw / Gaze</span>
-              <strong class="telemetry-val" id="teleYaw">0.0° (Centered)</strong>
+              <span class="telemetry-label">Head Yaw / Eye Contact</span>
+              <strong class="telemetry-val" id="teleYaw">0.0&deg; (Centered)</strong>
             </div>
           </div>
 
-          <!-- Live Task Instructions Card -->
-          <div class="task-instruction-box" id="taskInstructionBox">
-            <h4>📋 Guided Protocol / निर्देश</h4>
+          <!-- Protocol Instructions Card -->
+          <div class="protocol-instruction-card">
+            <h4>Clinical Protocol Instructions</h4>
             <p id="taskInstructionText">
-              Position the camera 2.5–3 meters away at waist height. Ensure the child's entire body from head to feet fits within the alignment markers.
+              Position camera 2.5–3m away at waist height. Ensure full body (head to ankles) is framed. Child walks naturally across the corridor.
             </p>
           </div>
-        </div>
-      </div>
 
-      <!-- Video Screening Results Section -->
-      <div id="videoResultsPanel" class="results-panel card" hidden>
-        <div class="results-banner" id="videoStatusBanner">
-          <div class="banner-top">
-            <span class="status-pill" id="videoStatusPill">STATUS</span>
-            <h3 id="videoResultHeading">Screening Analysis Complete</h3>
+          <!-- Analysis Output Panel -->
+          <div class="result-banner" id="videoResultBanner" hidden>
+            <div class="banner-top">
+              <span class="status-pill" id="videoStatusPill">STATUS</span>
+              <h3 id="videoScreeningStatusText">Evaluation Complete</h3>
+            </div>
+            <p id="videoAdviceText" class="advice-para"></p>
           </div>
-          <p id="videoAdviceText" class="advice-para"></p>
-        </div>
 
-        <!-- The 4Ds Categorization Breakdown -->
-        <div class="four-ds-grid">
-          <div class="four-d-card" id="cardD1">
-            <div class="four-d-badge">D1</div>
-            <h4>Defects at Birth (जन्म दोष)</h4>
-            <p class="four-d-desc">Club foot, hip dysplasia, neural tube/spine asymmetry.</p>
-            <div class="four-d-status" id="statusD1">Normal</div>
-          </div>
-          <div class="four-d-card" id="cardD2">
-            <div class="four-d-badge">D2</div>
-            <h4>Deficiencies (पोषण संबंधी कमियाँ)</h4>
-            <p class="four-d-desc">Rickets lower-limb bowing, severe stunting alignment.</p>
-            <div class="four-d-status" id="statusD2">Normal</div>
-          </div>
-          <div class="four-d-card" id="cardD3">
-            <div class="four-d-badge">D3</div>
-            <h4>Childhood Diseases (बचपन के रोग)</h4>
-            <p class="four-d-desc">Cerebral palsy spasticity, ataxias, muscular dystrophies.</p>
-            <div class="four-d-status" id="statusD3">Normal</div>
-          </div>
-          <div class="four-d-card" id="cardD4">
-            <div class="four-d-badge">D4</div>
-            <h4>Developmental Delays (विकास में देरी)</h4>
-            <p class="four-d-desc">Gross motor milestones, autism orienting latency, stereotypies.</p>
-            <div class="four-d-status" id="statusD4">Normal</div>
-          </div>
-        </div>
-
-        <!-- Algorithmic Telemetry Breakdown -->
-        <div class="metrics-details-card">
-          <h4>Biomechanical Telemetry Breakdown (बायोमैकेनिकल माप)</h4>
-          <div class="metrics-summary-table" id="metricsSummaryTable"></div>
           <div class="formula-explanations-box" id="formulaExplanationsBox"></div>
           <div class="flags-alert-box" id="flagsAlertBox" hidden>
             <h4>Clinical Screening Flags Noted:</h4>
@@ -346,54 +332,99 @@
       </div>
     </section>
 
-    <!-- TAB 2: SKIN CLASSIFICATION MODULE -->
+    <!-- TAB 2: SKIN CLASSIFICATION MODULE (WITH LIVE CAMERA CAPTURE) -->
     <section id="tab-skin" class="tab-content" role="tabpanel">
       <div class="classifier-layout">
-        <div class="card card-skin">
+        <div class="card card-skin" data-endpoint="/predict/skin">
           <div class="card-top-action">
-            <span class="badge">Skin Lesion AI</span>
-            <button class="pill-btn ghost-pill demo-load-btn" id="loadSkinDemoTopBtn">⚡ Load Sample Clinical Photo</button>
+            <span class="badge">Skin Lesion Classifier</span>
+            <button class="pill-btn ghost-pill demo-load-btn" type="button" data-target="skin">Load Sample Clinical Photo</button>
           </div>
           <h2>Childhood Skin Health Screening</h2>
           <p class="card-desc">
             8-Class clinical classifier (Eczema, Impetigo, Ringworm, Urticaria, Scabies, Chickenpox, Normal skin, Measles).
           </p>
 
-          <label class="upload-box" for="skinInput">
-            <div class="upload-icon">📸</div>
-            <div class="upload-text">Upload or capture skin lesion image (.jpg / .png)</div>
-            <span class="upload-sub">Click to select or drag and drop</span>
-            <input type="file" id="skinInput" accept="image/*" class="file-input" />
-            <img id="skinPreview" alt="Skin Preview" class="preview-img" />
-          </label>
-
-          <button id="predictSkinBtn" class="submit-btn" disabled>
-            Analyze Skin Lesion
-          </button>
-          <p id="skinStatus" class="status-msg" role="status"></p>
-        </div>
-
-        <div id="skinResultPanel" class="card result-card" hidden>
-          <div class="result-banner" id="skinStatusBanner">
-            <div class="banner-top">
-              <span class="status-pill" id="skinStatusPill">STATUS</span>
-              <h3 id="skinPredictedClass">Prediction</h3>
-            </div>
-            <p id="skinConfidenceText" class="conf-text"></p>
-            <p id="skinAdviceText" class="advice-para"></p>
+          <!-- Input Switcher: File Upload vs Live Camera -->
+          <div class="input-mode-tabs" role="tablist">
+            <button type="button" class="mode-tab-btn active" data-mode="upload">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mode-svg">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Upload Photo
+            </button>
+            <button type="button" class="mode-tab-btn" data-mode="camera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mode-svg">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              Live Camera Capture
+            </button>
           </div>
 
-          <div class="charts-row">
-            <div class="chart-card">
-              <h3>Probability Distribution</h3>
-              <div class="chart-box">
-                <canvas class="bar-canvas"></canvas>
+          <!-- Upload Mode View -->
+          <div class="mode-view mode-upload-view">
+            <label class="upload-box" for="skinFileInput">
+              <div class="upload-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="upload-svg">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </div>
+              <div class="upload-text">Upload or drop skin lesion image (.jpg / .png / .webp)</div>
+              <span class="upload-sub">15–25 cm perpendicular distance under clear diffuse lighting</span>
+              <input type="file" id="skinFileInput" accept="image/*" class="file-input" />
+              <img alt="Skin Preview" class="preview-image" style="display:none;" />
+            </label>
+          </div>
+
+          <!-- Live Camera Mode View -->
+          <div class="mode-view mode-camera-view" style="display:none;">
+            <div class="live-cam-viewport">
+              <video class="cam-feed" playsinline autoplay muted></video>
+              <canvas class="cam-snap-canvas" style="display:none;"></canvas>
+              <div class="cam-reticle skin-reticle">
+                <div class="reticle-ring"></div>
+                <span class="reticle-text">Center Lesion Inside Ring</span>
               </div>
             </div>
-            <div class="chart-card">
-              <h3>Confidence Share</h3>
-              <div class="chart-box chart-box-sm">
-                <canvas class="doughnut-canvas"></canvas>
+            <div class="cam-controls-bar">
+              <button type="button" class="action-btn primary-btn btn-open-cam">Start Live Camera</button>
+              <button type="button" class="action-btn record-btn btn-snap-photo" disabled>Capture Snapshot</button>
+              <button type="button" class="action-btn secondary-btn btn-flip-cam" style="display:none;">Flip Camera</button>
+            </div>
+          </div>
+
+          <button class="submit-btn predict-btn" disabled>
+            Analyze Skin Lesion
+          </button>
+          <p class="status status-msg" role="status"></p>
+
+          <div class="card result-card result-panel" hidden>
+            <div class="result-banner status-banner">
+              <div class="banner-top">
+                <span class="status-pill status-title">STATUS</span>
+                <h3 class="prediction-text">Prediction</h3>
+              </div>
+              <p class="conf-text"></p>
+              <p class="advice-para advice-text"></p>
+            </div>
+
+            <div class="charts-row">
+              <div class="chart-card">
+                <h3>Probability Distribution</h3>
+                <div class="chart-box">
+                  <canvas class="bar-canvas"></canvas>
+                </div>
+              </div>
+              <div class="chart-card">
+                <h3>Confidence Share</h3>
+                <div class="chart-box chart-box-sm">
+                  <canvas class="doughnut-canvas"></canvas>
+                </div>
               </div>
             </div>
           </div>
@@ -401,54 +432,98 @@
       </div>
     </section>
 
-    <!-- TAB 3: EYE CLASSIFICATION MODULE -->
+    <!-- TAB 3: EYE CLASSIFICATION MODULE (WITH LIVE CAMERA CAPTURE) -->
     <section id="tab-eye" class="tab-content" role="tabpanel">
       <div class="classifier-layout">
-        <div class="card card-eye">
+        <div class="card card-eye" data-endpoint="/predict/eye">
           <div class="card-top-action">
-            <span class="badge">Ocular AI</span>
-            <button class="pill-btn ghost-pill demo-load-btn" id="loadEyeDemoTopBtn">⚡ Load Sample Eye Photo</button>
+            <span class="badge">Ocular AI · Flip TTA</span>
+            <button class="pill-btn ghost-pill demo-load-btn" type="button" data-target="eye">Load Sample Eye Photo</button>
           </div>
           <h2>Child Eye Health Screening</h2>
           <p class="card-desc">
             5-Class ocular screening model (Cataract, Conjunctivitis, Eyelid abnormalities, Normal eye, Uveitis) with TTA.
           </p>
 
-          <label class="upload-box" for="eyeInput">
-            <div class="upload-icon">👁️</div>
-            <div class="upload-text">Upload or capture close-up eye photo (.jpg / .png)</div>
-            <span class="upload-sub">Click to select or drag and drop</span>
-            <input type="file" id="eyeInput" accept="image/*" class="file-input" />
-            <img id="eyePreview" alt="Eye Preview" class="preview-img" />
-          </label>
-
-          <button id="predictEyeBtn" class="submit-btn" disabled>
-            Analyze Eye Image
-          </button>
-          <p id="eyeStatus" class="status-msg" role="status"></p>
-        </div>
-
-        <div id="eyeResultPanel" class="card result-card" hidden>
-          <div class="result-banner" id="eyeStatusBanner">
-            <div class="banner-top">
-              <span class="status-pill" id="eyeStatusPill">STATUS</span>
-              <h3 id="eyePredictedClass">Prediction</h3>
-            </div>
-            <p id="eyeConfidenceText" class="conf-text"></p>
-            <p id="eyeAdviceText" class="advice-para"></p>
+          <!-- Input Switcher: File Upload vs Live Camera -->
+          <div class="input-mode-tabs" role="tablist">
+            <button type="button" class="mode-tab-btn active" data-mode="upload">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mode-svg">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Upload Photo
+            </button>
+            <button type="button" class="mode-tab-btn" data-mode="camera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mode-svg">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              Live Camera Capture
+            </button>
           </div>
 
-          <div class="charts-row">
-            <div class="chart-card">
-              <h3>Probability Distribution</h3>
-              <div class="chart-box">
-                <canvas class="bar-canvas"></canvas>
+          <!-- Upload Mode View -->
+          <div class="mode-view mode-upload-view">
+            <label class="upload-box" for="eyeFileInput">
+              <div class="upload-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="upload-svg">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </div>
+              <div class="upload-text">Upload or drop close-up eye photo (.jpg / .png / .webp)</div>
+              <span class="upload-sub">Hold camera steady at eye level under soft diffuse ambient lighting</span>
+              <input type="file" id="eyeFileInput" accept="image/*" class="file-input" />
+              <img alt="Eye Preview" class="preview-image" style="display:none;" />
+            </label>
+          </div>
+
+          <!-- Live Camera Mode View -->
+          <div class="mode-view mode-camera-view" style="display:none;">
+            <div class="live-cam-viewport">
+              <video class="cam-feed" playsinline autoplay muted></video>
+              <canvas class="cam-snap-canvas" style="display:none;"></canvas>
+              <div class="cam-reticle eye-reticle">
+                <div class="reticle-oval"></div>
+                <span class="reticle-text">Align Eye Inside Oval</span>
               </div>
             </div>
-            <div class="chart-card">
-              <h3>Confidence Share</h3>
-              <div class="chart-box chart-box-sm">
-                <canvas class="doughnut-canvas"></canvas>
+            <div class="cam-controls-bar">
+              <button type="button" class="action-btn primary-btn btn-open-cam">Start Live Camera</button>
+              <button type="button" class="action-btn record-btn btn-snap-photo" disabled>Capture Snapshot</button>
+              <button type="button" class="action-btn secondary-btn btn-flip-cam" style="display:none;">Flip Camera</button>
+            </div>
+          </div>
+
+          <button class="submit-btn predict-btn" disabled>
+            Analyze Eye Image
+          </button>
+          <p class="status status-msg" role="status"></p>
+
+          <div class="card result-card result-panel" hidden>
+            <div class="result-banner status-banner">
+              <div class="banner-top">
+                <span class="status-pill status-title">STATUS</span>
+                <h3 class="prediction-text">Prediction</h3>
+              </div>
+              <p class="conf-text"></p>
+              <p class="advice-para advice-text"></p>
+            </div>
+
+            <div class="charts-row">
+              <div class="chart-card">
+                <h3>Probability Distribution</h3>
+                <div class="chart-box">
+                  <canvas class="bar-canvas"></canvas>
+                </div>
+              </div>
+              <div class="chart-card">
+                <h3>Confidence Share</h3>
+                <div class="chart-box chart-box-sm">
+                  <canvas class="doughnut-canvas"></canvas>
+                </div>
               </div>
             </div>
           </div>
@@ -456,244 +531,286 @@
       </div>
     </section>
 
-    <!-- TAB 4: COMPREHENSIVE CAPTURE TUTORIALS & REAL VIDEOS -->
+    <!-- TAB 4: CLINICAL PROTOCOLS & GUIDES -->
     <section id="tab-tutorials" class="tab-content" role="tabpanel">
       <div class="card tutorial-main-card">
-        <h2>📖 Pediatric Screening Capture Tutorials &amp; Real Working Videos</h2>
+        <h2>Pediatric Screening Protocols &amp; Working Guides</h2>
         <p class="subtitle">
-          राष्ट्रीय बाल स्वास्थ्य कार्यक्रम (RBSK 2.0) दिशानिर्देश: Watch authentic screening demonstrations and test each modality with 1 click.
+          Rashtriya Bal Swasthya Karyakram (RBSK 2.0) guidelines: Authentic clinical demonstrations with 1-click benchmarking.
         </p>
 
         <div class="tutorial-grid">
-          <!-- Tutorial 1: Sitting Posture Video -->
+          <!-- Protocol 1: Sitting Posture Video -->
           <div class="tutorial-card featured-tutorial">
-            <div class="tutorial-badge purple">🪑 1. Sitting Posture &amp; Spine Screening (बैठने की जाँच)</div>
+            <div class="tutorial-badge purple">Protocol 1: Sitting Posture &amp; Spine Screening</div>
             <h3>How to Screen Sitting Posture</h3>
             <div class="tutorial-media-preview">
               <video src="assets/tutorial_sitting.mp4" controls preload="metadata" playsinline class="tutorial-video-player"></video>
             </div>
             <div class="guideline-list">
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>WHO Milestone (6–9 Months):</strong>
                   <p>Infants should sit steadily unsupported. Inability to maintain upright sitting by 9–10 months is an early gross motor delay flag (D4).</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>Coronal Spine Tilt (&theta; &le; 12&deg;):</strong>
                   <p>Observe the vertical plumbline from pelvis to neck. Lateral lean &gt; 12&deg; suggests scoliosis or axial hypotonia (D1/D3).</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>Framing &amp; Positioning:</strong>
-                  <p>Hold smartphone in <strong>9:16 portrait mode</strong> at chest height, 1.8m away. Infant seated on a firm floor mat (unsupported).</p>
+                  <p>Hold smartphone in 9:16 portrait mode at chest height, 1.8m away. Infant seated on a firm floor mat unsupported.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon cross">✗</span>
+                <span class="guide-icon cross">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </span>
                 <div>
                   <strong>Common Error:</strong>
                   <p>Adult hands holding the back obscures natural core stability and invalidates trunk hypotonia detection.</p>
                 </div>
               </div>
             </div>
-            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSittingBtn">▶️ Test Screening With This Sitting Video</button>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSittingBtn">Test Screening With Sitting Video</button>
           </div>
 
-          <!-- Tutorial 2: Walking Gait Video -->
+          <!-- Protocol 2: Walking Gait Video -->
           <div class="tutorial-card featured-tutorial">
-            <div class="tutorial-badge teal">🚶 2. Walking Gait &amp; Symmetry (चलने की चाल)</div>
+            <div class="tutorial-badge teal">Protocol 2: Walking Gait &amp; Symmetry</div>
             <h3>How to Capture Child Walking</h3>
             <div class="tutorial-media-preview">
               <video src="assets/tutorial_walking.mp4" controls preload="metadata" playsinline class="tutorial-video-player"></video>
             </div>
             <div class="guideline-list">
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>Distance &amp; Height:</strong>
                   <p>Place camera 2.5–3 meters away at waist/chest level so the child from head to ankles stays visible.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
-                  <strong>Gait Symmetry Index (GSI &ge; 0.85):</strong>
-                  <p>Measures left vs. right stride length and knee flexion cycles. Flags asymmetric limps, cerebral palsy, or hip dysplasia (D1/D3).</p>
+                  <strong>Gait Symmetry Index (&ge; 0.85):</strong>
+                  <p>Analyzes ankle peak-to-peak step lengths to screen for unilateral limp, hip dysplasia, or hemiplegia.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
-                  <strong>Clothing &amp; Posture:</strong>
-                  <p>Wear fitted shorts so knee and ankle joints are unhindered by loose garments or blankets.</p>
+                  <strong>Environment:</strong>
+                  <p>Well-lit open hallway without clutter. Child barefoot or in snug socks so ankles remain clearly exposed.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon cross">✗</span>
+                <span class="guide-icon cross">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </span>
                 <div>
                   <strong>Common Error:</strong>
-                  <p>Holding camera from high adult eye level or cutting off the child's feet prevents lower-limb biomechanics.</p>
+                  <p>Baggy clothing covering feet or parent walking directly in front of the child blocking landmark tracking.</p>
                 </div>
               </div>
             </div>
-            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestVideoBtn">▶️ Test Screening With This Walking Video</button>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestWalkingBtn">Test Screening With Walking Video</button>
           </div>
 
-          <!-- Tutorial 3: Standing Alignment Video -->
-          <div class="tutorial-card">
-            <div class="tutorial-badge green">🧍 3. Standing Alignment Screening (पैर का मुड़ाव / रिकेट्स)</div>
-            <h3>How to Capture Standing Alignment</h3>
+          <!-- Protocol 3: Standing Alignment Video -->
+          <div class="tutorial-card featured-tutorial">
+            <div class="tutorial-badge green">Protocol 3: Standing Alignment &amp; Rickets</div>
+            <h3>How to Screen Standing Alignment</h3>
             <div class="tutorial-media-preview">
               <video src="assets/tutorial_standing.mp4" controls preload="metadata" playsinline class="tutorial-video-player"></video>
             </div>
             <div class="guideline-list">
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
-                  <strong>Knee-Ankle Ratio (Rickets Check):</strong>
-                  <p>Compares inter-condylar (knee) distance vs. inter-malleolar (ankle) distance. Detects Genu Varum (bow legs) or Genu Valgum (knock knees) (D2).</p>
+                  <strong>Leg Alignment Ratio:</strong>
+                  <p>Calculates intercondylar (knee) vs intermalleolar (ankle) separation to screen for Genu Varum or Genu Valgum.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
-                  <strong>Framing &amp; Stance:</strong>
-                  <p>Child stands facing camera with feet naturally close (3–5 cm). Camera placed low at knee height (40–50 cm) in portrait mode, 2m away.</p>
+                  <strong>Physiological Baseline:</strong>
+                  <p>Mild bow legs are normal under 2 years; persistence or asymmetry beyond 24 months warrants clinical referral.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon cross">✗</span>
+                <span class="guide-icon cross">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </span>
                 <div>
                   <strong>Common Error:</strong>
-                  <p>Bulky diapers or socks covering the malleoli ankle bones or knees prevent accurate ratio computation.</p>
+                  <p>Child standing with bent knees (&theta; &lt; 160&deg;) which distorts coronal alignment calculations.</p>
                 </div>
               </div>
             </div>
-            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestStandingBtn">▶️ Test Screening With This Standing Video</button>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestStandingBtn">Test Screening With Standing Video</button>
           </div>
 
-          <!-- Tutorial 4: Balance & Sway Video -->
-          <div class="tutorial-card">
-            <div class="tutorial-badge purple">⚖️ 4. Balance &amp; Postural Sway (संतुलन व स्थिरता)</div>
-            <h3>How to Screen Static Balance</h3>
+          <!-- Protocol 4: Balance & Postural Sway Video -->
+          <div class="tutorial-card featured-tutorial">
+            <div class="tutorial-badge purple">Protocol 4: Balance &amp; Postural Sway</div>
+            <h3>How to Screen Postural Stability</h3>
             <div class="tutorial-media-preview">
               <video src="assets/tutorial_balance.mp4" controls preload="metadata" playsinline class="tutorial-video-player"></video>
             </div>
             <div class="guideline-list">
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>Center-of-Mass Sway (&sigma; &le; 0.04):</strong>
-                  <p>Tracks postural adjustments in Romberg stance over 10–12 seconds. FFT checks for high-frequency cerebellar tremor (&gt; 3 Hz) (D3).</p>
+                  <p>Measures horizontal standard deviation of mid-hip landmark during 10s standing to detect cerebellar ataxia.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
-                  <strong>Staging:</strong>
-                  <p>Flat, non-slip floor. Arms down by sides, feet together. Camera stationary at child navel level.</p>
+                  <strong>Tremor FFT Analysis:</strong>
+                  <p>Fast Fourier Transform analyzes wrist velocity oscillations in the 1.5–4.5 Hz frequency band for motor stereotypies.</p>
                 </div>
               </div>
             </div>
-            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestBalanceBtn">▶️ Test Screening With This Balance Video</button>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestBalanceBtn">Test Screening With Balance Video</button>
           </div>
 
-          <!-- Tutorial 5: Social Response Video -->
-          <div class="tutorial-card">
-            <div class="tutorial-badge orange">🤝 5. Social Response &amp; Audio Orienting (सामाजिक प्रतिक्रिया)</div>
-            <h3>How to Screen Audio-Visual Orienting</h3>
+          <!-- Protocol 5: Social Response & Head Turn Video -->
+          <div class="tutorial-card featured-tutorial">
+            <div class="tutorial-badge orange">Protocol 5: Social Response &amp; Head Turn</div>
+            <h3>How to Screen Social Orienting</h3>
             <div class="tutorial-media-preview">
               <video src="assets/tutorial_social.mp4" controls preload="metadata" playsinline class="tutorial-video-player"></video>
             </div>
             <div class="guideline-list">
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
-                  <strong>Response to Name Latency (&le; 2.0s):</strong>
-                  <p>Child looks away (~25&deg; yaw). At 3.0s an audio cue sounds. Time until head turns toward camera indicates prompt auditory orientation (D4).</p>
+                  <strong>Auditory Response Latency (&le; 2.0s):</strong>
+                  <p>Examiner calls child name at 3.0s. Measures response latency via head-yaw angular velocity for autism cues.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>Eye Contact Ratio (&ge; 50%):</strong>
-                  <p>Measures sustained gaze fixation toward examiner/camera. Also screens for upper-limb flapping stereotypies (1.5–3.5 Hz).</p>
+                  <p>Measures sustained gaze fixation toward examiner/camera. Also screens for upper-limb flapping stereotypies.</p>
                 </div>
               </div>
             </div>
-            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSocialBtn">▶️ Test Screening With This Social Video</button>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSocialBtn">Test Screening With Social Video</button>
           </div>
 
-          <!-- Tutorial 6: Skin Capture -->
+          <!-- Protocol 6: Skin Capture -->
           <div class="tutorial-card">
-            <div class="tutorial-badge">📸 6. Skin Condition Photography (त्वचा जाँच)</div>
+            <div class="tutorial-badge">Protocol 6: Skin Lesion Photography</div>
             <h3>How to Capture Skin Photos</h3>
             <div class="tutorial-media-preview">
               <img src="assets/demo_skin.jpg" alt="Optimal Skin Capture Example" class="tutorial-img-preview" />
             </div>
             <div class="guideline-list">
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>Angle &amp; Framing:</strong>
-                  <p>Hold camera perpendicular (90°) to the rash, 15–25 cm away, with lesion filling the central frame.</p>
+                  <p>Hold camera perpendicular (90&deg;) to the rash, 15–25 cm away, with lesion filling the central frame.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>Focus &amp; Lighting:</strong>
-                  <p>Tap screen to ensure razor-sharp focus on skin texture. Use diffused daylight; avoid harsh flash glare.</p>
+                  <p>Ensure razor-sharp focus on skin texture. Use diffuse daylight; avoid harsh flash glare.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon cross">✗</span>
+                <span class="guide-icon cross">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </span>
                 <div>
                   <strong>Common Error:</strong>
-                  <p>Blurry macro focus, cast shadows, or yellowish night lamps alter erythema color detection.</p>
+                  <p>Blurry macro focus, cast shadows, or yellowish incandescent lighting alter erythema color detection.</p>
                 </div>
               </div>
             </div>
-            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSkinBtn">▶️ Test Skin Classifier With This Sample Photo</button>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSkinBtn">Test Skin Classifier With Sample Photo</button>
           </div>
 
-          <!-- Tutorial 7: Eye Capture -->
+          <!-- Protocol 7: Eye Capture -->
           <div class="tutorial-card">
-            <div class="tutorial-badge">👁️ 7. Eye Health Photography (नेत्र जाँच)</div>
+            <div class="tutorial-badge">Protocol 7: Eye Health Photography</div>
             <h3>How to Capture Eye Photos</h3>
             <div class="tutorial-media-preview">
               <img src="assets/demo_eye.jpg" alt="Optimal Eye Capture Example" class="tutorial-img-preview" />
             </div>
             <div class="guideline-list">
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>Gaze &amp; Opening:</strong>
                   <p>Have child look straight forward into camera with eye wide open to reveal sclera, cornea, and iris.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon check">✓</span>
+                <span class="guide-icon check">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
                 <div>
                   <strong>Flash Safety &amp; Illumination:</strong>
-                  <p>NEVER use direct bright flash in a dark room. Soft side illumination prevents painful corneal reflections.</p>
+                  <p>Never use direct bright flash in a dark room. Soft side illumination prevents painful corneal reflections.</p>
                 </div>
               </div>
               <div class="guideline-item">
-                <span class="guide-icon cross">✗</span>
+                <span class="guide-icon cross">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </span>
                 <div>
                   <strong>Common Error:</strong>
                   <p>Motion blur from squinting or white flash washout obscuring cataract / conjunctival redness.</p>
                 </div>
               </div>
             </div>
-            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestEyeBtn">▶️ Test Eye Classifier With This Sample Photo</button>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestEyeBtn">Test Eye Classifier With Sample Photo</button>
           </div>
         </div>
       </div>

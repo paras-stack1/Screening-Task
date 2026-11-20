@@ -10,8 +10,8 @@ const API_URL = (window.location.port === "5500")
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const CHART_COLORS = [
-  "#2563eb", "#0d9488", "#f59e0b", "#ef4444",
-  "#8b5cf6", "#ec4899", "#10b981", "#64748b",
+  "#0F5C5C", "#2563EB", "#D97706", "#DC2626",
+  "#7C3AED", "#DB2777", "#10B981", "#475569",
 ];
 
 /* ==========================================================================
@@ -49,7 +49,7 @@ if (toggleHttpGuideBtn && httpGuideBox) {
 }
 
 /* ==========================================================================
-   2. Existing Skin & Eye Image Classification Setup (Preserved + Demo Loaders)
+   2. Skin & Eye Image Classification Setup (Dual Mode: Upload & Live Camera)
    ========================================================================== */
 document.querySelectorAll(".card[data-endpoint]").forEach(setupClassifierCard);
 
@@ -59,7 +59,7 @@ function setupClassifierCard(card) {
   const fileInput = card.querySelector(".file-input");
   const previewImage = card.querySelector(".preview-image");
   const predictBtn = card.querySelector(".predict-btn");
-  const defaultBtnText = predictBtn.textContent;
+  const defaultBtnText = predictBtn ? predictBtn.textContent : "Analyze";
   const statusText = card.querySelector(".status");
 
   const resultPanel = card.querySelector(".result-panel");
@@ -70,19 +70,34 @@ function setupClassifierCard(card) {
   const barCanvas = card.querySelector(".bar-canvas");
   const doughnutCanvas = card.querySelector(".doughnut-canvas");
 
+  // Dual mode switching
+  const uploadView = card.querySelector(".mode-upload-view");
+  const cameraView = card.querySelector(".mode-camera-view");
+  const modeTabs = card.querySelectorAll(".mode-tab-btn");
+
+  // Camera elements
+  const camFeed = card.querySelector(".cam-feed");
+  const camSnapCanvas = card.querySelector(".cam-snap-canvas");
+  const btnOpenCam = card.querySelector(".btn-open-cam");
+  const btnSnapPhoto = card.querySelector(".btn-snap-photo");
+  const btnFlipCam = card.querySelector(".btn-flip-cam");
+
   let selectedFile = null;
   let previewUrl = null;
   let barChart = null;
   let doughnutChart = null;
+  let activeCamStream = null;
+  let currentFacingMode = "environment";
 
   function setStatus(msg, isError = false) {
+    if (!statusText) return;
     statusText.textContent = msg;
     statusText.classList.toggle("error", isError);
   }
 
   function handleFile(file) {
     selectedFile = file || null;
-    resultPanel.hidden = true;
+    if (resultPanel) resultPanel.hidden = true;
     setStatus("");
 
     if (previewUrl) {
@@ -91,135 +106,268 @@ function setupClassifierCard(card) {
     }
 
     if (!selectedFile) {
-      previewImage.style.display = "none";
-      predictBtn.disabled = true;
+      if (previewImage) previewImage.style.display = "none";
+      if (predictBtn) predictBtn.disabled = true;
       return;
     }
 
     if (!ALLOWED_TYPES.includes(selectedFile.type)) {
       selectedFile = null;
-      previewImage.style.display = "none";
-      predictBtn.disabled = true;
+      if (previewImage) previewImage.style.display = "none";
+      if (predictBtn) predictBtn.disabled = true;
       setStatus("Please choose a JPG, PNG, or WEBP image.", true);
       return;
     }
 
     previewUrl = URL.createObjectURL(selectedFile);
-    previewImage.src = previewUrl;
-    previewImage.style.display = "inline-block";
-    predictBtn.disabled = false;
+    if (previewImage) {
+      previewImage.src = previewUrl;
+      previewImage.style.display = "inline-block";
+    }
+    if (predictBtn) predictBtn.disabled = false;
   }
 
-  fileInput.addEventListener("change", () => handleFile(fileInput.files[0]));
+  if (fileInput) {
+    fileInput.addEventListener("change", () => handleFile(fileInput.files[0]));
+  }
 
-  ["dragenter", "dragover"].forEach((evt) => {
-    uploadBox.addEventListener(evt, (e) => {
-      e.preventDefault();
-      uploadBox.classList.add("dragover");
+  if (uploadBox) {
+    ["dragenter", "dragover"].forEach((evt) => {
+      uploadBox.addEventListener(evt, (e) => {
+        e.preventDefault();
+        uploadBox.classList.add("dragover");
+      });
     });
-  });
 
-  ["dragleave", "drop"].forEach((evt) => {
-    uploadBox.addEventListener(evt, (e) => {
-      e.preventDefault();
-      uploadBox.classList.remove("dragover");
+    ["dragleave", "drop"].forEach((evt) => {
+      uploadBox.addEventListener(evt, (e) => {
+        e.preventDefault();
+        uploadBox.classList.remove("dragover");
+      });
     });
-  });
 
-  uploadBox.addEventListener("drop", (e) => {
-    const file = e.dataTransfer?.files?.[0];
-    if (file) handleFile(file);
-  });
+    uploadBox.addEventListener("drop", (e) => {
+      const file = e.dataTransfer?.files?.[0];
+      if (file) handleFile(file);
+    });
+  }
 
-  predictBtn.addEventListener("click", async () => {
-    if (!selectedFile) return;
+  // Camera Management
+  function stopActiveCamera() {
+    if (activeCamStream) {
+      activeCamStream.getTracks().forEach((t) => t.stop());
+      activeCamStream = null;
+    }
+    if (camFeed) camFeed.srcObject = null;
+    if (btnSnapPhoto) btnSnapPhoto.disabled = true;
+    if (btnOpenCam) btnOpenCam.textContent = "Start Live Camera";
+  }
 
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-
-    predictBtn.disabled = true;
-    predictBtn.textContent = "Analyzing...";
-    setStatus("");
+  async function startActiveCamera(facing = "environment") {
+    stopActiveCamera();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus("Camera access not supported or requires HTTPS.", true);
+      return;
+    }
 
     try {
-      const response = await fetch(`${API_URL}${endpoint}`, {
-        method: "POST",
-        body: formData,
+      setStatus("Initializing camera...");
+      activeCamStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1280 },
+          height: { ideal: 960 },
+        },
+        audio: false,
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.detail || "Prediction failed.");
+      if (camFeed) {
+        camFeed.srcObject = activeCamStream;
+        await camFeed.play();
       }
 
-      statusBanner.className = `status-banner ${data.screening_status}`;
-      statusTitle.textContent = `Status: ${data.screening_status}`;
-      const ttaNote = data.tta_horizontal_flip ? " · Flip TTA" : "";
-      predictionText.textContent =
-        `Detected: ${data.predicted_class} (${Number(data.confidence).toFixed(2)}% confidence${ttaNote})`;
-      adviceText.textContent = data.advice;
-
-      resultPanel.hidden = false;
-
-      if (typeof Chart !== "undefined") {
-        const sorted = Object.entries(data.all_predictions).sort((a, b) => b[1] - a[1]);
-        const labels = sorted.map(([name]) => name);
-        const values = sorted.map(([, score]) => Number(score));
-        const colors = labels.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]);
-
-        if (barChart) barChart.destroy();
-        if (doughnutChart) doughnutChart.destroy();
-
-        barChart = new Chart(barCanvas, {
-          type: "bar",
-          data: {
-            labels,
-            datasets: [{
-              label: "Confidence (%)",
-              data: values,
-              backgroundColor: colors,
-              borderRadius: 6,
-            }],
-          },
-          options: {
-            indexAxis: "y",
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-              x: { beginAtZero: true, max: 100, ticks: { callback: (v) => `${v}%` } },
-            },
-          },
-        });
-
-        doughnutChart = new Chart(doughnutCanvas, {
-          type: "doughnut",
-          data: {
-            labels,
-            datasets: [{
-              data: values,
-              backgroundColor: colors,
-              borderWidth: 1,
-            }],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } },
-            },
-          },
-        });
-      }
-
-      setStatus("Analysis complete.");
+      if (btnSnapPhoto) btnSnapPhoto.disabled = false;
+      if (btnFlipCam) btnFlipCam.style.display = "inline-flex";
+      if (btnOpenCam) btnOpenCam.textContent = "Stop Camera";
+      setStatus("Camera active. Align target inside reticle and capture.");
     } catch (err) {
-      setStatus(err.message || "Could not connect to FastAPI server.", true);
-    } finally {
-      predictBtn.disabled = !selectedFile;
-      predictBtn.textContent = defaultBtnText;
+      console.warn("Primary camera facing failed, trying fallback user camera:", err);
+      try {
+        activeCamStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+        if (camFeed) {
+          camFeed.srcObject = activeCamStream;
+          await camFeed.play();
+        }
+        if (btnSnapPhoto) btnSnapPhoto.disabled = false;
+        if (btnOpenCam) btnOpenCam.textContent = "Stop Camera";
+        setStatus("Camera active. Align target inside reticle and capture.");
+      } catch (e) {
+        setStatus(`Camera blocked or unavailable: ${e.message}`, true);
+      }
     }
+  }
+
+  if (btnOpenCam) {
+    btnOpenCam.addEventListener("click", () => {
+      if (activeCamStream) {
+        stopActiveCamera();
+        setStatus("Camera stopped.");
+      } else {
+        startActiveCamera(currentFacingMode);
+      }
+    });
+  }
+
+  if (btnFlipCam) {
+    btnFlipCam.addEventListener("click", () => {
+      currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+      startActiveCamera(currentFacingMode);
+    });
+  }
+
+  if (btnSnapPhoto) {
+    btnSnapPhoto.addEventListener("click", () => {
+      if (!camFeed || !activeCamStream) return;
+      const snapCanvas = camSnapCanvas || document.createElement("canvas");
+      snapCanvas.width = camFeed.videoWidth || 640;
+      snapCanvas.height = camFeed.videoHeight || 480;
+      const sCtx = snapCanvas.getContext("2d");
+      sCtx.drawImage(camFeed, 0, 0, snapCanvas.width, snapCanvas.height);
+
+      snapCanvas.toBlob((blob) => {
+        if (!blob) {
+          setStatus("Failed to capture snapshot from video.", true);
+          return;
+        }
+        const snapFile = new File([blob], `capture_${Date.now()}.jpg`, { type: "image/jpeg" });
+        handleFile(snapFile);
+        stopActiveCamera();
+
+        // Switch to upload view to show the captured preview
+        modeTabs.forEach((b) => b.classList.toggle("active", b.dataset.mode === "upload"));
+        if (uploadView) uploadView.style.display = "block";
+        if (cameraView) cameraView.style.display = "none";
+
+        setStatus("Snapshot captured! Click 'Analyze' below to run AI inference.");
+      }, "image/jpeg", 0.92);
+    });
+  }
+
+  // Mode tab switching (Upload vs Live Camera)
+  modeTabs.forEach((tabBtn) => {
+    tabBtn.addEventListener("click", () => {
+      const mode = tabBtn.dataset.mode;
+      modeTabs.forEach((b) => b.classList.toggle("active", b === tabBtn));
+
+      if (mode === "upload") {
+        if (uploadView) uploadView.style.display = "block";
+        if (cameraView) cameraView.style.display = "none";
+        stopActiveCamera();
+      } else if (mode === "camera") {
+        if (uploadView) uploadView.style.display = "none";
+        if (cameraView) cameraView.style.display = "block";
+        startActiveCamera(currentFacingMode);
+      }
+    });
   });
+
+  // Predict button
+  if (predictBtn) {
+    predictBtn.addEventListener("click", async () => {
+      if (!selectedFile) return;
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      predictBtn.disabled = true;
+      predictBtn.textContent = "Analyzing...";
+      setStatus("");
+
+      try {
+        const response = await fetch(`${API_URL}${endpoint}`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Prediction failed.");
+        }
+
+        if (statusBanner) statusBanner.className = `result-banner status-banner ${data.screening_status}`;
+        if (statusTitle) statusTitle.textContent = `Status: ${data.screening_status}`;
+        const ttaNote = data.tta_horizontal_flip ? " · Flip TTA" : "";
+        if (predictionText) {
+          predictionText.textContent =
+            `Detected: ${data.predicted_class} (${Number(data.confidence).toFixed(2)}% confidence${ttaNote})`;
+        }
+        if (adviceText) adviceText.textContent = data.advice;
+
+        if (resultPanel) resultPanel.hidden = false;
+
+        if (typeof Chart !== "undefined" && barCanvas && doughnutCanvas) {
+          const sorted = Object.entries(data.all_predictions).sort((a, b) => b[1] - a[1]);
+          const labels = sorted.map(([name]) => name);
+          const values = sorted.map(([, score]) => Number(score));
+          const colors = labels.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]);
+
+          if (barChart) barChart.destroy();
+          if (doughnutChart) doughnutChart.destroy();
+
+          barChart = new Chart(barCanvas, {
+            type: "bar",
+            data: {
+              labels,
+              datasets: [{
+                label: "Confidence (%)",
+                data: values,
+                backgroundColor: colors,
+                borderRadius: 4,
+              }],
+            },
+            options: {
+              indexAxis: "y",
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { beginAtZero: true, max: 100, ticks: { callback: (v) => `${v}%` } },
+              },
+            },
+          });
+
+          doughnutChart = new Chart(doughnutCanvas, {
+            type: "doughnut",
+            data: {
+              labels,
+              datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderWidth: 1,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: "right", labels: { boxWidth: 10, font: { size: 10 } } },
+              },
+            },
+          });
+        }
+
+        setStatus("Analysis complete.");
+      } catch (err) {
+        setStatus(err.message || "Could not connect to FastAPI server.", true);
+      } finally {
+        predictBtn.disabled = !selectedFile;
+        predictBtn.textContent = defaultBtnText;
+      }
+    });
+  }
 }
 
 // Demo Photo Loader for Skin and Eye Cards
@@ -240,13 +388,16 @@ async function loadDemoPhoto(target) {
     fileInput.files = dt.files;
     fileInput.dispatchEvent(new Event("change"));
 
+    // Ensure upload mode is active so preview is visible
+    const uploadModeBtn = card.querySelector('[data-mode="upload"]');
+    if (uploadModeBtn) uploadModeBtn.click();
+
     setTimeout(() => {
       const predictBtn = card.querySelector(".predict-btn");
       if (predictBtn && !predictBtn.disabled) predictBtn.click();
     }, 350);
   } catch (err) {
     console.error(`Demo load error for ${target}:`, err);
-    alert(`Could not load demo image: ${err.message}`);
   }
 }
 
@@ -278,22 +429,12 @@ const teleFraming = document.getElementById("teleFraming");
 const teleSpine = document.getElementById("teleSpine");
 const teleLKnee = document.getElementById("teleLKnee");
 const teleRKnee = document.getElementById("teleRKnee");
-const teleAnkle = document.getElementById("teleAnkle");
+const teleGSI = document.getElementById("teleGSI");
 const teleYaw = document.getElementById("teleYaw");
 const taskInstructionText = document.getElementById("taskInstructionText");
 
 const taskTypeSelect = document.getElementById("taskTypeSelect");
 const childAgeInput = document.getElementById("childAgeInput");
-
-const videoResultsPanel = document.getElementById("videoResultsPanel");
-const videoStatusBanner = document.getElementById("videoStatusBanner");
-const videoStatusPill = document.getElementById("videoStatusPill");
-const videoResultHeading = document.getElementById("videoResultHeading");
-const videoAdviceText = document.getElementById("videoAdviceText");
-const metricsChipsGrid = document.getElementById("metricsChipsGrid");
-const formulaExplanationsList = document.getElementById("formulaExplanationsList");
-const clinicalFlagsWrap = document.getElementById("clinicalFlagsWrap");
-const clinicalFlagsList = document.getElementById("clinicalFlagsList");
 
 let cameraStream = null;
 let poseLandmarker = null;
@@ -310,7 +451,7 @@ const AUDIO_CUE_SEC = 3.0;
 
 const TASK_INSTRUCTIONS = {
   walking_gait: "Position camera 2.5–3m away at waist height. Have the child walk naturally across or toward the camera. Track leg symmetry and stride balance.",
-  sitting_posture: "Child sits unsupported on a bench, play mat, or floor facing camera in portrait mode. Measures axial trunk tilt (θ <= 12°), kyphosis, hypotonia, and scoliosis.",
+  sitting_posture: "Child sits unsupported on a bench, play mat, or floor facing camera in portrait mode. Measures axial trunk tilt (theta <= 12 deg), kyphosis, hypotonia, and scoliosis.",
   standing_alignment: "Child stands upright facing camera with knees straight. Measures inter-condylar vs inter-malleolar spacing for bowed legs / knock knees.",
   balance_sway: "Child stands upright with feet close together for 10–12 seconds. Measures center-of-mass lateral and anteroposterior stability.",
   social_response: "Child sits facing forward. At 3.0s an auditory chime sounds. Measures orienting latency (head turn) and sustained eye contact.",
@@ -355,17 +496,21 @@ const TASK_CONFIGS = {
 };
 
 function updateTaskUI(taskKey) {
-  taskInstructionText.textContent = TASK_INSTRUCTIONS[taskKey] || TASK_INSTRUCTIONS.walking_gait;
+  if (taskInstructionText) {
+    taskInstructionText.textContent = TASK_INSTRUCTIONS[taskKey] || TASK_INSTRUCTIONS.walking_gait;
+  }
   const cfg = TASK_CONFIGS[taskKey] || TASK_CONFIGS.walking_gait;
-  if (runDemoBtn) runDemoBtn.textContent = `⚡ Test Demo: ${cfg.label}`;
+  if (runDemoBtn) runDemoBtn.textContent = `Run Demo: ${cfg.label}`;
   document.querySelectorAll(".demo-pill-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.task === taskKey);
   });
 }
 
-taskTypeSelect.addEventListener("change", () => {
-  updateTaskUI(taskTypeSelect.value);
-});
+if (taskTypeSelect) {
+  taskTypeSelect.addEventListener("change", () => {
+    updateTaskUI(taskTypeSelect.value);
+  });
+}
 
 // Demo Pill Buttons Listener
 document.querySelectorAll(".demo-pill-btn").forEach((btn) => {
@@ -380,7 +525,7 @@ async function initMediaPipeVision() {
   if (poseLandmarker) return;
 
   try {
-    videoStatus.textContent = "Loading MediaPipe Tasks Vision AI model in browser...";
+    if (videoStatus) videoStatus.textContent = "Loading MediaPipe Tasks Vision AI model in browser...";
     const vision = await window.MediaPipeVision.FilesetResolver.forVisionTasks(
       "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
     );
@@ -410,12 +555,12 @@ async function initMediaPipeVision() {
       console.warn("FaceLandmarker optional model loaded with pose fallback:", faceErr);
     }
 
-    videoStatus.textContent = "AI models loaded! Start live camera or choose video file.";
-    startCamBtn.disabled = false;
+    if (videoStatus) videoStatus.textContent = "AI models loaded. Start live camera or choose video file.";
+    if (startCamBtn) startCamBtn.disabled = false;
   } catch (err) {
     console.error("MediaPipe load error:", err);
-    videoStatus.textContent = "MediaPipe ready. Click 'Start Live Camera' or 'Choose Video'.";
-    startCamBtn.disabled = false;
+    if (videoStatus) videoStatus.textContent = "MediaPipe ready. Click 'Start Live Camera' or 'Upload Video'.";
+    if (startCamBtn) startCamBtn.disabled = false;
   }
 }
 
@@ -423,50 +568,52 @@ window.addEventListener("mediapipe-ready", initMediaPipeVision);
 if (window.MediaPipeVision) initMediaPipeVision();
 
 // Camera Start with Insecure Origin Fallback
-startCamBtn.addEventListener("click", async () => {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    videoStatus.innerHTML = `⚠️ <strong>Browser Camera Blocked:</strong> Browsers require HTTPS or localhost for live webcam.<br/>Use <strong>'Choose Video'</strong> or <strong>'Test With Demo'</strong>, or check the 10-Second Chrome Fix above.`;
-    videoStatus.classList.add("error");
-    if (httpGuideBox) httpGuideBox.hidden = false;
-    return;
-  }
+if (startCamBtn) {
+  startCamBtn.addEventListener("click", async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      videoStatus.innerHTML = "<strong>Camera Access Blocked:</strong> Browsers require HTTPS or localhost for live webcam.<br/>Use <strong>'Upload Video'</strong> or <strong>'Run Demo Video'</strong>, or check the Camera Permission Guide above.";
+      videoStatus.classList.add("error");
+      if (httpGuideBox) httpGuideBox.hidden = false;
+      return;
+    }
 
-  try {
-    videoStatus.textContent = "Requesting webcam access...";
-    videoStatus.classList.remove("error");
+    try {
+      videoStatus.textContent = "Requesting webcam access...";
+      videoStatus.classList.remove("error");
 
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        facingMode: "user",
-      },
-      audio: false,
-    });
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 480 },
+          height: { ideal: 640 },
+          facingMode: "user",
+        },
+        audio: false,
+      });
 
-    videoEl.srcObject = cameraStream;
-    videoEl.src = "";
-    videoEl.loop = false;
-    await videoEl.play();
+      videoEl.srcObject = cameraStream;
+      videoEl.src = "";
+      videoEl.loop = false;
+      await videoEl.play();
 
-    startCamBtn.disabled = true;
-    startRecordBtn.disabled = false;
-    stopRecordBtn.disabled = false;
-    videoStatus.textContent = "Camera active! Step back until full body is inside frame.";
+      startCamBtn.disabled = true;
+      startRecordBtn.disabled = false;
+      stopRecordBtn.disabled = false;
+      videoStatus.textContent = "Camera active. Step back until child is framed inside target box.";
 
-    canvasEl.width = videoEl.videoWidth || 640;
-    canvasEl.height = videoEl.videoHeight || 480;
+      canvasEl.width = videoEl.videoWidth || 360;
+      canvasEl.height = videoEl.videoHeight || 640;
 
-    startTrackingLoop();
-  } catch (err) {
-    console.error("Webcam error:", err);
-    videoStatus.innerHTML = `⚠️ <strong>Camera Access Blocked (${err.name}):</strong> ${err.message}.<br/>Tip: You can use <strong>'Choose Video'</strong> or <strong>'Test With Demo'</strong> without camera permission!`;
-    videoStatus.classList.add("error");
-    if (httpGuideBox) httpGuideBox.hidden = false;
-  }
-});
+      startTrackingLoop();
+    } catch (err) {
+      console.error("Webcam error:", err);
+      videoStatus.innerHTML = `<strong>Camera Blocked (${err.name}):</strong> ${err.message}.<br/>Tip: You can use <strong>'Upload Video'</strong> or <strong>'Run Demo Video'</strong> without camera permission.`;
+      videoStatus.classList.add("error");
+      if (httpGuideBox) httpGuideBox.hidden = false;
+    }
+  });
+}
 
-// Video File Upload Handler (Works everywhere without camera restrictions!)
+// Video File Upload Handler
 function handleVideoFile(file) {
   if (!file) return;
 
@@ -505,10 +652,10 @@ function startTrackingLoop() {
   if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
   function renderFrame() {
-    if (videoEl.readyState >= 2) {
+    if (videoEl && videoEl.readyState >= 2) {
       if (canvasEl.width !== videoEl.videoWidth || canvasEl.height !== videoEl.videoHeight) {
-        canvasEl.width = videoEl.videoWidth || 640;
-        canvasEl.height = videoEl.videoHeight || 480;
+        canvasEl.width = videoEl.videoWidth || 360;
+        canvasEl.height = videoEl.videoHeight || 640;
       }
 
       const nowMs = performance.now();
@@ -579,49 +726,51 @@ const cameraGuideFrame = document.getElementById("cameraGuideFrame");
 if (toggleMarkersBtn) {
   toggleMarkersBtn.addEventListener("click", () => {
     showGuideMarkers = !showGuideMarkers;
-    toggleMarkersBtn.textContent = showGuideMarkers ? "🎯 Guide Markers: ON" : "🎯 Guide Markers: OFF";
+    toggleMarkersBtn.textContent = showGuideMarkers ? "Guide Markers: Active" : "Guide Markers: Inactive";
     toggleMarkersBtn.style.opacity = showGuideMarkers ? "1" : "0.6";
     if (cameraGuideFrame) cameraGuideFrame.style.display = showGuideMarkers ? "block" : "none";
   });
 }
 
-// Draw Floating Joint Measurement Badge Helper
-function drawFloatingBadge(ctx, text, x, y, bgColor = "rgba(15, 92, 92, 0.85)", textColor = "#ffffff") {
+// Draw Floating Joint Measurement Badge Helper (Small, Crisp, Minimalist)
+function drawFloatingBadge(ctx, text, x, y, bgColor = "rgba(15, 23, 42, 0.75)", textColor = "#ffffff") {
   ctx.save();
-  ctx.font = "bold 11px system-ui, sans-serif";
+  ctx.font = "600 10px Inter, system-ui, sans-serif";
   const textWidth = ctx.measureText(text).width;
-  const paddingX = 6;
-  const paddingY = 3;
+  const paddingX = 5;
+  const paddingY = 2;
   const boxWidth = textWidth + paddingX * 2;
-  const boxHeight = 18;
+  const boxHeight = 16;
+  const rx = Math.max(4, Math.min(x - boxWidth / 2, ctx.canvas.width - boxWidth - 4));
+  const ry = Math.max(4, Math.min(y - boxHeight / 2, ctx.canvas.height - boxHeight - 4));
 
   ctx.fillStyle = bgColor;
   ctx.beginPath();
-  ctx.roundRect(x - boxWidth / 2, y - boxHeight / 2, boxWidth, boxHeight, 5);
+  ctx.roundRect(rx, ry, boxWidth, boxHeight, 4);
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
   ctx.lineWidth = 1;
   ctx.stroke();
 
   ctx.fillStyle = textColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, x, y);
+  ctx.fillText(text, rx + boxWidth / 2, ry + boxHeight / 2);
   ctx.restore();
 }
 
-// Draw 33 skeletal keypoints + connections + live alignment markers
+// Draw Small 33 Skeletal Keypoints + Connections + Live Alignment Markers (Proportioned for 9:16)
 function drawSkeleton(ctx, landmarks, w, h) {
   ctx.clearRect(0, 0, w, h);
 
-  // Check framing status
+  // Check framing status in 9:16 frame
   const nose = landmarks ? landmarks[0] : null;
   const lAnkle = landmarks ? landmarks[27] : null;
   const rAnkle = landmarks ? landmarks[28] : null;
-  const headFramed = nose && (nose.visibility ?? 1) > 0.4 && nose.y > 0.05 && nose.y < 0.38;
-  const feetFramed = (lAnkle && (lAnkle.visibility ?? 1) > 0.4 && lAnkle.y > 0.65) ||
-                     (rAnkle && (rAnkle.visibility ?? 1) > 0.4 && rAnkle.y > 0.65);
+  const headFramed = nose && (nose.visibility ?? 1) > 0.4 && nose.y > 0.04 && nose.y < 0.30;
+  const feetFramed = (lAnkle && (lAnkle.visibility ?? 1) > 0.4 && lAnkle.y > 0.70) ||
+                     (rAnkle && (rAnkle.visibility ?? 1) > 0.4 && rAnkle.y > 0.70);
   const isFramed = headFramed && feetFramed;
 
   if (cameraGuideFrame) {
@@ -630,32 +779,32 @@ function drawSkeleton(ctx, landmarks, w, h) {
 
   // Draw Camera Alignment Guide Markers on Canvas if enabled
   if (showGuideMarkers) {
-    const guideColor = isFramed ? "rgba(16, 185, 129, 0.75)" : "rgba(232, 137, 28, 0.65)";
+    const guideColor = isFramed ? "rgba(16, 185, 129, 0.7)" : "rgba(232, 137, 28, 0.6)";
     ctx.save();
     ctx.strokeStyle = guideColor;
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([6, 6]);
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 4]);
 
     // 1. Head Target Oval
     ctx.beginPath();
-    ctx.ellipse(w * 0.5, h * 0.18, w * 0.13, h * 0.10, 0, 0, Math.PI * 2);
+    ctx.ellipse(w * 0.5, h * 0.14, w * 0.24, h * 0.08, 0, 0, Math.PI * 2);
     ctx.stroke();
 
     // 2. Shoulder Alignment Line
     ctx.beginPath();
-    ctx.moveTo(w * 0.22, h * 0.32);
-    ctx.lineTo(w * 0.78, h * 0.32);
+    ctx.moveTo(w * 0.14, h * 0.24);
+    ctx.lineTo(w * 0.86, h * 0.24);
     ctx.stroke();
 
     // 3. Central Vertical Plumbline (Spinal Axis)
     ctx.beginPath();
-    ctx.moveTo(w * 0.5, h * 0.28);
-    ctx.lineTo(w * 0.5, h * 0.72);
+    ctx.moveTo(w * 0.5, h * 0.24);
+    ctx.lineTo(w * 0.5, h * 0.76);
     ctx.stroke();
 
     // 4. Feet Ground Placement Box
     ctx.beginPath();
-    ctx.roundRect(w * 0.26, h * 0.82, w * 0.48, h * 0.14, 8);
+    ctx.roundRect(w * 0.14, h * 0.82, w * 0.72, h * 0.12, 6);
     ctx.stroke();
 
     ctx.restore();
@@ -674,10 +823,10 @@ function drawSkeleton(ctx, landmarks, w, h) {
     [9, 10]                                 // Mouth
   ];
 
-  ctx.lineWidth = 3.5;
-  ctx.strokeStyle = "#00f0ff";
-  ctx.shadowColor = "#00f0ff";
-  ctx.shadowBlur = 8;
+  // Thin crisp connecting lines (no heavy glow)
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = "rgba(16, 185, 129, 0.85)";
+  ctx.shadowBlur = 0;
 
   for (const [i, j] of CONNECTIONS) {
     const p1 = landmarks[i];
@@ -690,19 +839,18 @@ function drawSkeleton(ctx, landmarks, w, h) {
     }
   }
 
-  ctx.shadowBlur = 10;
+  // Small, clean landmark dots (1.4px for face, 2.2px for joints)
   landmarks.forEach((p, idx) => {
     if (p && (p.visibility ?? 1) > 0.35) {
       ctx.beginPath();
-      const r = idx <= 10 ? 3.5 : (idx === 15 || idx === 16 || idx === 27 || idx === 28 ? 6 : 5);
+      const r = idx <= 10 ? 1.4 : (idx === 15 || idx === 16 || idx === 27 || idx === 28 ? 2.8 : 2.2);
       ctx.arc(p.x * w, p.y * h, r, 0, 2 * Math.PI);
-      ctx.fillStyle = idx >= 23 ? "#10b981" : idx >= 11 ? "#3b82f6" : "#f59e0b";
-      ctx.shadowColor = ctx.fillStyle;
+      ctx.fillStyle = idx >= 23 ? "#10b981" : idx >= 11 ? "#38bdf8" : "#fbbf24";
       ctx.fill();
     }
   });
 
-  // Draw Live Biomechanical Floating Joint Markers
+  // Floating Micro Badges
   if (showGuideMarkers) {
     const lkAngle = calcAngle(landmarks[23], landmarks[25], landmarks[27]);
     const rkAngle = calcAngle(landmarks[24], landmarks[26], landmarks[28]);
@@ -710,10 +858,10 @@ function drawSkeleton(ctx, landmarks, w, h) {
     const pRK = landmarks[26];
 
     if (pLK && (pLK.visibility ?? 1) > 0.4) {
-      drawFloatingBadge(ctx, `L Knee: ${lkAngle.toFixed(0)}°`, pLK.x * w - 38, pLK.y * h);
+      drawFloatingBadge(ctx, `L Knee: ${lkAngle.toFixed(0)}°`, pLK.x * w - 34, pLK.y * h);
     }
     if (pRK && (pRK.visibility ?? 1) > 0.4) {
-      drawFloatingBadge(ctx, `R Knee: ${rkAngle.toFixed(0)}°`, pRK.x * w + 38, pRK.y * h);
+      drawFloatingBadge(ctx, `R Knee: ${rkAngle.toFixed(0)}°`, pRK.x * w + 34, pRK.y * h);
     }
 
     // Mid-Spine Marker
@@ -726,11 +874,10 @@ function drawSkeleton(ctx, landmarks, w, h) {
     const dx = sMidX - hMidX;
     const dy = sMidY - hMidY;
     const spineTilt = Math.abs((Math.atan2(dx, dy) * 180.0) / Math.PI);
-    drawFloatingBadge(ctx, `Spine: ${spineTilt.toFixed(1)}°`, spineX * w + 45, spineY * h, "rgba(232, 137, 28, 0.85)");
+    drawFloatingBadge(ctx, `Spine: ${spineTilt.toFixed(1)}°`, spineX * w + 40, spineY * h, "rgba(217, 119, 6, 0.85)");
 
-    // Head / Gaze Marker
     if (nose && (nose.visibility ?? 1) > 0.4) {
-      drawFloatingBadge(ctx, "Gaze: Centered", nose.x * w, nose.y * h - 22, "rgba(15, 92, 92, 0.9)");
+      drawFloatingBadge(ctx, "Gaze: Centered", nose.x * w, nose.y * h - 18, "rgba(15, 92, 92, 0.85)");
     }
   }
 }
@@ -748,55 +895,56 @@ function calcAngle(a, b, c) {
 }
 
 // Live Biomechanical Telemetry Updates
-function updateLiveTelemetry(poseLm, worldLm, faceMet) {
-  if (!poseLm || poseLm.length < 33) {
-    framingBadge.innerHTML = '<span class="hud-dot red"></span> Move Into Frame';
-    teleFraming.textContent = "No Person Detected";
-    teleFraming.style.color = "#dc2626";
+function updateLiveTelemetry(pose, world, face) {
+  if (!pose || pose.length < 33) {
+    if (framingBadge) framingBadge.innerHTML = `<span class="hud-dot yellow"></span> Waiting for Input...`;
+    if (teleFraming) teleFraming.textContent = "Child Not Detected";
     return;
   }
 
-  const nose = poseLm[0];
-  const lAnkle = poseLm[27];
-  const rAnkle = poseLm[28];
-  const headVis = (nose.visibility ?? 1) > 0.45;
-  const ankleVis = (lAnkle.visibility ?? 1) > 0.45 || (rAnkle.visibility ?? 1) > 0.45;
+  const nose = pose[0];
+  const lAnkle = pose[27];
+  const rAnkle = pose[28];
+  const headOk = nose && (nose.visibility ?? 1) > 0.4;
+  const feetOk = (lAnkle && (lAnkle.visibility ?? 1) > 0.4) || (rAnkle && (rAnkle.visibility ?? 1) > 0.4);
 
-  if (headVis && ankleVis) {
-    framingBadge.innerHTML = '<span class="hud-dot green"></span> Full Body In Frame';
-    teleFraming.textContent = "Full Body Visible (Good)";
-    teleFraming.style.color = "#16a34a";
-  } else if (headVis && !ankleVis) {
-    framingBadge.innerHTML = '<span class="hud-dot yellow"></span> Move Back (Feet Out of View)';
-    teleFraming.textContent = "Feet Cut Off (Move Back)";
-    teleFraming.style.color = "#ca8a04";
+  if (headOk && feetOk) {
+    if (framingBadge) framingBadge.innerHTML = `<span class="hud-dot green"></span> Full-Body Framed`;
+    if (teleFraming) teleFraming.textContent = "Framed (Head & Ankles)";
+  } else if (headOk) {
+    if (framingBadge) framingBadge.innerHTML = `<span class="hud-dot yellow"></span> Upper Body Only`;
+    if (teleFraming) teleFraming.textContent = "Step Back (Ankles Cut Off)";
   } else {
-    framingBadge.innerHTML = '<span class="hud-dot yellow"></span> Adjust Position';
-    teleFraming.textContent = "Partial View";
-    teleFraming.style.color = "#ca8a04";
+    if (framingBadge) framingBadge.innerHTML = `<span class="hud-dot red"></span> Partial Frame`;
+    if (teleFraming) teleFraming.textContent = "Adjust Position";
   }
 
-  const pts = worldLm || poseLm;
-  const lk = calcAngle(pts[23], pts[25], pts[27]);
-  const rk = calcAngle(pts[24], pts[26], pts[28]);
-  teleLKnee.textContent = `${lk.toFixed(1)}°`;
-  teleRKnee.textContent = `${rk.toFixed(1)}°`;
+  // Torso / Spine Tilt
+  const sMidX = (pose[11].x + pose[12].x) / 2;
+  const sMidY = (pose[11].y + pose[12].y) / 2;
+  const hMidX = (pose[23].x + pose[24].x) / 2;
+  const hMidY = (pose[23].y + pose[24].y) / 2;
+  const dx = sMidX - hMidX;
+  const dy = sMidY - hMidY;
+  const spineTilt = Math.abs((Math.atan2(dx, dy) * 180.0) / Math.PI);
+  if (teleSpine) teleSpine.textContent = `${spineTilt.toFixed(1)}°`;
 
-  const sMid = { x: (pts[11].x + pts[12].x) / 2, y: (pts[11].y + pts[12].y) / 2, z: ((pts[11].z || 0) + (pts[12].z || 0)) / 2 };
-  const hMid = { x: (pts[23].x + pts[24].x) / 2, y: (pts[23].y + pts[24].y) / 2, z: ((pts[23].z || 0) + (pts[24].z || 0)) / 2 };
-  const torso = [sMid.x - hMid.x, sMid.y - hMid.y, sMid.z - hMid.z];
-  const tNorm = Math.sqrt(torso[0] * torso[0] + torso[1] * torso[1] + torso[2] * torso[2]);
-  if (tNorm > 1e-5) {
-    const spineTilt = (Math.acos(Math.min(1.0, Math.abs(torso[1]) / tNorm)) * 180.0) / Math.PI;
-    teleSpine.textContent = `${spineTilt.toFixed(1)}°`;
+  // Left & Right Knee Angles
+  const lkAngle = calcAngle(pose[23], pose[25], pose[27]);
+  const rkAngle = calcAngle(pose[24], pose[26], pose[28]);
+  if (teleLKnee) teleLKnee.textContent = `${lkAngle.toFixed(1)}°`;
+  if (teleRKnee) teleRKnee.textContent = `${rkAngle.toFixed(1)}°`;
+
+  // Gait Separation
+  if (lAnkle && rAnkle && teleGSI) {
+    const sep = Math.abs(lAnkle.x - rAnkle.x);
+    teleGSI.textContent = `${sep.toFixed(3)}`;
   }
 
-  const ankleSep = Math.abs(pts[27].x - pts[28].x);
-  teleAnkle.textContent = ankleSep.toFixed(2);
-
-  if (faceMet && faceMet.head_yaw !== undefined) {
-    const yawDeg = (faceMet.head_yaw * 57.3).toFixed(1);
-    const facing = Math.abs(faceMet.head_yaw) < 0.15 ? "Facing Camera" : (faceMet.head_yaw > 0 ? "Turned Left" : "Turned Right");
+  // Head Yaw & Eye Contact
+  if (face && teleYaw) {
+    const yawDeg = Math.round(face.head_yaw * 45.0);
+    const facing = Math.abs(face.head_yaw) < 0.12 ? "Centered" : face.head_yaw > 0 ? "Turned Right" : "Turned Left";
     teleYaw.textContent = `${yawDeg}° (${facing})`;
   }
 }
@@ -821,67 +969,72 @@ function playAudioChime() {
 }
 
 // Guided 12-Second Recording Session (10 FPS Sampling)
-startRecordBtn.addEventListener("click", () => {
-  if (isRecording) return;
+if (startRecordBtn) {
+  startRecordBtn.addEventListener("click", () => {
+    if (isRecording) return;
 
-  isRecording = true;
-  capturedFrames = [];
-  sessionStartTime = performance.now();
-  startRecordBtn.disabled = true;
-  startRecordBtn.classList.add("recording");
-  startRecordBtn.textContent = "🔴 Recording Session...";
-  timerBadge.hidden = false;
-  videoResultsPanel.hidden = true;
-  videoStatus.textContent = "Guided screening active. Maintain child in frame.";
+    isRecording = true;
+    capturedFrames = [];
+    sessionStartTime = performance.now();
+    startRecordBtn.disabled = true;
+    startRecordBtn.classList.add("recording");
+    startRecordBtn.textContent = "Recording Session... [Active]";
+    timerBadge.hidden = false;
+    const videoResultBanner = document.getElementById("videoResultBanner");
+    if (videoResultBanner) videoResultBanner.hidden = true;
+    videoStatus.textContent = "Guided screening active. Maintain child inside camera frame.";
 
-  let cueFired = false;
-  const isSocialTask = taskTypeSelect.value === "social_response";
+    let cueFired = false;
+    const isSocialTask = taskTypeSelect.value === "social_response";
 
-  sampleTimer = setInterval(() => {
-    const elapsedSec = (performance.now() - sessionStartTime) / 1000.0;
-    const remainingSec = Math.max(0.0, SESSION_DURATION_SEC - elapsedSec);
-    countdownText.textContent = `${remainingSec.toFixed(1)}s`;
-    frameCountText.textContent = `${capturedFrames.length} / ${TARGET_FRAMES}`;
+    sampleTimer = setInterval(() => {
+      const elapsedSec = (performance.now() - sessionStartTime) / 1000.0;
+      const remainingSec = Math.max(0.0, SESSION_DURATION_SEC - elapsedSec);
+      countdownText.textContent = `${remainingSec.toFixed(1)}s`;
+      frameCountText.textContent = `${capturedFrames.length} / ${TARGET_FRAMES}`;
 
-    if (isSocialTask && !cueFired && elapsedSec >= AUDIO_CUE_SEC) {
-      cueFired = true;
-      cueAlert.hidden = false;
-      playAudioChime();
-      setTimeout(() => { cueAlert.hidden = true; }, 1800);
-    }
+      if (isSocialTask && !cueFired && elapsedSec >= AUDIO_CUE_SEC) {
+        cueFired = true;
+        cueAlert.hidden = false;
+        playAudioChime();
+        setTimeout(() => { cueAlert.hidden = true; }, 1800);
+      }
 
-    if (currentWorldLandmarks && currentWorldLandmarks.length >= 33) {
-      const frameLms = currentWorldLandmarks.map((lm) => ({
-        x: Number(lm.x.toFixed(4)),
-        y: Number(lm.y.toFixed(4)),
-        z: Number((lm.z || 0).toFixed(4)),
-        visibility: Number((lm.visibility ?? 1).toFixed(2)),
-      }));
+      if (currentWorldLandmarks && currentWorldLandmarks.length >= 33) {
+        const frameLms = currentWorldLandmarks.map((lm) => ({
+          x: Number(lm.x.toFixed(4)),
+          y: Number(lm.y.toFixed(4)),
+          z: Number((lm.z || 0).toFixed(4)),
+          visibility: Number((lm.visibility ?? 1).toFixed(2)),
+        }));
 
-      capturedFrames.push({
-        timestamp_ms: Math.round(elapsedSec * 1000),
-        pose_world_landmarks: frameLms,
-        face_metrics: currentFaceMetrics || { head_yaw: 0.0, iris_center_ratio: 0.5, face_detected: true },
-      });
-    }
+        capturedFrames.push({
+          timestamp_ms: Math.round(elapsedSec * 1000),
+          pose_world_landmarks: frameLms,
+          face_metrics: currentFaceMetrics || { head_yaw: 0.0, iris_center_ratio: 0.5, face_detected: true },
+        });
+      }
 
-    if (elapsedSec >= SESSION_DURATION_SEC || capturedFrames.length >= TARGET_FRAMES) {
-      finishRecordingSession();
-    }
-  }, 1000 / TARGET_FPS);
-});
+      if (elapsedSec >= SESSION_DURATION_SEC || capturedFrames.length >= TARGET_FRAMES) {
+        finishRecordingSession();
+      }
+    }, 1000 / TARGET_FPS);
+  });
+}
 
 // Stop / Reset
-stopRecordBtn.addEventListener("click", () => {
-  if (sampleTimer) clearInterval(sampleTimer);
-  isRecording = false;
-  startRecordBtn.disabled = false;
-  startRecordBtn.classList.remove("recording");
-  startRecordBtn.textContent = "▶️ Record Session";
-  timerBadge.hidden = true;
-  cueAlert.hidden = true;
-  videoStatus.textContent = "Session reset. Ready for next screening.";
-});
+if (stopRecordBtn) {
+  stopRecordBtn.addEventListener("click", () => {
+    if (sampleTimer) clearInterval(sampleTimer);
+    isRecording = false;
+    startRecordBtn.disabled = false;
+    startRecordBtn.classList.remove("recording");
+    startRecordBtn.textContent = "Record Session";
+    timerBadge.hidden = true;
+    cueAlert.hidden = true;
+    videoStatus.textContent = "Session reset. Ready for next screening.";
+  });
+}
 
 // Transmit Landmark Stream & Display Results
 async function finishRecordingSession() {
@@ -889,10 +1042,10 @@ async function finishRecordingSession() {
   isRecording = false;
   startRecordBtn.disabled = false;
   startRecordBtn.classList.remove("recording");
-  startRecordBtn.textContent = "▶️ Record Session";
+  startRecordBtn.textContent = "Record Session";
   timerBadge.hidden = true;
 
-  videoStatus.textContent = `Analyzing ${capturedFrames.length} normalized coordinate frames (~45 KB payload)...`;
+  videoStatus.textContent = `Analyzing ${capturedFrames.length} coordinate frames (~45 KB JSON payload)...`;
 
   const payload = {
     child_age_months: parseInt(childAgeInput.value, 10) || 24,
@@ -915,7 +1068,7 @@ async function finishRecordingSession() {
     }
 
     displayVideoResults(data);
-    videoStatus.textContent = "Analysis complete! Review the 4Ds screening report below.";
+    videoStatus.textContent = "Analysis complete. Review the evaluation report below.";
   } catch (err) {
     console.error("Analysis submission error:", err);
     videoStatus.textContent = err.message || "Could not connect to FastAPI backend on port 8000.";
@@ -923,7 +1076,7 @@ async function finishRecordingSession() {
   }
 }
 
-// Instant Demo Simulation Runner (Works on ANY device in 1 click for all 5 tasks!)
+// Instant Demo Simulation Runner (Benchmarking for All 5 Tasks)
 let activeDemoInterval = null;
 
 async function runDemoSession(targetTask = null) {
@@ -949,7 +1102,6 @@ async function runDemoSession(targetTask = null) {
       animationFrameId = null;
     }
 
-    // Configure background media
     if (cfg.videoFile) {
       videoEl.srcObject = null;
       videoEl.poster = "";
@@ -961,13 +1113,8 @@ async function runDemoSession(targetTask = null) {
       videoEl.srcObject = null;
       videoEl.src = "";
       videoEl.poster = cfg.poster;
-    } else {
-      videoEl.srcObject = null;
-      videoEl.src = "";
-      videoEl.poster = "";
     }
 
-    // Fetch pre-computed 120-frame landmark stream for chosen task
     const resp = await fetch(cfg.dataFile);
     if (!resp.ok) throw new Error(`Could not load ${cfg.dataFile}`);
     const demoPayload = await resp.json();
@@ -976,8 +1123,8 @@ async function runDemoSession(targetTask = null) {
     let frameIdx = 0;
     const totalDemoFrames = demoPayload.frames.length;
 
-    canvasEl.width = 480;
-    canvasEl.height = 480;
+    canvasEl.width = 360;
+    canvasEl.height = 640;
 
     activeDemoInterval = setInterval(() => {
       if (frameIdx >= totalDemoFrames) {
@@ -987,7 +1134,6 @@ async function runDemoSession(targetTask = null) {
         cueAlert.hidden = true;
         videoStatus.textContent = "Transmitting demo landmark frames to backend...";
 
-        // Send to API
         fetch(`${API_URL}/analyze-video-landmarks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -996,8 +1142,7 @@ async function runDemoSession(targetTask = null) {
           .then((r) => r.json())
           .then((data) => {
             displayVideoResults(data);
-            videoStatus.textContent = `Demo ${cfg.label} analysis complete! See the 4Ds breakdown below.`;
-            videoResultsPanel.scrollIntoView({ behavior: "smooth" });
+            videoStatus.textContent = `Demo ${cfg.label} analysis complete! See breakdown below.`;
           })
           .catch((err) => {
             videoStatus.textContent = err.message || "Demo submission failed.";
@@ -1010,17 +1155,13 @@ async function runDemoSession(targetTask = null) {
       const lms = f.pose_world_landmarks;
       const face = f.face_metrics;
 
-      // Animate skeleton and telemetry
       drawSkeleton(ctx, lms, canvasEl.width, canvasEl.height);
       updateLiveTelemetry(lms, lms, face);
 
-      // Trigger audio chime for social response task at frame 30 (3.0s)
       if (chosenTask === "social_response" && frameIdx === 30) {
-        playChimeSound();
+        playAudioChime();
         cueAlert.hidden = false;
-        setTimeout(() => {
-          cueAlert.hidden = true;
-        }, 1500);
+        setTimeout(() => { cueAlert.hidden = true; }, 1500);
       }
 
       const remain = Math.max(0, 12.0 - frameIdx * 0.1);
@@ -1039,12 +1180,12 @@ async function runDemoSession(targetTask = null) {
 if (runDemoBtn) runDemoBtn.addEventListener("click", () => runDemoSession());
 if (quickDemoBtn) quickDemoBtn.addEventListener("click", () => runDemoSession("walking_gait"));
 
-// Tutorial Action Button Triggers for All Modalities
+// Tutorial Action Button Triggers for All Protocols
 const tutorialTestSittingBtn = document.getElementById("tutorialTestSittingBtn");
 if (tutorialTestSittingBtn) tutorialTestSittingBtn.addEventListener("click", () => runDemoSession("sitting_posture"));
 
-const tutorialTestVideoBtn = document.getElementById("tutorialTestVideoBtn");
-if (tutorialTestVideoBtn) tutorialTestVideoBtn.addEventListener("click", () => runDemoSession("walking_gait"));
+const tutorialTestWalkingBtn = document.getElementById("tutorialTestWalkingBtn");
+if (tutorialTestWalkingBtn) tutorialTestWalkingBtn.addEventListener("click", () => runDemoSession("walking_gait"));
 
 const tutorialTestStandingBtn = document.getElementById("tutorialTestStandingBtn");
 if (tutorialTestStandingBtn) tutorialTestStandingBtn.addEventListener("click", () => runDemoSession("standing_alignment"));
@@ -1073,86 +1214,50 @@ if (tutorialTestEyeBtn) {
 
 // Display Video Results & The 4Ds Categorization
 function displayVideoResults(data) {
-  videoResultsPanel.hidden = false;
+  const videoResultBanner = document.getElementById("videoResultBanner");
+  const videoStatusPill = document.getElementById("videoStatusPill");
+  const videoScreeningStatusText = document.getElementById("videoScreeningStatusText");
+  const videoAdviceText = document.getElementById("videoAdviceText");
+  const formulaExplanationsBox = document.getElementById("formulaExplanationsBox");
+  const flagsAlertBox = document.getElementById("flagsAlertBox");
+  const flagsList = document.getElementById("flagsList");
 
+  if (!videoResultBanner) return;
+
+  videoResultBanner.hidden = false;
   const st = data.screening_status || "YELLOW";
-  videoStatusBanner.className = `results-banner ${st}`;
-  videoStatusPill.textContent = st;
-  videoResultHeading.textContent = `Pediatric Screening Status: ${st}`;
-  videoAdviceText.textContent = data.advice;
+  videoResultBanner.className = `result-banner ${st}`;
+  if (videoStatusPill) videoStatusPill.textContent = st;
+  if (videoScreeningStatusText) videoScreeningStatusText.textContent = `Screening Evaluation: ${st}`;
+  if (videoAdviceText) videoAdviceText.textContent = data.advice || "";
+
+  if (formulaExplanationsBox) {
+    formulaExplanationsBox.innerHTML = "<strong>Biomechanical Analysis Notes:</strong>";
+    const ul = document.createElement("ul");
+    ul.style.margin = "6px 0 0 16px";
+    ul.style.padding = "0";
+    (data.formula_explanations || []).forEach((exp) => {
+      const li = document.createElement("li");
+      li.textContent = exp;
+      ul.appendChild(li);
+    });
+    formulaExplanationsBox.appendChild(ul);
+  }
 
   const flags = data.clinical_flags || [];
-  const flagsText = flags.join(" ");
-
-  const d1Flagged = flagsText.includes("D1") || flagsText.includes("hip dysplasia") || flagsText.includes("scoliosis");
-  update4DCard("cardD1", "statusD1", d1Flagged ? (st === "RED" ? "RED" : "YELLOW") : "GREEN", d1Flagged ? "Flagged" : "Normal");
-
-  const d2Flagged = flagsText.includes("D2") || flagsText.includes("Rickets") || flagsText.includes("bowing");
-  update4DCard("cardD2", "statusD2", d2Flagged ? (st === "RED" ? "RED" : "YELLOW") : "GREEN", d2Flagged ? "Flagged" : "Normal");
-
-  const d3Flagged = flagsText.includes("D3") || flagsText.includes("CP") || flagsText.includes("spasticity") || flagsText.includes("ataxia") || flagsText.includes("tremor");
-  update4DCard("cardD3", "statusD3", d3Flagged ? (st === "RED" ? "RED" : "YELLOW") : "GREEN", d3Flagged ? "Flagged" : "Normal");
-
-  const d4Flagged = flagsText.includes("D4") || flagsText.includes("delayed") || flagsText.includes("ASD") || flagsText.includes("stereotypy") || flagsText.includes("engagement");
-  update4DCard("cardD4", "statusD4", d4Flagged ? (st === "RED" ? "RED" : "YELLOW") : "GREEN", d4Flagged ? "Flagged" : "Normal");
-
-  metricsChipsGrid.innerHTML = "";
-  const m = data.metrics || {};
-  const metricLabels = {
-    gait_symmetry_index: "Gait Symmetry (GSI)",
-    mean_spine_tilt_deg: "Mean Spine Tilt",
-    mean_left_knee_deg: "Mean Left Knee",
-    mean_right_knee_deg: "Mean Right Knee",
-    knee_ankle_ratio: "Knee-Ankle Ratio",
-    sway_std: "Balance Sway σ",
-    wrist_oscillation_hz: "Wrist Oscillation",
-    eye_contact_pct: "Eye Contact",
-    response_latency_sec: "Orienting Latency",
-  };
-
-  for (const [key, label] of Object.entries(metricLabels)) {
-    if (m[key] !== undefined) {
-      let unit = "";
-      if (key.includes("deg")) unit = "°";
-      else if (key.includes("pct")) unit = "%";
-      else if (key.includes("hz")) unit = " Hz";
-      else if (key.includes("sec")) unit = "s";
-
-      const chip = document.createElement("div");
-      chip.className = "metric-chip";
-      chip.innerHTML = `${label}: <strong>${m[key]}${unit}</strong>`;
-      metricsChipsGrid.appendChild(chip);
+  if (flagsAlertBox && flagsList) {
+    if (flags.length > 0) {
+      flagsAlertBox.hidden = false;
+      flagsList.innerHTML = "";
+      flags.forEach((f) => {
+        const li = document.createElement("li");
+        li.textContent = f;
+        flagsList.appendChild(li);
+      });
+    } else {
+      flagsAlertBox.hidden = true;
     }
   }
 
-  formulaExplanationsList.innerHTML = "";
-  (data.formula_explanations || []).forEach((exp) => {
-    const li = document.createElement("li");
-    li.textContent = exp;
-    formulaExplanationsList.appendChild(li);
-  });
-
-  if (flags.length > 0) {
-    clinicalFlagsWrap.hidden = false;
-    clinicalFlagsList.innerHTML = "";
-    flags.forEach((flag) => {
-      const li = document.createElement("li");
-      li.textContent = flag;
-      clinicalFlagsList.appendChild(li);
-    });
-  } else {
-    clinicalFlagsWrap.hidden = true;
-  }
-
-  videoResultsPanel.scrollIntoView({ behavior: "smooth" });
-}
-
-function update4DCard(cardId, statusId, statusClass, statusLabel) {
-  const card = document.getElementById(cardId);
-  const badge = document.getElementById(statusId);
-  if (card && badge) {
-    card.classList.toggle("flagged", statusClass !== "GREEN");
-    badge.className = `four-d-status ${statusClass}`;
-    badge.textContent = statusLabel;
-  }
+  videoResultBanner.scrollIntoView({ behavior: "smooth" });
 }
