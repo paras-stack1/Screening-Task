@@ -13,15 +13,28 @@
     "react-dom": "19.3.0"
   },
   "engines": {
-    "node": ">=22.0.0 <23"
+    "node": ">=22.12.0 <23"
   },
   "scripts": {
     "build:contracts": "npm run build --workspace @balswasthya/shared-contracts",
+    "lint": "npm run build:contracts && npm run lint --workspaces --if-present",
+    "test": "npm run build:contracts && npm run test --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm run test",
     "dev:api": "npm run dev --workspace @balswasthya/api",
     "dev:app": "npm run start --workspace @balswasthya/worker-app",
     "dev:web": "npm run web --workspace @balswasthya/worker-app",
     "typecheck": "npm run build:contracts && npm run typecheck --workspaces --if-present",
     "db:up": "docker compose -f infrastructure/docker-compose.yml --env-file .env up -d",
     "db:down": "docker compose -f infrastructure/docker-compose.yml --env-file .env down"
+  },
+  "devDependencies": {
+    "@eslint/js": "~9.39.5",
+    "eslint": "~9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
+    "prettier": "~3.9.10",
+    "typescript-eslint": "~8.72.1"
   }
 }

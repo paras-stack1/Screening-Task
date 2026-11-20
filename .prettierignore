@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.expo/
+.venv/
+package-lock.json
+services/ai-service/
+# Hand-formatted documentation (tables and ASCII diagrams)
+*.md

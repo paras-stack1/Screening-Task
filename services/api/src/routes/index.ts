@@ -1,12 +1,18 @@
 import { Router } from 'express';
-import { healthRouter } from './health.routes';
+import { createHealthRouter, type HealthDependencies } from './health.routes';
+
+export interface ApiRouterDependencies {
+  health: HealthDependencies;
+}
 
 /**
  * Versioned API router mounted at /api/v1.
  * Each feature module will export its own router and be registered here, e.g.
- *   apiRouter.use('/auth', authRouter);
- *   apiRouter.use('/children', childrenRouter);
+ *   router.use('/auth', authRouter);
+ *   router.use('/children', childrenRouter);
  */
-export const apiRouter = Router();
-
-apiRouter.use('/health', healthRouter);
+export function createApiRouter(deps: ApiRouterDependencies): Router {
+  const router = Router();
+  router.use('/health', createHealthRouter(deps.health));
+  return router;
+}

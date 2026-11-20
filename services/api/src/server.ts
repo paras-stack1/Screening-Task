@@ -1,7 +1,10 @@
 import { createApp } from './app';
 import { prisma } from './config/database';
 import { env } from './config/env';
+import { describeError } from './utils/describeError';
 import { logger } from './utils/logger';
+
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 const app = createApp();
 
@@ -10,20 +13,39 @@ const server = app.listen(env.PORT, env.HOST, () => {
 });
 
 server.on('error', (error: NodeJS.ErrnoException) => {
-  logger.error('api_listen_failed', { code: error.code, message: error.message });
+  logger.fatal('api_listen_failed', { code: error.code, message: error.message });
   process.exit(1);
 });
 
+let shuttingDown = false;
+
 /** Graceful shutdown: stop accepting requests, then close DB connections. */
-async function shutdown(signal: string) {
-  logger.info('api_shutting_down', { signal });
-  server.close(async () => {
-    await prisma.$disconnect();
-    process.exit(0);
+function shutdown(reason: string, exitCode: number) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info('api_shutting_down', { reason });
+
+  server.close(() => {
+    prisma
+      .$disconnect()
+      .catch((error: unknown) => logger.error('db_disconnect_failed', describeError(error)))
+      .finally(() => process.exit(exitCode));
   });
   // Force exit if connections do not drain in time.
-  setTimeout(() => process.exit(1), 10_000).unref();
+  setTimeout(() => process.exit(exitCode || 1), SHUTDOWN_TIMEOUT_MS).unref();
 }
 
-process.on('SIGINT', () => void shutdown('SIGINT'));
-process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT', 0));
+process.on('SIGTERM', () => shutdown('SIGTERM', 0));
+
+// A rejected promise nobody handled means state may be inconsistent: log and restart cleanly.
+process.on('unhandledRejection', (reason) => {
+  logger.fatal('unhandled_rejection', describeError(reason));
+  shutdown('unhandledRejection', 1);
+});
+
+// After an uncaught exception the process state is unknown: exit immediately.
+process.on('uncaughtException', (error) => {
+  logger.fatal('uncaught_exception', describeError(error));
+  process.exit(1);
+});

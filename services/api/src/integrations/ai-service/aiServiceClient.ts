@@ -1,5 +1,6 @@
 import { aiServiceHealthSchema, type DependencyStatus } from '@balswasthya/shared-contracts';
 import { env } from '../../config/env';
+import { readJsonWithLimit } from '../../utils/http';
 
 /**
  * Adapter for the separately owned Python AI service.
@@ -9,35 +10,66 @@ import { env } from '../../config/env';
  * team's real endpoints arrive, only this file and the shared contract change.
  *
  * Design rules:
- *  - Every call has a timeout.
+ *  - Every call has a timeout and a maximum response size.
  *  - Failure is never fatal: callers get "unavailable" and the screening
  *    questionnaire flow continues without AI support.
  *  - No AI result is ever invented here.
  */
-function buildHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (env.AI_SERVICE_API_KEY) {
-    headers['X-API-Key'] = env.AI_SERVICE_API_KEY;
+export interface AiServiceConfig {
+  /** Base URL without trailing slash; empty string = not configured. */
+  baseUrl: string;
+  apiKey: string;
+  timeoutMs: number;
+  maxResponseBytes?: number;
+}
+
+/** Generous for JSON results; media is never returned inline by the AI service. */
+export const DEFAULT_AI_MAX_RESPONSE_BYTES = 1_000_000;
+
+export interface AiServiceClient {
+  isConfigured(): boolean;
+  getStatus(): Promise<DependencyStatus>;
+}
+
+export function createAiServiceClient(config: AiServiceConfig): AiServiceClient {
+  const maxResponseBytes = config.maxResponseBytes ?? DEFAULT_AI_MAX_RESPONSE_BYTES;
+
+  function buildHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (config.apiKey) {
+      headers['X-API-Key'] = config.apiKey;
+    }
+    return headers;
   }
-  return headers;
-}
 
-export function isAiServiceConfigured(): boolean {
-  return env.AI_SERVICE_URL.length > 0;
-}
+  const isConfigured = () => config.baseUrl.length > 0;
 
-export async function getAiServiceStatus(): Promise<DependencyStatus> {
-  if (!isAiServiceConfigured()) return 'not_configured';
+  async function getStatus(): Promise<DependencyStatus> {
+    if (!isConfigured()) return 'not_configured';
 
-  try {
-    const response = await fetch(`${env.AI_SERVICE_URL}/health`, {
-      headers: buildHeaders(),
-      signal: AbortSignal.timeout(env.AI_SERVICE_TIMEOUT_MS),
-    });
-    if (!response.ok) return 'down';
-    const parsed = aiServiceHealthSchema.safeParse(await response.json());
-    return parsed.success ? 'up' : 'down';
-  } catch {
-    return 'down';
+    try {
+      const response = await fetch(`${config.baseUrl}/health`, {
+        headers: buildHeaders(),
+        signal: AbortSignal.timeout(config.timeoutMs),
+        redirect: 'error', // never follow redirects to an unexpected host
+      });
+      if (!response.ok) {
+        await response.body?.cancel();
+        return 'down';
+      }
+      const parsed = aiServiceHealthSchema.safeParse(await readJsonWithLimit(response, maxResponseBytes));
+      return parsed.success ? 'up' : 'down';
+    } catch {
+      return 'down';
+    }
   }
+
+  return { isConfigured, getStatus };
 }
+
+/** Process-wide client built from validated environment configuration. */
+export const aiServiceClient = createAiServiceClient({
+  baseUrl: env.AI_SERVICE_URL,
+  apiKey: env.AI_SERVICE_API_KEY,
+  timeoutMs: env.AI_SERVICE_TIMEOUT_MS,
+});

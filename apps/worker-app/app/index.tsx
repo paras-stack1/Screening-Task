@@ -29,7 +29,7 @@ export default function HomeScreen() {
         <Text style={styles.disclaimerText}>{t('screeningDisclaimer')}</Text>
       </AppCard>
 
-      <ConnectionStatusCard state={state} onRetry={() => void retry()} />
+      <ConnectionStatusCard state={state} onRetry={retry} />
 
       <Text style={styles.notice}>{t('foundationNotice')}</Text>
     </ScrollView>

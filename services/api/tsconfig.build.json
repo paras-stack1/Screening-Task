@@ -1,4 +1,14 @@
 {
+  // Production build: CommonJS output for Node.js 22.
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    "sourceMap": true
+  },
+  "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
 }

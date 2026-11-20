@@ -87,6 +87,9 @@ is intentionally **not** an npm workspace.
 `helmet` → `cors` (allow-list) → `requestId` → `requestLogger` → `express.json (1 MB)`
 → `/api/v1` routes → `notFoundHandler` → `errorHandler`.
 
+Not yet in the pipeline (added with authentication in Phase 3): rate limiting and
+`trust proxy` configuration.
+
 **Module pattern** (see `services/api/src/modules/README.md`):
 `routes → (validate middleware) → controller → service → Prisma / integrations`.
 
@@ -96,17 +99,31 @@ is intentionally **not** an npm workspace.
 { "error": { "code": "VALIDATION_ERROR", "message": "...", "details": [...], "requestId": "..." } }
 ```
 
-Unexpected errors return a generic 500 message; details go to logs only.
+Unexpected errors return a generic 500 message; details go to logs only. Body-parser errors
+map to 4xx (`INVALID_JSON` 400, `PAYLOAD_TOO_LARGE` 413) instead of 500. The 404 response does
+not echo the requested path.
 
 **Configuration:** `src/config/env.ts` validates all environment variables with Zod at
 startup. The process exits with a list of the invalid *variable names* (never their values).
+With `NODE_ENV=production` it also refuses insecure settings: missing `JWT_SECRET`, non-HTTPS
+CORS origins or AI URL, a missing/short AI key, or a `DATABASE_URL` without
+`sslmode=require|verify-ca|verify-full`.
+
+**Logging:** `src/utils/logger.ts` (pino, JSON lines) with a redaction list for secret and
+common personal-data field names (`password`, `refreshToken`, `phone`, `dateOfBirth`, ...).
+Redaction is a safety net, not permission to log personal data. `src/utils/describeError.ts`
+logs only the type and code of Prisma errors, because Prisma messages can embed query values
+(e.g. a child's name). `server.ts` logs and exits on `unhandledRejection` / `uncaughtException`.
+
+**Dependency injection:** `createApp(deps)` takes its health dependencies as functions, so tests
+run without a database. Feature modules will follow the same pattern.
 
 ### Health endpoints
 
 | Endpoint                     | Purpose   | Behaviour                                                               |
 |------------------------------|-----------|-------------------------------------------------------------------------|
 | `GET /api/v1/health`         | Liveness  | Always 200 while the process runs. No DB access.                        |
-| `GET /api/v1/health/ready`   | Readiness | DB down → **503 unavailable**. AI down → **200 degraded**. All up → 200 ready. AI URL empty → `not_configured`. |
+| `GET /api/v1/health/ready`   | Readiness | DB down → **503 unavailable**. AI down → **200 degraded**. All up → 200 ready. AI URL empty → `not_configured`. Result cached for 5 s (public endpoint; prevents it being used to load the DB/AI service). |
 | `GET /health` (ai-service)   | Liveness  | `{status, service, version, modelsLoaded}` - `modelsLoaded` is `false` in the placeholder. |
 
 ## 4. AI service integration (future)
@@ -119,7 +136,8 @@ application architecture does not change when their endpoints arrive:
 3. Call it from `modules/screening/screening.service.ts`.
 
 **Resilience rules**
-- Every AI call has a timeout (`AI_SERVICE_TIMEOUT_MS`).
+- Every AI call has a timeout (`AI_SERVICE_TIMEOUT_MS`), a maximum response size
+  (1 MB default, enforced while streaming) and does not follow redirects.
 - AI failure never blocks the workflow: the questionnaire is saved, and the result is
   marked "AI support unavailable".
 - No AI result is ever fabricated or simulated in production code paths.
@@ -154,7 +172,23 @@ application architecture does not change when their endpoints arrive:
 - **Data access:** `src/services/apiClient.ts` validates every response against the shared
   Zod schema and returns friendly errors (timeout, offline, contract mismatch).
 
-## 7. Local ports
+## 7. Quality gates
+
+`npm run check` = Prettier check → typecheck → ESLint → tests. Run it before every commit.
+
+| Tool       | Scope | Notes |
+|------------|-------|-------|
+| TypeScript | all   | `strict`. The API is checked twice: `tsconfig.json` (Bundler resolution, covers tests) and `tsconfig.build.json` (NodeNext, what is emitted). |
+| ESLint 9   | API, contracts | `typescript-eslint` type-checked rules; `no-console` (use the logger). ESLint 10 is not used yet because Expo's lint plugins do not support it. |
+| ESLint 9   | app   | `eslint-config-expo` via `expo lint` (includes React hooks rules). |
+| Prettier   | all code/config | Markdown is excluded (hand-formatted tables). |
+| Vitest + Supertest | API | `services/api/tests`. No database or network beyond a local fake AI server; synthetic env set in `vitest.config.mts`. |
+
+Security regression tests already in place: no path echo on 404, no leaked error details, no
+Prisma query values in logs, log redaction, request-size limits, AI timeout/size/redirect limits,
+production config guard, CORS allow-list, unknown body fields stripped by validation.
+
+## 8. Local ports
 
 | Service          | Port                         |
 |------------------|------------------------------|
@@ -163,7 +197,7 @@ application architecture does not change when their endpoints arrive:
 | PostgreSQL       | 5433 on host → 5432 in container (5432 is often used by a native Postgres install) |
 | Expo dev server  | 8081                         |
 
-## 8. Deployment (later)
+## 9. Deployment (later)
 
 Local first. For the cloud: containerise the API, use a managed PostgreSQL with backups and
 encryption at rest, keep secrets in a secret manager, TLS everywhere, and build the app with

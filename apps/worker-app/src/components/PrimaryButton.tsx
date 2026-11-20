@@ -19,11 +19,7 @@ export function PrimaryButton({ label, onPress, disabled = false, accessibilityH
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        pressed && styles.pressed,
-        disabled && styles.disabled,
-      ]}
+      style={({ pressed }) => [styles.button, pressed && styles.pressed, disabled && styles.disabled]}
     >
       <Text style={styles.label}>{label}</Text>
     </Pressable>

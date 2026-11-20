@@ -21,11 +21,11 @@ services:
       PGTZ: Asia/Kolkata
     ports:
       # Bound to localhost only so the database is not exposed on the LAN.
-      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432'
     volumes:
       - balswasthya_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 10s
       timeout: 5s
       retries: 5

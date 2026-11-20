@@ -24,7 +24,7 @@ Architecture and design decisions: [docs/architecture.md](docs/architecture.md).
 
 | Tool            | Version            | Check                    |
 |-----------------|--------------------|--------------------------|
-| Node.js         | 22 LTS             | `node -v`                |
+| Node.js         | 22 LTS (22.12+)    | `node -v`                |
 | npm             | 10+                | `npm -v`                 |
 | Docker Desktop  | running            | `docker info`            |
 | Git             | any recent         | `git --version`          |
@@ -154,6 +154,11 @@ To **delete** all local database data: `docker volume rm balswasthya_pgdata` (ir
 
 | Command (from repo root)                                   | What it does                                     |
 |------------------------------------------------------------|--------------------------------------------------|
+| `npm run check`                                            | **Run before every commit:** format check, typecheck, lint, tests |
+| `npm test`                                                 | API tests (Vitest + Supertest; no database needed) |
+| `npm run lint`                                             | ESLint (API/contracts: typed rules; app: `expo lint`) |
+| `npm run format`                                           | Formats code with Prettier (`format:check` only checks) |
+| `npm run test:watch --workspace @balswasthya/api`          | Re-runs API tests on file changes                |
 | `npm run typecheck`                                        | Builds contracts, type-checks app + API          |
 | `npm run build --workspace @balswasthya/api`               | Compiles the API to `services/api/dist`          |
 | `npm run prisma:validate --workspace @balswasthya/api`     | Checks `schema.prisma`                           |
@@ -182,7 +187,8 @@ Never put passwords, database URLs, JWT secrets or API keys there.
 
 | Problem | Fix |
 |---------|-----|
-| `npm install` fails with `EPERM ... query_engine-windows.dll.node` | The API is running and Windows has locked Prisma's engine file. Stop the API (`Ctrl+C`), then run `npm install` again. |
+| `npm install` fails with `EPERM ... query_engine-windows.dll.node` | The API is running and Windows has locked Prisma's engine file. Stop **every** API terminal (`Ctrl+C`), then run `npm install` again. Check for leftover servers with `Get-CimInstance Win32_Process -Filter "Name='node.exe'" \| Select ProcessId, CommandLine`. |
+| `npm install` fails with `Cannot read properties of null (reading 'edgesOut')` | An earlier install was interrupted. Stop all dev servers, delete `node_modules\.prisma\client\*.tmp*`, and run `npm install` again. |
 | `failed to connect to the docker API` | Start Docker Desktop and wait until it says "Engine running". |
 | Port 5433 already in use | Change `POSTGRES_HOST_PORT` in `.env` **and** the port in `DATABASE_URL`. |
 | API exits with `Invalid environment configuration` | The message lists which variables are missing/invalid in `services/api/.env`. |
@@ -197,5 +203,9 @@ Never put passwords, database URLs, JWT secrets or API keys there.
 API health card), API skeleton (config, middleware, error handling, health/readiness),
 Prisma 6 connection, Docker PostgreSQL, AI placeholder, shared contracts, docs.
 
+**Step 1b - Quality and hardening: done.** ESLint, Prettier, Vitest + Supertest API tests,
+pino logging with redaction, production configuration guard, readiness caching, AI client
+size/redirect limits, safer error handling. See [docs/architecture.md](docs/architecture.md) §3 and §7.
+
 Not implemented yet (by design): login, users, children, guardians, consent,
-screening forms, referrals, dashboards, database models.
+screening forms, referrals, dashboards, database models, rate limiting.

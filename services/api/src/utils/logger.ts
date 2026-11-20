@@ -1,24 +1,84 @@
+import pino, { type DestinationStream, type LevelWithSilent, type Logger as PinoLogger } from 'pino';
+import { env } from '../config/env';
+
 /**
- * Minimal structured logger (JSON lines). Can be swapped for pino later without
- * changing call sites.
+ * Structured JSON logger (pino).
  *
  * PRIVACY RULE: never log request bodies, child names, dates of birth, phone
  * numbers, Aadhaar-like identifiers, tokens or passwords.
+ *
+ * The redaction list below is a SAFETY NET for common secret/PII field names. It
+ * cannot catch personal data stored under other keys, so the rule above still applies.
  */
-type Level = 'debug' | 'info' | 'warn' | 'error';
+const SENSITIVE_KEYS = [
+  'password',
+  'newPassword',
+  'currentPassword',
+  'passwordHash',
+  'token',
+  'accessToken',
+  'refreshToken',
+  'idToken',
+  'authorization',
+  'cookie',
+  'apiKey',
+  'secret',
+  'jwt',
+  'otp',
+  'phone',
+  'phoneNumber',
+  'mobile',
+  'dateOfBirth',
+  'dob',
+  'aadhaar',
+  'fullName',
+  'childName',
+  'guardianName',
+] as const;
 
-function write(level: Level, message: string, meta?: Record<string, unknown>) {
-  const line = JSON.stringify({ time: new Date().toISOString(), level, message, ...meta });
-  if (level === 'error' || level === 'warn') {
-    console.error(line);
-  } else {
-    console.log(line);
-  }
+/** Redacted at the top level and one level deep (e.g. `{ user: { password } }`). */
+export const REDACT_PATHS = [
+  ...SENSITIVE_KEYS.flatMap((key) => [key, `*.${key}`]),
+  'headers["x-api-key"]',
+  '*.headers["x-api-key"]',
+];
+
+export type LogMeta = Record<string, unknown>;
+
+export interface AppLogger {
+  debug(message: string, meta?: LogMeta): void;
+  info(message: string, meta?: LogMeta): void;
+  warn(message: string, meta?: LogMeta): void;
+  error(message: string, meta?: LogMeta): void;
+  fatal(message: string, meta?: LogMeta): void;
 }
 
-export const logger = {
-  debug: (message: string, meta?: Record<string, unknown>) => write('debug', message, meta),
-  info: (message: string, meta?: Record<string, unknown>) => write('info', message, meta),
-  warn: (message: string, meta?: Record<string, unknown>) => write('warn', message, meta),
-  error: (message: string, meta?: Record<string, unknown>) => write('error', message, meta),
-};
+/** Keeps the call style `logger.info('event_name', { ...meta })` independent of pino's API. */
+function wrap(instance: PinoLogger): AppLogger {
+  return {
+    debug: (message, meta) => instance.debug(meta ?? {}, message),
+    info: (message, meta) => instance.info(meta ?? {}, message),
+    warn: (message, meta) => instance.warn(meta ?? {}, message),
+    error: (message, meta) => instance.error(meta ?? {}, message),
+    fatal: (message, meta) => instance.fatal(meta ?? {}, message),
+  };
+}
+
+export function createLogger(level: LevelWithSilent, destination?: DestinationStream): AppLogger {
+  const instance = pino(
+    {
+      level,
+      base: undefined, // omit pid/hostname
+      messageKey: 'message',
+      timestamp: pino.stdTimeFunctions.isoTime,
+      formatters: { level: (label) => ({ level: label }) },
+      redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
+    },
+    destination,
+  );
+  return wrap(instance);
+}
+
+const defaultLevel: LevelWithSilent = env.NODE_ENV === 'test' ? 'silent' : 'info';
+
+export const logger = createLogger(env.LOG_LEVEL ?? defaultLevel);

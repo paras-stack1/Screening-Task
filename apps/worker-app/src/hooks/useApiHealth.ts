@@ -4,26 +4,32 @@ import { fetchApiHealth } from '../services/healthService';
 import { toErrorMessage } from '../utils/errors';
 
 export type ApiHealthState =
-  | { status: 'checking' }
-  | { status: 'online'; data: HealthResponse }
-  | { status: 'offline'; error: string };
+  { status: 'checking' } | { status: 'online'; data: HealthResponse } | { status: 'offline'; error: string };
 
 export function useApiHealth() {
   const [state, setState] = useState<ApiHealthState>({ status: 'checking' });
-
-  const check = useCallback(async () => {
-    setState({ status: 'checking' });
-    try {
-      const data = await fetchApiHealth();
-      setState({ status: 'online', data });
-    } catch (error) {
-      setState({ status: 'offline', error: toErrorMessage(error) });
-    }
-  }, []);
+  // Incrementing this re-runs the effect; the previous run's result is ignored.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    void check();
-  }, [check]);
+    let active = true;
+    fetchApiHealth().then(
+      (data) => {
+        if (active) setState({ status: 'online', data });
+      },
+      (error: unknown) => {
+        if (active) setState({ status: 'offline', error: toErrorMessage(error) });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [attempt]);
 
-  return { state, retry: check };
+  const retry = useCallback(() => {
+    setState({ status: 'checking' });
+    setAttempt((current) => current + 1);
+  }, []);
+
+  return { state, retry };
 }

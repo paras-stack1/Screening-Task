@@ -16,7 +16,7 @@ export function validate(schemas: RequestSchemas) {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       res.locals.validated = {
-        body: schemas.body ? schemas.body.parse(req.body) : req.body,
+        body: schemas.body ? schemas.body.parse(req.body) : (req.body as unknown),
         params: schemas.params ? schemas.params.parse(req.params) : req.params,
         query: schemas.query ? schemas.query.parse(req.query) : req.query,
       };

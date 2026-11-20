@@ -1,13 +1,14 @@
 {
+  // Editor, lint and test configuration (covers src + tests).
+  // Tests run under Vitest (ESM, bundler-style resolution), so this file uses Bundler resolution.
+  // The emitted build uses NodeNext via tsconfig.build.json; `npm run typecheck` checks both.
   "compilerOptions": {
     "target": "ES2023",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "lib": ["ES2023"],
     "types": ["node"],
-    "rootDir": "src",
-    "outDir": "dist",
-    "sourceMap": true,
+    "noEmit": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
@@ -17,5 +18,5 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": ["src", "tests", "vitest.config.mts"]
 }

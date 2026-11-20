@@ -12,3 +12,9 @@ export function requestId(req: Request, res: Response, next: NextFunction) {
   res.setHeader(HEADER, id);
   next();
 }
+
+/** Typed accessor: res.locals is untyped (`any`) in Express. */
+export function getRequestId(res: Response): string | undefined {
+  const value: unknown = res.locals.requestId;
+  return typeof value === 'string' ? value : undefined;
+}
