@@ -1,6 +1,7 @@
 // ============================================================
 // Nanhe Kadam - RBSK 2.0 Pediatric Biomechanical Screening
-// Robust 33-Landmark Pose Tracker, Live Kinematics & Analysis
+// Real-Time Pose Tracking & Biomechanical Monitoring Dashboard
+// Incorporating: Pose-Track, Google MediaPipe Vision, and berad217
 // ============================================================
 
 const API_URL = (window.location.port === "5500")
@@ -14,6 +15,98 @@ const CHART_COLORS = [
   "#0F5C5C", "#2563EB", "#D97706", "#DC2626",
   "#7C3AED", "#DB2777", "#10B981", "#475569",
 ];
+
+// ============================================================
+// Complete 33 MediaPipe Landmark Registry
+// ============================================================
+const LANDMARK_REGISTRY = [
+  { id: 0,  name: "nose",             side: "center", category: "face" },
+  { id: 1,  name: "left_eye_inner",    side: "left",   category: "face" },
+  { id: 2,  name: "left_eye",          side: "left",   category: "face" },
+  { id: 3,  name: "left_eye_outer",    side: "left",   category: "face" },
+  { id: 4,  name: "right_eye_inner",   side: "right",  category: "face" },
+  { id: 5,  name: "right_eye",         side: "right",  category: "face" },
+  { id: 6,  name: "right_eye_outer",   side: "right",  category: "face" },
+  { id: 7,  name: "left_ear",          side: "left",   category: "face" },
+  { id: 8,  name: "right_ear",         side: "right",  category: "face" },
+  { id: 9,  name: "mouth_left",        side: "left",   category: "face" },
+  { id: 10, name: "mouth_right",       side: "right",  category: "face" },
+  { id: 11, name: "left_shoulder",     side: "left",   category: "upper" },
+  { id: 12, name: "right_shoulder",    side: "right",  category: "upper" },
+  { id: 13, name: "left_elbow",        side: "left",   category: "arms" },
+  { id: 14, name: "right_elbow",       side: "right",  category: "arms" },
+  { id: 15, name: "left_wrist",        side: "left",   category: "arms" },
+  { id: 16, name: "right_wrist",       side: "right",  category: "arms" },
+  { id: 17, name: "left_pinky",        side: "left",   category: "arms" },
+  { id: 18, name: "right_pinky",       side: "right",  category: "arms" },
+  { id: 19, name: "left_index",        side: "left",   category: "arms" },
+  { id: 20, name: "right_index",       side: "right",  category: "arms" },
+  { id: 21, name: "left_thumb",        side: "left",   category: "arms" },
+  { id: 22, name: "right_thumb",       side: "right",  category: "arms" },
+  { id: 23, name: "left_hip",          side: "left",   category: "upper" },
+  { id: 24, name: "right_hip",         side: "right",  category: "upper" },
+  { id: 25, name: "left_knee",         side: "left",   category: "lower" },
+  { id: 26, name: "right_knee",        side: "right",  category: "lower" },
+  { id: 27, name: "left_ankle",        side: "left",   category: "lower" },
+  { id: 28, name: "right_ankle",       side: "right",  category: "lower" },
+  { id: 29, name: "left_heel",         side: "left",   category: "lower" },
+  { id: 30, name: "right_heel",        side: "right",  category: "lower" },
+  { id: 31, name: "left_foot_index",   side: "left",   category: "lower" },
+  { id: 32, name: "right_foot_index",  side: "right",  category: "lower" },
+];
+
+// Pose-Track 35 Anatomical Connections (including Foot Triangles)
+const SKELETON_CONNECTIONS = [
+  // Torso box
+  { a: 11, b: 12, side: "center" },
+  { a: 11, b: 23, side: "left" },
+  { a: 12, b: 24, side: "right" },
+  { a: 23, b: 24, side: "center" },
+  // Left arm
+  { a: 11, b: 13, side: "left" },
+  { a: 13, b: 15, side: "left" },
+  { a: 15, b: 17, side: "left" },
+  { a: 15, b: 19, side: "left" },
+  { a: 15, b: 21, side: "left" },
+  { a: 17, b: 19, side: "left" },
+  // Right arm
+  { a: 12, b: 14, side: "right" },
+  { a: 14, b: 16, side: "right" },
+  { a: 16, b: 18, side: "right" },
+  { a: 16, b: 20, side: "right" },
+  { a: 16, b: 22, side: "right" },
+  { a: 18, b: 20, side: "right" },
+  // Left leg
+  { a: 23, b: 25, side: "left" },
+  { a: 25, b: 27, side: "left" },
+  // Right leg
+  { a: 24, b: 26, side: "right" },
+  { a: 26, b: 28, side: "right" },
+  // Left foot triangle (Pose-Track)
+  { a: 27, b: 29, side: "left" },
+  { a: 29, b: 31, side: "left" },
+  { a: 31, b: 27, side: "left" },
+  // Right foot triangle (Pose-Track)
+  { a: 28, b: 30, side: "right" },
+  { a: 30, b: 32, side: "right" },
+  { a: 32, b: 28, side: "right" },
+  // Face
+  { a: 0, b: 1, side: "left" },
+  { a: 1, b: 2, side: "left" },
+  { a: 2, b: 3, side: "left" },
+  { a: 3, b: 7, side: "left" },
+  { a: 0, b: 4, side: "right" },
+  { a: 4, b: 5, side: "right" },
+  { a: 5, b: 6, side: "right" },
+  { a: 6, b: 8, side: "right" },
+  { a: 9, b: 10, side: "center" },
+];
+
+function getSideColor(side) {
+  if (side === "left") return "#F59E0B";   // Warm Amber (Left)
+  if (side === "right") return "#38BDF8";  // Sky Blue (Right)
+  return "#10B981";                        // Mint Green (Center / Midline)
+}
 
 // ============================================================
 // 1. Language Toggle (EN / Hindi)
@@ -46,6 +139,9 @@ const I18N = {
     kpi_rknee: "R-Knee Angle",
     kpi_gsi: "Gait Symmetry (GSI)",
     kpi_yaw: "Head Yaw / Gaze",
+    subtab_stream: "Telemetry Stream",
+    subtab_inspector: "33-Landmarks Inspector",
+    subtab_charts: "Real-Time Kinematics",
     log_stream_title: "Per-Second Telemetry Stream (Live Measurements)",
     btn_copy_json: "Copy JSON",
     th_sec: "Sec",
@@ -86,6 +182,9 @@ const I18N = {
     kpi_rknee: "दायाँ घुटना",
     kpi_gsi: "कदम सममिति (GSI)",
     kpi_yaw: "सिर का कोण",
+    subtab_stream: "टेलीमेट्री स्ट्रीम",
+    subtab_inspector: "33 लैंडमार्क निरीक्षक",
+    subtab_charts: "रीयल-टाइम काइनेमेटिक्स",
     log_stream_title: "प्रति-सेकंड लाइव टेलीमेट्री स्ट्रीम",
     btn_copy_json: "JSON कॉपी करें",
     th_sec: "समय",
@@ -127,7 +226,7 @@ if (langToggleBtn) {
 setLanguage(currentLang);
 
 // ============================================================
-// 2. Tab Switching
+// 2. Tab Switching (Walking Gait / Skin / Eye)
 // ============================================================
 function switchTab(tabId) {
   document.querySelectorAll(".nav-tab").forEach((b) => {
@@ -154,6 +253,9 @@ const ctx = canvasEl.getContext("2d");
 const startCamBtn = document.getElementById("startCamBtn");
 const videoFileInputAlt = document.getElementById("videoFileInputAlt");
 const runDemoBtn = document.getElementById("runDemoBtn");
+const playPauseBtn = document.getElementById("playPauseBtn");
+const restartVideoBtn = document.getElementById("restartVideoBtn");
+const toggleLabelsBtn = document.getElementById("toggleLabelsBtn");
 const startRecordBtn = document.getElementById("startRecordBtn");
 const stopRecordBtn = document.getElementById("stopRecordBtn");
 const videoStatus = document.getElementById("videoStatus");
@@ -162,6 +264,8 @@ const framingBadge = document.getElementById("framingBadge");
 const timerBadge = document.getElementById("timerBadge");
 const countdownText = document.getElementById("countdownText");
 const frameCountText = document.getElementById("frameCountText");
+const fpsText = document.getElementById("fpsText");
+const latencyText = document.getElementById("latencyText");
 
 const teleFraming = document.getElementById("teleFraming");
 const teleSpine = document.getElementById("teleSpine");
@@ -174,6 +278,33 @@ const childAgeInput = document.getElementById("childAgeInput");
 const toggleMarkersBtn = document.getElementById("toggleMarkersBtn");
 const cameraGuideFrame = document.getElementById("cameraGuideFrame");
 
+// Subtabs elements
+const subtabBtns = document.querySelectorAll(".subtab-btn");
+const subtabPanels = document.querySelectorAll(".subtab-panel");
+
+// Landmark Inspector elements
+const landmarkSearch = document.getElementById("landmarkSearch");
+const filterChips = document.querySelectorAll(".filter-chips .chip:not(.clear-chip)");
+const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+const inspectorTableBody = document.getElementById("inspectorTableBody");
+
+// Kinematics Chart elements
+const kinematicsCanvas = document.getElementById("kinematicsCanvas");
+const chartStatLKnee = document.getElementById("chartStatLKnee");
+const chartStatRKnee = document.getElementById("chartStatRKnee");
+const chartStatSpine = document.getElementById("chartStatSpine");
+const chartStatDelta = document.getElementById("chartStatDelta");
+
+const biLKnee = document.getElementById("biLKnee");
+const biRKnee = document.getElementById("biRKnee");
+const biLHip = document.getElementById("biLHip");
+const biRHip = document.getElementById("biRHip");
+const biLAnkle = document.getElementById("biLAnkle");
+const biRAnkle = document.getElementById("biRAnkle");
+const biKneeDiff = document.getElementById("biKneeDiff");
+const biStatusText = document.getElementById("biStatusText");
+
+// Telemetry stream & results
 const telemetryTableBody = document.getElementById("telemetryTableBody");
 const copyTelemetryBtn = document.getElementById("copyTelemetryBtn");
 const mathBreakdownCard = document.getElementById("mathBreakdownCard");
@@ -193,24 +324,162 @@ let sessionStartTime = null;
 let capturedFrames = [];
 let sampleTimer = null;
 let showMarkers = true;
+let showLandmarkLabels = false;
+
+// Selected landmark for inspector highlight reticle
+let selectedLandmarkIndex = null;
+let categoryFilter = "all";
 
 // Monotonically increasing timestamp for MediaPipe
 let mpTimestamp = 1;
 let lastVideoTime = -1;
+
+// Performance metrics
+let lastTickTime = performance.now();
+let frameTimeWindow = [];
+let lastInferenceDuration = 0;
+
+// Kinematics history for rolling chart
+const MAX_CHART_SAMPLES = 50;
+const kinematicsHistory = {
+  times: [],
+  lKnee: [],
+  rKnee: [],
+  spine: []
+};
 
 // Tracking state
 let currentPoseLandmarks = null;
 let currentWorldLandmarks = null;
 let currentFaceMetrics = null;
 let frameCounter = 0;
-let allLogs = []; // Stores frame logs
+let allLogs = [];
 
 const TARGET_FPS = 10.0;
 const SESSION_DURATION_SEC = 12.0;
 const TARGET_FRAMES = 120;
 
 // ============================================================
-// 5. Markers Toggle
+// 5. Initialize Landmark Inspector Rows
+// ============================================================
+function initLandmarkInspector() {
+  if (!inspectorTableBody) return;
+  inspectorTableBody.innerHTML = "";
+
+  LANDMARK_REGISTRY.forEach((lm) => {
+    const tr = document.createElement("tr");
+    tr.dataset.id = lm.id;
+    tr.dataset.name = lm.name;
+    tr.dataset.side = lm.side;
+    tr.dataset.category = lm.category;
+
+    const sideBadgeClass = lm.side === "left" ? "dot-left" : lm.side === "right" ? "dot-right" : "dot-center";
+    const sideName = lm.side.toUpperCase();
+
+    tr.innerHTML = `
+      <td><strong>#${lm.id}</strong></td>
+      <td>${lm.name}</td>
+      <td><span class="side-badge"><span class="side-dot ${sideBadgeClass}"></span>${sideName}</span></td>
+      <td class="cell-x">--</td>
+      <td class="cell-y">--</td>
+      <td class="cell-z">--</td>
+      <td class="cell-vis">--%</td>
+    `;
+
+    tr.addEventListener("click", () => {
+      if (selectedLandmarkIndex === lm.id) {
+        selectedLandmarkIndex = null;
+      } else {
+        selectedLandmarkIndex = lm.id;
+      }
+      updateInspectorSelectionUI();
+    });
+
+    inspectorTableBody.appendChild(tr);
+  });
+}
+
+function updateInspectorSelectionUI() {
+  const rows = inspectorTableBody?.querySelectorAll("tr") || [];
+  rows.forEach((tr) => {
+    const id = parseInt(tr.dataset.id, 10);
+    tr.classList.toggle("selected", id === selectedLandmarkIndex);
+  });
+  if (clearSelectionBtn) {
+    clearSelectionBtn.style.display = selectedLandmarkIndex !== null ? "inline-block" : "none";
+  }
+}
+
+if (clearSelectionBtn) {
+  clearSelectionBtn.addEventListener("click", () => {
+    selectedLandmarkIndex = null;
+    updateInspectorSelectionUI();
+  });
+}
+
+function applyInspectorFilter() {
+  const query = (landmarkSearch?.value || "").toLowerCase().trim();
+  const rows = inspectorTableBody?.querySelectorAll("tr") || [];
+  rows.forEach((tr) => {
+    const id = tr.dataset.id;
+    const name = tr.dataset.name;
+    const cat = tr.dataset.category;
+    const matchesSearch = !query || name.includes(query) || id.includes(query);
+    const matchesCat = categoryFilter === "all" || cat === categoryFilter;
+    tr.style.display = (matchesSearch && matchesCat) ? "" : "none";
+  });
+}
+
+if (landmarkSearch) {
+  landmarkSearch.addEventListener("input", applyInspectorFilter);
+}
+
+filterChips.forEach((chip) => {
+  chip.addEventListener("click", () => {
+    filterChips.forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    categoryFilter = chip.dataset.filter;
+    applyInspectorFilter();
+  });
+});
+
+// Update Inspector Row Values
+function updateInspectorValues(landmarks) {
+  if (!landmarks || landmarks.length < 33 || !inspectorTableBody) return;
+  const rows = inspectorTableBody.querySelectorAll("tr");
+  rows.forEach((tr) => {
+    const id = parseInt(tr.dataset.id, 10);
+    const p = landmarks[id];
+    if (!p) return;
+
+    const cellX = tr.querySelector(".cell-x");
+    const cellY = tr.querySelector(".cell-y");
+    const cellZ = tr.querySelector(".cell-z");
+    const cellVis = tr.querySelector(".cell-vis");
+
+    if (cellX) cellX.textContent = p.x.toFixed(3);
+    if (cellY) cellY.textContent = p.y.toFixed(3);
+    if (cellZ) cellZ.textContent = (p.z || 0).toFixed(3);
+    if (cellVis) {
+      const v = Math.round((p.visibility !== undefined ? p.visibility : 1.0) * 100);
+      cellVis.textContent = `${v}%`;
+    }
+  });
+}
+
+// ============================================================
+// 6. Subtab Switching inside Telemetry Card
+// ============================================================
+subtabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const target = btn.dataset.subtab;
+    subtabBtns.forEach(b => b.classList.toggle("active", b === btn));
+    subtabPanels.forEach(p => p.classList.toggle("active", p.id === target));
+  });
+});
+
+// ============================================================
+// 7. Video Transport & Overlay Toggles
 // ============================================================
 if (toggleMarkersBtn) {
   toggleMarkersBtn.addEventListener("click", () => {
@@ -221,8 +490,39 @@ if (toggleMarkersBtn) {
   });
 }
 
+if (toggleLabelsBtn) {
+  toggleLabelsBtn.addEventListener("click", () => {
+    showLandmarkLabels = !showLandmarkLabels;
+    toggleLabelsBtn.textContent = showLandmarkLabels ? "Labels: ON" : "Labels: Off";
+  });
+}
+
+if (playPauseBtn) {
+  playPauseBtn.addEventListener("click", () => {
+    if (videoEl.paused) {
+      videoEl.play();
+    } else {
+      videoEl.pause();
+    }
+  });
+}
+
+videoEl.addEventListener("play", () => {
+  if (playPauseBtn) playPauseBtn.textContent = "⏸ Pause";
+});
+videoEl.addEventListener("pause", () => {
+  if (playPauseBtn) playPauseBtn.textContent = "▶ Play";
+});
+
+if (restartVideoBtn) {
+  restartVideoBtn.addEventListener("click", () => {
+    videoEl.currentTime = 0;
+    videoEl.play();
+  });
+}
+
 // ============================================================
-// 6. Math Utilities
+// 8. Math Utilities (3D Vector Angle from berad217)
 // ============================================================
 function angle3D(a, b, c) {
   if (!a || !b || !c) return 180.0;
@@ -243,145 +543,260 @@ function vis(p) {
 }
 
 // ============================================================
-// 7. SKELETON RENDERING - 33 Visible Dots + Foot Triangles
+// 9. SKELETON RENDERING - 33 Landmarks, Bilateral Colors & Reticle
 // ============================================================
 function drawSkeleton(landmarks, w, h) {
   ctx.clearRect(0, 0, w, h);
   if (!landmarks || landmarks.length < 33 || !showMarkers) return;
 
-  // --- 1. Body Connections (emerald green lines) ---
-  const BODY = [
-    [11, 12], [11, 23], [12, 24], [23, 24], // Torso box
-    [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], // Left arm
-    [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], // Right arm
-    [23, 25], [25, 27], // Left leg
-    [24, 26], [26, 28], // Right leg
-    [0, 1], [1, 2], [2, 3], [3, 7], // Left face
-    [0, 4], [4, 5], [5, 6], [6, 8], // Right face
-    [9, 10], // Mouth
-  ];
-
-  ctx.lineWidth = 2.2;
-  ctx.strokeStyle = "rgba(16, 185, 129, 0.95)";
-
-  for (const [i, j] of BODY) {
-    const a = landmarks[i], b = landmarks[j];
+  // --- 1. Draw 35 Anatomical Connections (Pose-Track) ---
+  ctx.lineCap = "round";
+  for (const conn of SKELETON_CONNECTIONS) {
+    const a = landmarks[conn.a], b = landmarks[conn.b];
     if (vis(a) && vis(b)) {
       ctx.beginPath();
+      ctx.lineWidth = (conn.a >= 27 && conn.b >= 27) ? 2.8 : 2.2;
+      ctx.strokeStyle = conn.side === "left"
+        ? "rgba(245, 158, 11, 0.92)"
+        : conn.side === "right"
+          ? "rgba(56, 189, 248, 0.92)"
+          : "rgba(16, 185, 129, 0.92)";
       ctx.moveTo(a.x * w, a.y * h);
       ctx.lineTo(b.x * w, b.y * h);
       ctx.stroke();
     }
   }
 
-  // --- 2. Dedicated Anatomical Foot Triangles (amber/orange) ---
-  // Connects Ankle (27/28), Heel (29/30), Toe (31/32)
-  const FEET = [
-    [27, 29], [29, 31], [31, 27], // Left foot triangle
-    [28, 30], [30, 32], [32, 28], // Right foot triangle
-  ];
-
-  ctx.lineWidth = 2.8;
-  ctx.strokeStyle = "rgba(245, 158, 11, 1.0)";
-
-  for (const [i, j] of FEET) {
-    const a = landmarks[i], b = landmarks[j];
-    if (vis(a) && vis(b)) {
-      ctx.beginPath();
-      ctx.moveTo(a.x * w, a.y * h);
-      ctx.lineTo(b.x * w, b.y * h);
-      ctx.stroke();
-    }
-  }
-
-  // --- 3. Draw All 33 Landmark Dots with Outer Glow ---
+  // --- 2. Draw All 33 Landmark Dots ---
   landmarks.forEach((p, idx) => {
     if (!vis(p)) return;
     const px = p.x * w;
     const py = p.y * h;
+    const def = LANDMARK_REGISTRY[idx] || { side: "center" };
+    const color = getSideColor(def.side);
 
-    let r, color;
-    if (idx <= 10) {
-      r = 3; color = "#94A3B8"; // Face: slate
-    } else if (idx <= 22) {
-      r = 4; color = "#38BDF8"; // Arms: cyan
-    } else if (idx <= 24) {
-      r = 4.5; color = "#10B981"; // Hips: emerald
-    } else if (idx <= 26) {
-      r = 5.5; color = "#10B981"; // Knees: emerald
-    } else {
-      r = 5.5; color = "#F59E0B"; // Feet & Ankles: amber
-    }
+    let r = 4.0;
+    if (idx <= 10) r = 3.2;         // Face
+    else if (idx <= 24) r = 4.5;    // Upper body / arms
+    else r = 5.5;                   // Legs / feet
 
     // Outer glow
     ctx.beginPath();
     ctx.arc(px, py, r + 2.5, 0, 2 * Math.PI);
-    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fill();
 
-    // Inner dot
+    // Colored body
     ctx.beginPath();
     ctx.arc(px, py, r, 0, 2 * Math.PI);
     ctx.fillStyle = color;
     ctx.fill();
 
-    // Crisp white rim
+    // Crisp white core
     ctx.beginPath();
-    ctx.arc(px, py, r, 0, 2 * Math.PI);
-    ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    ctx.arc(px, py, r * 0.45, 0, 2 * Math.PI);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fill();
+
+    // Landmark ID/Name labels toggle
+    if (showLandmarkLabels) {
+      drawLabel(ctx, `#${idx}`, px + 6, py - 4, "rgba(15,23,42,0.85)");
+    }
   });
 
-  // --- 4. Joint Angle Badges ---
+  // --- 3. Highlight Selected Landmark with Targeting Reticle ---
+  if (selectedLandmarkIndex !== null && vis(landmarks[selectedLandmarkIndex])) {
+    const selP = landmarks[selectedLandmarkIndex];
+    const sx = selP.x * w;
+    const sy = selP.y * h;
+    const selDef = LANDMARK_REGISTRY[selectedLandmarkIndex];
+    const pulse = Math.sin(performance.now() * 0.008) * 4;
+
+    // Glowing animated outer target ring
+    ctx.beginPath();
+    ctx.arc(sx, sy, 14 + pulse, 0, 2 * Math.PI);
+    ctx.strokeStyle = "#F59E0B";
+    ctx.lineWidth = 2.2;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Crosshair ticks
+    const tickLen = 6;
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    // Top
+    ctx.moveTo(sx, sy - 18 - pulse);
+    ctx.lineTo(sx, sy - 18 - pulse - tickLen);
+    // Bottom
+    ctx.moveTo(sx, sy + 18 + pulse);
+    ctx.lineTo(sx, sy + 18 + pulse + tickLen);
+    // Left
+    ctx.moveTo(sx - 18 - pulse, sy);
+    ctx.lineTo(sx - 18 - pulse - tickLen, sy);
+    // Right
+    ctx.moveTo(sx + 18 + pulse, sy);
+    ctx.lineTo(sx + 18 + pulse + tickLen, sy);
+    ctx.stroke();
+
+    // Callout banner above target
+    const bannerText = `#${selectedLandmarkIndex} ${selDef.name.toUpperCase()} (X:${selP.x.toFixed(2)} Y:${selP.y.toFixed(2)})`;
+    drawLabel(ctx, bannerText, sx - 40, sy - 30, "#D97706");
+  }
+
+  // --- 4. Joint Angle Callouts on Knees & Spine ---
   const lk = angle3D(landmarks[23], landmarks[25], landmarks[27]);
   const rk = angle3D(landmarks[24], landmarks[26], landmarks[28]);
 
   if (vis(landmarks[25])) {
-    drawLabel(ctx, `L:${lk.toFixed(0)}°`, landmarks[25].x * w - 32, landmarks[25].y * h - 10);
+    drawLabel(ctx, `L:${lk.toFixed(0)}°`, landmarks[25].x * w - 38, landmarks[25].y * h - 10, "rgba(217, 119, 6, 0.9)");
   }
   if (vis(landmarks[26])) {
-    drawLabel(ctx, `R:${rk.toFixed(0)}°`, landmarks[26].x * w + 10, landmarks[26].y * h - 10);
+    drawLabel(ctx, `R:${rk.toFixed(0)}°`, landmarks[26].x * w + 12, landmarks[26].y * h - 10, "rgba(2, 132, 199, 0.9)");
   }
 
-  // Spine tilt
-  const smx = (landmarks[11].x + landmarks[12].x) / 2;
-  const smy = (landmarks[11].y + landmarks[12].y) / 2;
-  const hmx = (landmarks[23].x + landmarks[24].x) / 2;
-  const hmy = (landmarks[23].y + landmarks[24].y) / 2;
-  const dx = smx - hmx, dy = smy - hmy;
-  const tilt = Math.abs((Math.atan2(dx, dy) * 180) / Math.PI);
-  const sx = (smx + hmx) / 2, sy = (smy + hmy) / 2;
-  drawLabel(ctx, `Tilt:${tilt.toFixed(1)}°`, sx * w + 16, sy * h, "#0F5C5C");
+  // Spine tilt indicator
+  if (vis(landmarks[11]) && vis(landmarks[12]) && vis(landmarks[23]) && vis(landmarks[24])) {
+    const smx = (landmarks[11].x + landmarks[12].x) / 2;
+    const smy = (landmarks[11].y + landmarks[12].y) / 2;
+    const hmx = (landmarks[23].x + landmarks[24].x) / 2;
+    const hmy = (landmarks[23].y + landmarks[24].y) / 2;
+    const dx = smx - hmx, dy = smy - hmy;
+    const tilt = Math.abs((Math.atan2(dx, dy) * 180) / Math.PI);
+    const sx = (smx + hmx) / 2, sy = (smy + hmy) / 2;
+    drawLabel(ctx, `Tilt:${tilt.toFixed(1)}°`, sx * w + 16, sy * h, "#0F5C5C");
+  }
 }
 
-function drawLabel(ctx, text, x, y, bg = "rgba(15,23,42,0.85)") {
-  ctx.save();
-  ctx.font = "bold 10px monospace";
-  const tw = ctx.measureText(text).width;
-  const bx = Math.max(2, Math.min(x, ctx.canvas.width - tw - 8));
-  const by = Math.max(2, Math.min(y, ctx.canvas.height - 16));
+function drawLabel(targetCtx, text, x, y, bg = "rgba(15,23,42,0.85)") {
+  targetCtx.save();
+  targetCtx.font = "bold 10px monospace";
+  const tw = targetCtx.measureText(text).width;
+  const bx = Math.max(2, Math.min(x, targetCtx.canvas.width - tw - 8));
+  const by = Math.max(2, Math.min(y, targetCtx.canvas.height - 16));
 
-  ctx.fillStyle = bg;
-  ctx.beginPath();
-  ctx.roundRect(bx, by, tw + 6, 14, 3);
-  ctx.fill();
+  targetCtx.fillStyle = bg;
+  targetCtx.beginPath();
+  targetCtx.roundRect(bx, by, tw + 6, 14, 3);
+  targetCtx.fill();
 
-  ctx.fillStyle = "#FFFFFF";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.fillText(text, bx + 3, by + 2);
-  ctx.restore();
+  targetCtx.fillStyle = "#FFFFFF";
+  targetCtx.textAlign = "left";
+  targetCtx.textBaseline = "top";
+  targetCtx.fillText(text, bx + 3, by + 2);
+  targetCtx.restore();
 }
 
 // ============================================================
-// 8. TELEMETRY - Compute & Stream Live Measurements
+// 10. REAL-TIME KINEMATICS CHART (HTML5 Canvas 60 FPS)
+// ============================================================
+function updateKinematicsChart(t, lk, rk, spine) {
+  kinematicsHistory.times.push(t);
+  kinematicsHistory.lKnee.push(lk);
+  kinematicsHistory.rKnee.push(rk);
+  kinematicsHistory.spine.push(spine);
+
+  if (kinematicsHistory.times.length > MAX_CHART_SAMPLES) {
+    kinematicsHistory.times.shift();
+    kinematicsHistory.lKnee.shift();
+    kinematicsHistory.rKnee.shift();
+    kinematicsHistory.spine.shift();
+  }
+
+  if (!kinematicsCanvas) return;
+  const kCtx = kinematicsCanvas.getContext("2d");
+  const cw = kinematicsCanvas.width;
+  const ch = kinematicsCanvas.height;
+  kCtx.clearRect(0, 0, cw, ch);
+
+  // Background grid
+  kCtx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+  kCtx.lineWidth = 1;
+  const gridAngles = [60, 90, 120, 150, 180];
+  gridAngles.forEach((deg) => {
+    const y = ch - (deg / 180.0) * (ch - 24) - 12;
+    kCtx.beginPath();
+    kCtx.moveTo(35, y);
+    kCtx.lineTo(cw - 10, y);
+    kCtx.stroke();
+
+    kCtx.fillStyle = "rgba(255, 255, 255, 0.35)";
+    kCtx.font = "9px monospace";
+    kCtx.textAlign = "right";
+    kCtx.fillText(`${deg}°`, 30, y + 3);
+  });
+
+  const len = kinematicsHistory.times.length;
+  if (len < 2) return;
+
+  function plotSeries(data, color, width = 2) {
+    kCtx.strokeStyle = color;
+    kCtx.lineWidth = width;
+    kCtx.beginPath();
+    for (let i = 0; i < len; i++) {
+      const x = 40 + (i / (MAX_CHART_SAMPLES - 1)) * (cw - 55);
+      const val = Math.max(0, Math.min(180, data[i]));
+      const y = ch - (val / 180.0) * (ch - 24) - 12;
+      if (i === 0) kCtx.moveTo(x, y);
+      else kCtx.lineTo(x, y);
+    }
+    kCtx.stroke();
+
+    // Latest point head
+    const lastX = 40 + ((len - 1) / (MAX_CHART_SAMPLES - 1)) * (cw - 55);
+    const lastY = ch - (Math.max(0, Math.min(180, data[len - 1])) / 180.0) * (ch - 24) - 12;
+    kCtx.fillStyle = color;
+    kCtx.beginPath();
+    kCtx.arc(lastX, lastY, 3.5, 0, 2 * Math.PI);
+    kCtx.fill();
+  }
+
+  // Left Knee (Amber)
+  plotSeries(kinematicsHistory.lKnee, "#F59E0B", 2.2);
+  // Right Knee (Sky Blue)
+  plotSeries(kinematicsHistory.rKnee, "#38BDF8", 2.2);
+  // Spine Tilt (Mint)
+  plotSeries(kinematicsHistory.spine, "#10B981", 1.8);
+
+  // Update stats bar
+  if (chartStatLKnee) chartStatLKnee.textContent = `LK: ${lk.toFixed(0)}°`;
+  if (chartStatRKnee) chartStatRKnee.textContent = `RK: ${rk.toFixed(0)}°`;
+  if (chartStatSpine) chartStatSpine.textContent = `Spine: ${spine.toFixed(1)}°`;
+  const delta = Math.abs(lk - rk);
+  if (chartStatDelta) chartStatDelta.textContent = `|L-R|: ${delta.toFixed(0)}°`;
+
+  // Update Bilateral Card
+  if (biLKnee) biLKnee.textContent = `${lk.toFixed(0)}°`;
+  if (biRKnee) biRKnee.textContent = `${rk.toFixed(0)}°`;
+  if (biKneeDiff) biKneeDiff.textContent = `Δ ${delta.toFixed(0)}°`;
+  if (biStatusText) {
+    if (delta <= 12) {
+      biStatusText.textContent = "Symmetrical";
+      biStatusText.style.background = "#DCFCE7";
+      biStatusText.style.color = "#166534";
+    } else if (delta <= 25) {
+      biStatusText.textContent = "Mild Asymmetry";
+      biStatusText.style.background = "#FEF3C7";
+      biStatusText.style.color = "#92400E";
+    } else {
+      biStatusText.textContent = "Significant Asymmetry";
+      biStatusText.style.background = "#FEE2E2";
+      biStatusText.style.color = "#991B1B";
+    }
+  }
+}
+
+// ============================================================
+// 11. TELEMETRY - Compute & Stream Live Measurements
 // ============================================================
 function computeTelemetry(pose, timeSec, frame) {
   if (!pose || pose.length < 33) return null;
 
   const lk = angle3D(pose[23], pose[25], pose[27]);
   const rk = angle3D(pose[24], pose[26], pose[28]);
+  const lHip = angle3D(pose[11], pose[23], pose[25]);
+  const rHip = angle3D(pose[12], pose[24], pose[26]);
 
   const smx = (pose[11].x + pose[12].x) / 2;
   const smy = (pose[11].y + pose[12].y) / 2;
@@ -415,6 +830,12 @@ function computeTelemetry(pose, timeSec, frame) {
       gsi = Math.max(0.0, Math.min(1.0, gsi));
     }
   }
+
+  // Update Bilateral Card Hips & Ankles
+  if (biLHip) biLHip.textContent = `${lHip.toFixed(0)}°`;
+  if (biRHip) biRHip.textContent = `${rHip.toFixed(0)}°`;
+  if (biLAnkle && pose[27]) biLAnkle.textContent = pose[27].y.toFixed(2);
+  if (biRAnkle && pose[28]) biRAnkle.textContent = pose[28].y.toFixed(2);
 
   return {
     time: Number(timeSec.toFixed(3)),
@@ -473,6 +894,10 @@ function appendLogRow(t) {
 function clearLogs() {
   allLogs = [];
   frameCounter = 0;
+  kinematicsHistory.times = [];
+  kinematicsHistory.lKnee = [];
+  kinematicsHistory.rKnee = [];
+  kinematicsHistory.spine = [];
   if (telemetryTableBody) {
     const dict = I18N[currentLang] || I18N.en;
     telemetryTableBody.innerHTML = `<tr class="empty-row"><td colspan="8">${dict.empty_log}</td></tr>`;
@@ -490,7 +915,7 @@ if (copyTelemetryBtn) {
 }
 
 // ============================================================
-// 9. MediaPipe Initialization (With GPU & CPU Fallback)
+// 12. MediaPipe Initialization (With GPU & CPU Fallback)
 // ============================================================
 async function ensureMediaPipe() {
   if (poseLandmarker) return poseLandmarker;
@@ -505,7 +930,6 @@ async function ensureMediaPipe() {
   try {
     if (videoStatus) videoStatus.textContent = "Loading AI Vision model from Google CDN...";
 
-    // Wait for MediaPipeVision module if needed
     let attempts = 0;
     while (!window.MediaPipeVision && attempts < 50) {
       await new Promise(r => setTimeout(r, 100));
@@ -577,14 +1001,28 @@ window.addEventListener("mediapipe-ready", ensureMediaPipe);
 if (window.MediaPipeVision) ensureMediaPipe();
 
 // ============================================================
-// 10. Main Tracking Loop
+// 13. Main Real-Time Tracking Loop
 // ============================================================
 function startTracking() {
   if (animationFrameId) cancelAnimationFrame(animationFrameId);
   lastVideoTime = -1;
   mpTimestamp = performance.now();
+  lastTickTime = performance.now();
+  frameTimeWindow = [];
 
   function tick() {
+    const now = performance.now();
+    const frameDelta = now - lastTickTime;
+    lastTickTime = now;
+
+    if (frameDelta > 0) {
+      frameTimeWindow.push(frameDelta);
+      if (frameTimeWindow.length > 15) frameTimeWindow.shift();
+      const avgDelta = frameTimeWindow.reduce((a, b) => a + b, 0) / frameTimeWindow.length;
+      const fps = Math.round(1000 / avgDelta);
+      if (fpsText) fpsText.textContent = `${fps} FPS`;
+    }
+
     if (videoEl && videoEl.readyState >= 2) {
       const vw = videoEl.videoWidth || 360;
       const vh = videoEl.videoHeight || 640;
@@ -601,8 +1039,12 @@ function startTracking() {
         lastVideoTime = curTime;
         mpTimestamp = Math.max(mpTimestamp + 33, performance.now());
 
+        const tStart = performance.now();
         try {
           const result = poseLandmarker.detectForVideo(videoEl, mpTimestamp);
+          lastInferenceDuration = performance.now() - tStart;
+          if (latencyText) latencyText.textContent = `${Math.round(lastInferenceDuration)} ms`;
+
           if (result && result.landmarks && result.landmarks.length > 0) {
             currentPoseLandmarks = result.landmarks[0];
             currentWorldLandmarks = (result.worldLandmarks && result.worldLandmarks.length > 0)
@@ -633,8 +1075,11 @@ function startTracking() {
         frameCounter++;
         const timeSec = videoEl.currentTime || 0;
 
-        // Draw skeleton & landmarks
+        // Draw skeleton & landmarks with bilateral colors & reticle
         drawSkeleton(currentPoseLandmarks, canvasEl.width, canvasEl.height);
+
+        // Update 33-Landmark Inspector values
+        updateInspectorValues(currentPoseLandmarks);
 
         // Compute telemetry for this frame
         const telemetry = computeTelemetry(currentPoseLandmarks, timeSec, frameCounter);
@@ -649,9 +1094,12 @@ function startTracking() {
           if (currentFaceMetrics && teleYaw) {
             teleYaw.textContent = `${Math.round((currentFaceMetrics.head_yaw || 0) * 45)}°`;
           }
+
+          // Update Real-Time Kinematics Canvas Chart
+          updateKinematicsChart(telemetry.time, telemetry.lKnee, telemetry.rKnee, telemetry.spine);
         }
       } else {
-        // Redraw overlay even if no new video frame to maintain visual alignment
+        // Redraw overlay to maintain visual alignment even when paused
         drawSkeleton(currentPoseLandmarks, canvasEl.width, canvasEl.height);
       }
     }
@@ -663,7 +1111,7 @@ function startTracking() {
 }
 
 // ============================================================
-// 11. Camera Start
+// 14. Camera Start
 // ============================================================
 if (startCamBtn) {
   startCamBtn.addEventListener("click", async () => {
@@ -705,7 +1153,7 @@ if (startCamBtn) {
 }
 
 // ============================================================
-// 12. Video File Upload (Handles Pre-Recorded Videos)
+// 15. Video File Upload (Handles Pre-Recorded Videos)
 // ============================================================
 async function handleVideoFile(file) {
   if (!file) return;
@@ -746,7 +1194,7 @@ if (videoFileInputAlt) {
 }
 
 // ============================================================
-// 13. Demo Button - Runs MediaPipe on tutorial_walking.mp4
+// 16. Demo Button - Runs MediaPipe on tutorial_walking.mp4
 // ============================================================
 async function runDemo() {
   stopEverything();
@@ -784,7 +1232,7 @@ async function runDemo() {
 if (runDemoBtn) runDemoBtn.addEventListener("click", runDemo);
 
 // ============================================================
-// 14. Recording Session (Captures 120 Frames at 10 FPS)
+// 17. Recording Session (Captures 120 Frames at 10 FPS)
 // ============================================================
 function startAutoRecording() {
   isRecording = true;
@@ -877,7 +1325,7 @@ async function finishRecording() {
 }
 
 // ============================================================
-// 15. Results Display (Stage 1 & Stage 2 Screening Report)
+// 18. Results Display (Stage 1 & Stage 2 Screening Report)
 // ============================================================
 function showResults(data) {
   if (!mathBreakdownCard || !mathStepsList) return;
@@ -937,7 +1385,7 @@ function showResults(data) {
 }
 
 // ============================================================
-// 16. Cleanup Helper
+// 19. Cleanup Helper
 // ============================================================
 function stopEverything() {
   if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
@@ -948,8 +1396,11 @@ function stopEverything() {
   currentWorldLandmarks = null;
 }
 
+// Initialize inspector rows on page load
+initLandmarkInspector();
+
 // ============================================================
-// 17. Skin & Eye Classifiers (Preserved Modules)
+// 20. Skin & Eye Classifiers (Preserved Modules)
 // ============================================================
 document.querySelectorAll(".card[data-endpoint]").forEach(setupClassifierCard);
 

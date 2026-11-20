@@ -86,6 +86,9 @@
           <label for="videoFileInputAlt" class="btn btn-secondary" data-i18n="btn_upload_video">Upload Video File</label>
           <input type="file" id="videoFileInputAlt" accept="video/*" capture="user" style="display: none;" />
           <button id="runDemoBtn" class="btn btn-accent" data-i18n="btn_run_demo">Run Walking Demo</button>
+          <button type="button" id="playPauseBtn" class="btn btn-ghost" title="Play or Pause Video">⏸ Pause</button>
+          <button type="button" id="restartVideoBtn" class="btn btn-ghost" title="Restart Video from Beginning">↺ Restart</button>
+          <button type="button" id="toggleLabelsBtn" class="btn btn-ghost" title="Toggle Landmark IDs / Names">Labels: Off</button>
           <button id="startRecordBtn" class="btn btn-record" disabled data-i18n="btn_record">Record Session</button>
           <button id="stopRecordBtn" class="btn btn-ghost" disabled data-i18n="btn_reset">Reset</button>
         </div>
@@ -121,6 +124,9 @@
             <div class="hud-pill top-left" id="framingBadge">
               <span class="hud-dot yellow"></span> <span data-i18n="status_waiting">Waiting for Input...</span>
             </div>
+            <div class="hud-pill bottom-left" id="fpsBadge">
+              <span id="fpsText">-- FPS</span> · <span id="latencyText">-- ms</span>
+            </div>
             <div class="hud-pill top-right" id="timerBadge" hidden>
               <span id="countdownText">12.0s</span> | <span id="frameCountText">0 / 120</span>
             </div>
@@ -129,7 +135,7 @@
           <p id="videoStatus" class="status-bar" role="status" data-i18n="status_ready_prompt">Camera ready. Start camera or select a video to begin tracking.</p>
         </div>
 
-        <!-- Right: Real-time Telemetry, Second-by-Second Log Table & Math Calculations -->
+        <!-- Right: Real-time Telemetry, Sub-Tabs: Stream, 33-Inspector & Kinematics -->
         <div class="telemetry-card">
           <!-- Live Telemetry KPI Cards -->
           <div class="kpi-grid">
@@ -159,32 +165,129 @@
             </div>
           </div>
 
-          <!-- Per-Second Live Engineering Log Table -->
-          <div class="log-stream-section">
-            <div class="section-top">
-              <h4 data-i18n="log_stream_title">Per-Second Telemetry Stream (Live Measurements)</h4>
-              <button type="button" id="copyTelemetryBtn" class="btn-micro" data-i18n="btn_copy_json">Copy JSON</button>
+          <!-- Subtabs Navigation -->
+          <div class="subtabs-bar" role="tablist">
+            <button type="button" class="subtab-btn active" data-subtab="subtab-telemetry" data-i18n="subtab_stream">
+              Telemetry Stream
+            </button>
+            <button type="button" class="subtab-btn" data-subtab="subtab-inspector" data-i18n="subtab_inspector">
+              33-Landmarks Inspector
+            </button>
+            <button type="button" class="subtab-btn" data-subtab="subtab-charts" data-i18n="subtab_charts">
+              Real-Time Kinematics
+            </button>
+          </div>
+
+          <!-- Subtab 1: Per-Second Live Engineering Log Table -->
+          <div class="subtab-panel active" id="subtab-telemetry">
+            <div class="log-stream-section">
+              <div class="section-top">
+                <h4 data-i18n="log_stream_title">Per-Second Telemetry Stream (Live Measurements)</h4>
+                <button type="button" id="copyTelemetryBtn" class="btn-micro" data-i18n="btn_copy_json">Copy JSON</button>
+              </div>
+              <div class="table-container">
+                <table class="telemetry-table" id="telemetryTable">
+                  <thead>
+                    <tr>
+                      <th data-i18n="th_sec">Sec</th>
+                      <th data-i18n="th_frame">Frame</th>
+                      <th data-i18n="th_lknee">L-Knee</th>
+                      <th data-i18n="th_rknee">R-Knee</th>
+                      <th data-i18n="th_spine">Spine</th>
+                      <th data-i18n="th_sep">Ankle Sep (s)</th>
+                      <th data-i18n="th_torso">Torso (px)</th>
+                      <th data-i18n="th_status">Framing</th>
+                    </tr>
+                  </thead>
+                  <tbody id="telemetryTableBody">
+                    <tr class="empty-row">
+                      <td colspan="8" data-i18n="empty_log">Live telemetry data will stream here second-by-second...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div class="table-container">
-              <table class="telemetry-table" id="telemetryTable">
-                <thead>
-                  <tr>
-                    <th data-i18n="th_sec">Sec</th>
-                    <th data-i18n="th_frame">Frame</th>
-                    <th data-i18n="th_lknee">L-Knee</th>
-                    <th data-i18n="th_rknee">R-Knee</th>
-                    <th data-i18n="th_spine">Spine</th>
-                    <th data-i18n="th_sep">Ankle Sep (s)</th>
-                    <th data-i18n="th_torso">Torso (px)</th>
-                    <th data-i18n="th_status">Framing</th>
-                  </tr>
-                </thead>
-                <tbody id="telemetryTableBody">
-                  <tr class="empty-row">
-                    <td colspan="8" data-i18n="empty_log">Live telemetry data will stream here second-by-second...</td>
-                  </tr>
-                </tbody>
-              </table>
+          </div>
+
+          <!-- Subtab 2: Complete 33-Landmark Inspector -->
+          <div class="subtab-panel" id="subtab-inspector">
+            <div class="inspector-section">
+              <div class="inspector-toolbar">
+                <input type="text" id="landmarkSearch" class="inspector-search" placeholder="Search joint (e.g. knee, ankle, shoulder)..." />
+                <div class="filter-chips">
+                  <button type="button" class="chip active" data-filter="all">All (33)</button>
+                  <button type="button" class="chip" data-filter="face">Face (11)</button>
+                  <button type="button" class="chip" data-filter="upper">Upper (4)</button>
+                  <button type="button" class="chip" data-filter="arms">Arms (10)</button>
+                  <button type="button" class="chip" data-filter="lower">Lower (8)</button>
+                  <button type="button" id="clearSelectionBtn" class="chip clear-chip" style="display:none;">Clear Selection</button>
+                </div>
+              </div>
+
+              <div class="table-container inspector-container">
+                <table class="inspector-table" id="inspectorTable">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Landmark Name</th>
+                      <th>Side</th>
+                      <th>X (norm)</th>
+                      <th>Y (norm)</th>
+                      <th>Z (depth)</th>
+                      <th>Vis %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inspectorTableBody">
+                    <!-- Populated dynamically from script.js -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="inspector-legend">
+                <span class="legend-item"><span class="legend-dot dot-left"></span> Left (Amber)</span>
+                <span class="legend-item"><span class="legend-dot dot-right"></span> Right (Sky Blue)</span>
+                <span class="legend-item"><span class="legend-dot dot-center"></span> Center (Mint)</span>
+                <span class="legend-tip">💡 Click row to target &amp; highlight on video canvas</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subtab 3: Real-Time Kinematics Charts -->
+          <div class="subtab-panel" id="subtab-charts">
+            <div class="kinematics-section">
+              <div class="chart-stats-bar">
+                <span class="chart-stat-badge stat-amber" id="chartStatLKnee">LK: 180°</span>
+                <span class="chart-stat-badge stat-blue" id="chartStatRKnee">RK: 180°</span>
+                <span class="chart-stat-badge stat-teal" id="chartStatSpine">Spine: 0.0°</span>
+                <span class="chart-stat-badge stat-gray" id="chartStatDelta">|L-R|: 0°</span>
+              </div>
+
+              <div class="realtime-chart-wrap">
+                <canvas id="kinematicsCanvas" width="600" height="190"></canvas>
+              </div>
+
+              <!-- Bilateral Kinematic Symmetry Card -->
+              <div class="bilateral-card">
+                <div class="bilateral-grid">
+                  <div class="bilateral-col col-left">
+                    <span class="bilateral-side-title">LEFT SIDE (Amber)</span>
+                    <div class="bilateral-metric"><span>Knee Angle:</span> <strong id="biLKnee">--°</strong></div>
+                    <div class="bilateral-metric"><span>Hip Angle:</span> <strong id="biLHip">--°</strong></div>
+                    <div class="bilateral-metric"><span>Ankle Height:</span> <strong id="biLAnkle">--</strong></div>
+                  </div>
+                  <div class="bilateral-center">
+                    <span class="bilateral-center-title">SYMMETRY</span>
+                    <strong class="bilateral-diff" id="biKneeDiff">Δ 0.0°</strong>
+                    <span class="bilateral-sub" id="biStatusText">Balanced</span>
+                  </div>
+                  <div class="bilateral-col col-right">
+                    <span class="bilateral-side-title">RIGHT SIDE (Sky Blue)</span>
+                    <div class="bilateral-metric"><span>Knee Angle:</span> <strong id="biRKnee">--°</strong></div>
+                    <div class="bilateral-metric"><span>Hip Angle:</span> <strong id="biRHip">--°</strong></div>
+                    <div class="bilateral-metric"><span>Ankle Height:</span> <strong id="biRAnkle">--</strong></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
