@@ -310,15 +310,69 @@ const AUDIO_CUE_SEC = 3.0;
 
 const TASK_INSTRUCTIONS = {
   walking_gait: "Position camera 2.5–3m away at waist height. Have the child walk naturally across or toward the camera. Track leg symmetry and stride balance.",
-  sitting_posture: "Child sits unsupported on a bench, chair, or floor facing camera. Measures axial trunk tilt, hypotonia, and lateral curvature.",
+  sitting_posture: "Child sits unsupported on a bench, play mat, or floor facing camera in portrait mode. Measures axial trunk tilt (θ <= 12°), kyphosis, hypotonia, and scoliosis.",
   standing_alignment: "Child stands upright facing camera with knees straight. Measures inter-condylar vs inter-malleolar spacing for bowed legs / knock knees.",
   balance_sway: "Child stands upright with feet close together for 10–12 seconds. Measures center-of-mass lateral and anteroposterior stability.",
   social_response: "Child sits facing forward. At 3.0s an auditory chime sounds. Measures orienting latency (head turn) and sustained eye contact.",
 };
 
+const TASK_CONFIGS = {
+  walking_gait: {
+    label: "Walking Gait",
+    dataFile: "assets/demo_walk_landmarks.json",
+    videoFile: "assets/demo_child_gait.mp4",
+    poster: "",
+    defaultAge: 24,
+  },
+  sitting_posture: {
+    label: "Sitting Posture",
+    dataFile: "assets/demo_sitting_landmarks.json",
+    videoFile: "",
+    poster: "assets/demo_sitting.jpg",
+    defaultAge: 18,
+  },
+  standing_alignment: {
+    label: "Standing Alignment",
+    dataFile: "assets/demo_standing_landmarks.json",
+    videoFile: "",
+    poster: "",
+    defaultAge: 24,
+  },
+  balance_sway: {
+    label: "Balance & Sway",
+    dataFile: "assets/demo_balance_landmarks.json",
+    videoFile: "",
+    poster: "",
+    defaultAge: 36,
+  },
+  social_response: {
+    label: "Social Response",
+    dataFile: "assets/demo_social_landmarks.json",
+    videoFile: "",
+    poster: "",
+    defaultAge: 20,
+  },
+};
+
+function updateTaskUI(taskKey) {
+  taskInstructionText.textContent = TASK_INSTRUCTIONS[taskKey] || TASK_INSTRUCTIONS.walking_gait;
+  const cfg = TASK_CONFIGS[taskKey] || TASK_CONFIGS.walking_gait;
+  if (runDemoBtn) runDemoBtn.textContent = `⚡ Test Demo: ${cfg.label}`;
+  document.querySelectorAll(".demo-pill-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.task === taskKey);
+  });
+}
+
 taskTypeSelect.addEventListener("change", () => {
-  const t = taskTypeSelect.value;
-  taskInstructionText.textContent = TASK_INSTRUCTIONS[t] || TASK_INSTRUCTIONS.walking_gait;
+  updateTaskUI(taskTypeSelect.value);
+});
+
+// Demo Pill Buttons Listener
+document.querySelectorAll(".demo-pill-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const task = btn.dataset.task;
+    runDemoSession(task);
+  });
 });
 
 // Initialize MediaPipe Vision Tasks
@@ -750,24 +804,53 @@ async function finishRecordingSession() {
   }
 }
 
-// Instant Demo Simulation Runner (Works on ANY device in 1 click!)
-async function runDemoSession() {
+// Instant Demo Simulation Runner (Works on ANY device in 1 click for all 5 tasks!)
+let activeDemoInterval = null;
+
+async function runDemoSession(targetTask = null) {
   switchTab("tab-video");
 
+  const chosenTask = targetTask || taskTypeSelect.value || "walking_gait";
+  taskTypeSelect.value = chosenTask;
+  updateTaskUI(chosenTask);
+
+  const cfg = TASK_CONFIGS[chosenTask] || TASK_CONFIGS.walking_gait;
+  childAgeInput.value = cfg.defaultAge;
+
   try {
-    videoStatus.textContent = "Loading demo child walk dataset (120 frames)...";
+    videoStatus.textContent = `Loading ${cfg.label} dataset (120 frames)...`;
     videoStatus.classList.remove("error");
 
-    // Load sample video into player
-    videoEl.srcObject = null;
-    videoEl.src = "assets/demo_child_gait.mp4";
-    videoEl.loop = true;
-    videoEl.muted = true;
-    videoEl.play();
+    if (activeDemoInterval) {
+      clearInterval(activeDemoInterval);
+      activeDemoInterval = null;
+    }
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    }
 
-    // Fetch pre-computed 120-frame landmark stream
-    const resp = await fetch("assets/demo_walk_landmarks.json");
-    if (!resp.ok) throw new Error("Could not load assets/demo_walk_landmarks.json");
+    // Configure background media
+    if (cfg.videoFile) {
+      videoEl.srcObject = null;
+      videoEl.poster = "";
+      videoEl.src = cfg.videoFile;
+      videoEl.loop = true;
+      videoEl.muted = true;
+      videoEl.play().catch(() => {});
+    } else if (cfg.poster) {
+      videoEl.srcObject = null;
+      videoEl.src = "";
+      videoEl.poster = cfg.poster;
+    } else {
+      videoEl.srcObject = null;
+      videoEl.src = "";
+      videoEl.poster = "";
+    }
+
+    // Fetch pre-computed 120-frame landmark stream for chosen task
+    const resp = await fetch(cfg.dataFile);
+    if (!resp.ok) throw new Error(`Could not load ${cfg.dataFile}`);
     const demoPayload = await resp.json();
 
     timerBadge.hidden = false;
@@ -777,12 +860,12 @@ async function runDemoSession() {
     canvasEl.width = 480;
     canvasEl.height = 480;
 
-    if (animationFrameId) cancelAnimationFrame(animationFrameId);
-
-    const demoInterval = setInterval(() => {
+    activeDemoInterval = setInterval(() => {
       if (frameIdx >= totalDemoFrames) {
-        clearInterval(demoInterval);
+        clearInterval(activeDemoInterval);
+        activeDemoInterval = null;
         timerBadge.hidden = true;
+        cueAlert.hidden = true;
         videoStatus.textContent = "Transmitting demo landmark frames to backend...";
 
         // Send to API
@@ -794,7 +877,8 @@ async function runDemoSession() {
           .then((r) => r.json())
           .then((data) => {
             displayVideoResults(data);
-            videoStatus.textContent = "Demo analysis complete! See the 4Ds breakdown below.";
+            videoStatus.textContent = `Demo ${cfg.label} analysis complete! See the 4Ds breakdown below.`;
+            videoResultsPanel.scrollIntoView({ behavior: "smooth" });
           })
           .catch((err) => {
             videoStatus.textContent = err.message || "Demo submission failed.";
@@ -811,7 +895,16 @@ async function runDemoSession() {
       drawSkeleton(ctx, lms, canvasEl.width, canvasEl.height);
       updateLiveTelemetry(lms, lms, face);
 
-      const remain = Math.max(0, 12.0 - (frameIdx * 0.1));
+      // Trigger audio chime for social response task at frame 30 (3.0s)
+      if (chosenTask === "social_response" && frameIdx === 30) {
+        playChimeSound();
+        cueAlert.hidden = false;
+        setTimeout(() => {
+          cueAlert.hidden = true;
+        }, 1500);
+      }
+
+      const remain = Math.max(0, 12.0 - frameIdx * 0.1);
       countdownText.textContent = `${remain.toFixed(1)}s`;
       frameCountText.textContent = `${frameIdx + 1} / ${totalDemoFrames}`;
 
@@ -824,12 +917,24 @@ async function runDemoSession() {
   }
 }
 
-if (runDemoBtn) runDemoBtn.addEventListener("click", runDemoSession);
-if (quickDemoBtn) quickDemoBtn.addEventListener("click", runDemoSession);
+if (runDemoBtn) runDemoBtn.addEventListener("click", () => runDemoSession());
+if (quickDemoBtn) quickDemoBtn.addEventListener("click", () => runDemoSession("walking_gait"));
 
-// Tutorial Action Button Triggers
+// Tutorial Action Button Triggers for All Modalities
+const tutorialTestSittingBtn = document.getElementById("tutorialTestSittingBtn");
+if (tutorialTestSittingBtn) tutorialTestSittingBtn.addEventListener("click", () => runDemoSession("sitting_posture"));
+
 const tutorialTestVideoBtn = document.getElementById("tutorialTestVideoBtn");
-if (tutorialTestVideoBtn) tutorialTestVideoBtn.addEventListener("click", runDemoSession);
+if (tutorialTestVideoBtn) tutorialTestVideoBtn.addEventListener("click", () => runDemoSession("walking_gait"));
+
+const tutorialTestStandingBtn = document.getElementById("tutorialTestStandingBtn");
+if (tutorialTestStandingBtn) tutorialTestStandingBtn.addEventListener("click", () => runDemoSession("standing_alignment"));
+
+const tutorialTestBalanceBtn = document.getElementById("tutorialTestBalanceBtn");
+if (tutorialTestBalanceBtn) tutorialTestBalanceBtn.addEventListener("click", () => runDemoSession("balance_sway"));
+
+const tutorialTestSocialBtn = document.getElementById("tutorialTestSocialBtn");
+if (tutorialTestSocialBtn) tutorialTestSocialBtn.addEventListener("click", () => runDemoSession("social_response"));
 
 const tutorialTestSkinBtn = document.getElementById("tutorialTestSkinBtn");
 if (tutorialTestSkinBtn) {

@@ -177,6 +177,16 @@
               ⏹️ Reset
             </button>
           </div>
+
+          <!-- 1-Click Interactive Demos Selector -->
+          <div class="demo-pills-bar">
+            <span class="demo-pills-label">⚡ 1-Click Interactive Demos:</span>
+            <button type="button" class="demo-pill-btn active" data-task="walking_gait">🚶 Walk Gait</button>
+            <button type="button" class="demo-pill-btn" data-task="sitting_posture">🪑 Sitting Posture</button>
+            <button type="button" class="demo-pill-btn" data-task="standing_alignment">🧍 Standing Alignment</button>
+            <button type="button" class="demo-pill-btn" data-task="balance_sway">⚖️ Balance &amp; Sway</button>
+            <button type="button" class="demo-pill-btn" data-task="social_response">🤝 Social Response</button>
+          </div>
           <p id="videoStatus" class="status-msg" role="status"></p>
         </div>
 
@@ -390,10 +400,57 @@
         </p>
 
         <div class="tutorial-grid">
-          <!-- Tutorial 1: Video Capture -->
+          <!-- Tutorial 1: Sitting Posture & Spine Alignment -->
+          <div class="tutorial-card featured-tutorial">
+            <div class="tutorial-badge purple">🪑 Sitting Posture &amp; Spine Screening</div>
+            <h3>How to Screen Sitting Posture</h3>
+            <div class="tutorial-media-preview portrait-preview">
+              <img src="assets/demo_sitting.jpg" alt="Optimal Sitting Posture Example" class="tutorial-img-preview" />
+            </div>
+            <div class="guideline-list">
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>WHO Milestone (6–9 Months):</strong>
+                  <p>Infants should sit steadily without support. Inability to maintain upright sitting by 9–10 months is an early gross motor delay flag (D4).</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Coronal Spine Tilt (&theta; &le; 12&deg;):</strong>
+                  <p>Observe the vertical line from mid-pelvis to neck. A persistent lateral lean &gt; 12&deg; suggests coronal asymmetry; &gt; 22&deg; flags structural scoliosis or axial hypotonia (D1/D3).</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Framing &amp; Positioning:</strong>
+                  <p>Hold smartphone in <strong>9:16 portrait mode</strong> at child chest height, 1.8m away. Infant seated on a firm floor mat (unsupported, no pillows or adult hands holding).</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Clothing &amp; Shoulder Level:</strong>
+                  <p>Sleeveless top and bare legs allow accurate visibility of shoulder height symmetry, spinal curvature, and core pelvic stability.</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon cross">✗</span>
+                <div>
+                  <strong>Common Error:</strong>
+                  <p>Testing in a high chair or with adult hands supporting the back obscures natural core stability and invalidates trunk hypotonia detection.</p>
+                </div>
+              </div>
+            </div>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSittingBtn">▶️ Test Sitting Posture With Sample Infant Demo</button>
+          </div>
+
+          <!-- Tutorial 2: Walking Gait & Symmetry -->
           <div class="tutorial-card">
-            <div class="tutorial-badge">🎥 Video Screening Protocol (4Ds)</div>
-            <h3>How to Capture Child Video</h3>
+            <div class="tutorial-badge">🚶 Walking Gait &amp; Symmetry (4Ds)</div>
+            <h3>How to Capture Child Walking</h3>
             <div class="tutorial-media-preview">
               <video src="assets/demo_child_gait.mp4" autoplay loop muted playsinline class="tutorial-video-player"></video>
             </div>
@@ -408,15 +465,15 @@
               <div class="guideline-item">
                 <span class="guide-icon check">✓</span>
                 <div>
-                  <strong>Lighting &amp; Background:</strong>
-                  <p>Well-lit room with front lighting. Avoid backlit windows which turn the child into a dark silhouette.</p>
+                  <strong>Gait Symmetry Index (GSI &ge; 0.85):</strong>
+                  <p>Measures left vs. right stride length and knee flexion cycles. Flags asymmetric limps, cerebral palsy hemiplegia, or hip dysplasia (D1/D3).</p>
                 </div>
               </div>
               <div class="guideline-item">
                 <span class="guide-icon check">✓</span>
                 <div>
                   <strong>Clothing &amp; Posture:</strong>
-                  <p>Wear fitted shorts/pants so knee and ankle joints are unhindered by loose garments or blankets.</p>
+                  <p>Wear fitted shorts so knee and ankle joints are unhindered by loose garments or blankets.</p>
                 </div>
               </div>
               <div class="guideline-item">
@@ -430,7 +487,83 @@
             <button class="pill-btn primary-pill full-width-btn" id="tutorialTestVideoBtn">▶️ Test Video Module With This Sample Walk</button>
           </div>
 
-          <!-- Tutorial 2: Skin Capture -->
+          <!-- Tutorial 3: Standing Alignment & Limb Bowing -->
+          <div class="tutorial-card">
+            <div class="tutorial-badge green">🧍 Standing Alignment Screening</div>
+            <h3>How to Capture Standing Alignment</h3>
+            <div class="guideline-list">
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Knee-Ankle Ratio (Rickets Check):</strong>
+                  <p>Compares inter-condylar (knee) distance vs. inter-malleolar (ankle) distance. Detects Genu Varum (bow legs) or Genu Valgum (knock knees) (D2).</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Framing &amp; Stance:</strong>
+                  <p>Child stands facing camera with feet naturally close (3–5 cm). Camera placed low at knee height (40–50 cm) in portrait mode, 2m away.</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon cross">✗</span>
+                <div>
+                  <strong>Common Error:</strong>
+                  <p>Bulky diapers or socks covering the malleoli ankle bones or knees prevent accurate ratio computation.</p>
+                </div>
+              </div>
+            </div>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestStandingBtn">▶️ Test Standing Alignment Demo</button>
+          </div>
+
+          <!-- Tutorial 4: Balance & Postural Sway -->
+          <div class="tutorial-card">
+            <div class="tutorial-badge purple">⚖️ Balance &amp; Postural Sway</div>
+            <h3>How to Screen Static Balance</h3>
+            <div class="guideline-list">
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Center-of-Mass Sway (&sigma; &le; 0.04):</strong>
+                  <p>Tracks postural adjustments in Romberg stance over 10–12 seconds. FFT checks for high-frequency cerebellar tremor (&gt; 3 Hz) (D3).</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Staging:</strong>
+                  <p>Flat, non-slip floor. Arms down by sides, feet together. Camera stationary at child navel level.</p>
+                </div>
+              </div>
+            </div>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestBalanceBtn">▶️ Test Balance &amp; Sway Demo</button>
+          </div>
+
+          <!-- Tutorial 5: Social Response & Audio Orienting -->
+          <div class="tutorial-card">
+            <div class="tutorial-badge orange">🤝 Social Response Screening</div>
+            <h3>How to Screen Audio-Visual Orienting</h3>
+            <div class="guideline-list">
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Response to Name Latency (&le; 2.0s):</strong>
+                  <p>Child looks away (~25&deg; yaw). At 3.0s an audio cue sounds. Time until head turns toward camera indicates prompt auditory orientation (D4).</p>
+                </div>
+              </div>
+              <div class="guideline-item">
+                <span class="guide-icon check">✓</span>
+                <div>
+                  <strong>Eye Contact Ratio (&ge; 50%):</strong>
+                  <p>Measures sustained gaze fixation toward examiner/camera. Also screens for upper-limb flapping stereotypies (1.5–3.5 Hz).</p>
+                </div>
+              </div>
+            </div>
+            <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSocialBtn">▶️ Test Social Response Demo</button>
+          </div>
+
+          <!-- Tutorial 6: Skin Capture -->
           <div class="tutorial-card">
             <div class="tutorial-badge">📸 Skin Condition Photography</div>
             <h3>How to Capture Skin Photos</h3>
@@ -463,7 +596,7 @@
             <button class="pill-btn primary-pill full-width-btn" id="tutorialTestSkinBtn">▶️ Test Skin Classifier With This Sample Photo</button>
           </div>
 
-          <!-- Tutorial 3: Eye Capture -->
+          <!-- Tutorial 7: Eye Capture -->
           <div class="tutorial-card">
             <div class="tutorial-badge">👁️ Eye Health Photography</div>
             <h3>How to Capture Eye Photos</h3>
