@@ -29,8 +29,16 @@ const envSchema = z
           .map((origin) => origin.trim())
           .filter(Boolean),
       ),
-    // Optional in development until the auth step; required in production (see below).
-    JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters').optional(),
+    /** HS256 signing key for access tokens. Use a different random value in every environment. */
+    JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+    /** Defaults include NODE_ENV so a token from one environment is rejected by another. */
+    JWT_ISSUER: z.string().min(1).optional(),
+    JWT_AUDIENCE: z.string().min(1).default('balswasthya-worker-app'),
+    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+    REFRESH_TOKEN_IDLE_DAYS: z.coerce.number().int().min(1).max(90).default(14),
+    REFRESH_TOKEN_ABSOLUTE_DAYS: z.coerce.number().int().min(1).max(180).default(30),
+    /** Number of reverse proxies in front of the API (0 = direct). Needed for correct client IPs. */
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     AI_SERVICE_URL: z
       .union([z.literal(''), z.url()])
       .default('')
@@ -43,13 +51,17 @@ const envSchema = z
     MIGRATION_DATABASE_URL: z.string().optional(),
   })
   .superRefine((env, ctx) => {
+    const fail = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
+
+    if (env.REFRESH_TOKEN_ABSOLUTE_DAYS < env.REFRESH_TOKEN_IDLE_DAYS) {
+      fail('REFRESH_TOKEN_ABSOLUTE_DAYS', 'must be greater than or equal to REFRESH_TOKEN_IDLE_DAYS');
+    }
+
     if (env.NODE_ENV !== 'production') return;
 
     // Production guard: refuse insecure settings that are acceptable on a laptop.
-    const fail = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
-
-    if (!env.JWT_SECRET) {
-      fail('JWT_SECRET', 'is required in production');
+    if (/replace_with|change_me|example/i.test(env.JWT_SECRET)) {
+      fail('JWT_SECRET', 'must not be a placeholder value in production');
     }
     // An empty list is allowed: it blocks all browser origins (native apps send no Origin).
     if (env.CORS_ORIGINS.some((origin) => !origin.startsWith('https://'))) {

@@ -26,3 +26,13 @@ export function validate(schemas: RequestSchemas) {
     }
   };
 }
+
+/**
+ * Reads a part validated by `validate()`. The caller states the type that the route's schema
+ * produces (one checked cast here instead of `any` in every controller).
+ */
+export function getValidated<T>(res: Response, part: keyof RequestSchemas): T {
+  const validated = res.locals.validated as Record<keyof RequestSchemas, unknown> | undefined;
+  if (!validated) throw new Error('getValidated called on a route without validate()');
+  return validated[part] as T;
+}

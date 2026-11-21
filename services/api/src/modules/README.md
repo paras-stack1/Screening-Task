@@ -11,6 +11,9 @@ creates the folders. Every module follows the same layout:
   <module>.schema.ts      Zod schemas for request body / params / query
 ```
 
+Very thin handlers (validated input -> one service call -> JSON) may live inline in
+`<module>.routes.ts` instead of a separate controller file (see auth/auth.routes.ts).
+
 Rules:
 - Controllers stay thin and contain no business logic; services hold no Express code.
 - Request/response shapes that the mobile app also uses go in `packages/shared-contracts`.
@@ -20,7 +23,7 @@ Rules:
 
 | Module      | Responsibility (planned)                                         |
 |-------------|------------------------------------------------------------------|
-| auth        | Login, JWT issue/refresh, password hashing                      |
+| auth        | Login, JWT, refresh rotation, sessions, password change (done)   |
 | users       | ASHA / Anganwadi worker and supervisor accounts, roles          |
 | facilities  | Anganwadi centres, schools, health facilities (referral targets)|
 | children    | Child registration and profile                                  |

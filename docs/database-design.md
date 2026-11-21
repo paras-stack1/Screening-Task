@@ -264,6 +264,11 @@ To create or change an assignment, the acting user must:
 1. hold `assignment.manage` through an effective assignment whose scope **covers the target area**;
 2. only grant a role whose permissions are a **subset** of the permissions they hold over that area
    (no privilege escalation);
+   **Amended by D11 (2026-11-21):** the subset rule applies to *management* permissions
+   (`report.aggregate`, `assignment.manage`, `user.manage`, `area.manage`, `facility.manage`,
+   `audit.read`). *Fieldwork* permissions (`child.*`, `consent.record`, `screening.*`, `referral.*`) may
+   be granted inside the actor's area without being held, so administrators who do not read child
+   records (D3) can still provision field workers. See [authorization.md](authorization.md) §7;
 3. not modify their **own** assignments;
 4. give a reason.
 
@@ -1518,6 +1523,7 @@ All written in the same transaction as the change:
 | D8 | Retention periods | **Open:** to be set by legal / programme review. |
 | D9 | Facility types and referral urgency definitions | **Open - assumption:** illustrative; clinical/programme confirmation required. |
 | D10 | Database naming convention | **Decided:** Prisma defaults (camelCase, quoted identifiers). |
+| D11 | Conflict between §4.4 subset rule and D3 (no admin could provision field workers) | **Decided 2026-11-21:** subset rule for management permissions only; fieldwork permissions delegable within scope. Residual risk (admin creating a worker account to read children) is audited, not prevented - see authorization.md §10. |
 
 ---
 
@@ -1543,5 +1549,8 @@ made at least one test fail every time. The runtime account was checked from the
 read/write allowed; audit-log update/delete/truncate, migration history, DDL, trigger disabling and
 role creation denied.
 
-**Still not verified:** scenario 14 (privilege-escalation rule - implemented with the assignment
-management API in Phase 3) and query performance at state scale (needs a large synthetic dataset).
+**Step 3, Stage 3 (2026-11-21):** scenario 14 (privilege escalation) is verified through the
+assignment-management API (tests/db/administration.test.ts), and every child-linked entity has IDOR
+tests (tests/db/authorization.test.ts).
+
+**Still not verified:** query performance at state scale (needs a large synthetic dataset).

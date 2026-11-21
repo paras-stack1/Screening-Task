@@ -34,10 +34,16 @@ function harness(register: (router: express.Router) => void) {
 
 describe('error responses', () => {
   it('returns a generic 404 that does not echo the requested path', async () => {
-    const res = await request(app).get('/api/v1/children/asha-kumari-2019');
+    const res = await request(app).get('/api/v1/no-such-module/asha-kumari-2019');
     expect(res.status).toBe(404);
     expect(res.body.error).toMatchObject({ code: 'NOT_FOUND', message: 'Route not found' });
     expect(res.body.error.requestId).toMatch(UUID);
+    expect(res.text).not.toContain('asha');
+  });
+
+  it('a protected route answers 401 before anything else, without echoing the path', async () => {
+    const res = await request(app).get('/api/v1/children/asha-kumari-2019');
+    expect(res.status).toBe(401);
     expect(res.text).not.toContain('asha');
   });
 

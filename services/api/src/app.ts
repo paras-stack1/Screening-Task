@@ -1,9 +1,11 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
-import { isDatabaseReachable } from './config/database';
+import { isDatabaseReachable, prisma } from './config/database';
 import { env } from './config/env';
+import { authConfig } from './config/security';
 import { aiServiceClient } from './integrations/ai-service/aiServiceClient';
+import { noStore, requireJsonBody } from './middleware/apiHeaders';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requestId } from './middleware/requestId';
 import { requestLogger } from './middleware/requestLogger';
@@ -14,21 +16,28 @@ export const JSON_BODY_LIMIT = '1mb';
 
 export type AppDependencies = ApiRouterDependencies;
 
-const defaultDependencies: AppDependencies = {
-  health: {
-    checkDatabase: isDatabaseReachable,
-    checkAiService: () => aiServiceClient.getStatus(),
-  },
-};
+function defaultDependencies(): AppDependencies {
+  return {
+    health: {
+      checkDatabase: isDatabaseReachable,
+      checkAiService: () => aiServiceClient.getStatus(),
+    },
+    auth: { db: prisma, config: authConfig },
+  };
+}
 
 /**
  * Builds the Express application (no network listening here, so it can be
- * imported by tests without opening a port). Dependencies can be replaced in tests.
+ * imported by tests without opening a port). Any dependency can be replaced in tests;
+ * the Prisma client only connects when a query actually runs.
  */
-export function createApp(deps: AppDependencies = defaultDependencies): Express {
+export function createApp(overrides: Partial<AppDependencies> = {}): Express {
+  const deps: AppDependencies = { ...defaultDependencies(), ...overrides };
   const app = express();
 
   app.disable('x-powered-by');
+  // Correct client IPs (rate limiting) behind a known number of reverse proxies only.
+  app.set('trust proxy', env.TRUST_PROXY_HOPS > 0 ? env.TRUST_PROXY_HOPS : false);
   app.use(helmet());
   app.use(
     cors({
@@ -41,6 +50,8 @@ export function createApp(deps: AppDependencies = defaultDependencies): Express 
   );
   app.use(requestId);
   app.use(requestLogger);
+  app.use(noStore);
+  app.use(requireJsonBody);
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
   app.use('/api/v1', createApiRouter(deps));

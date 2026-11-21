@@ -19,7 +19,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "db:bootstrap-admin": "tsx --env-file=.env prisma/bootstrap-admin.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -27,9 +28,12 @@
   "dependencies": {
     "@balswasthya/shared-contracts": "0.1.0",
     "@prisma/client": "^6.19.3",
+    "argon2": "0.45.2",
     "cors": "^2.8.6",
     "express": "^5.3.0",
+    "express-rate-limit": "8.7.3",
     "helmet": "^8.3.0",
+    "jose": "6.2.15",
     "pino": "^10.4.0",
     "zod": "^4.6.7"
   },

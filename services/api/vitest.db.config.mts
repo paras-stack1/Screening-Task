@@ -18,6 +18,14 @@ export default defineConfig({
     globalSetup: ['tests/db/globalSetup.ts'],
     fileParallelism: false, // one shared database
     testTimeout: 20_000,
+    // Fixed synthetic settings so results never depend on the developer's .env values.
+    env: {
+      NODE_ENV: 'test',
+      LOG_LEVEL: 'silent',
+      JWT_SECRET: 'db-test-only-jwt-secret-0123456789abcdef',
+      CORS_ORIGINS: 'http://localhost:8081',
+      AI_SERVICE_URL: '',
+    },
     hookTimeout: 120_000,
   },
 });

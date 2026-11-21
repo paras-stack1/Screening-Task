@@ -10,6 +10,12 @@ const validProduction = {
   AI_SERVICE_API_KEY: 'k'.repeat(40),
 };
 
+/** The smallest valid development configuration. */
+const minimalDevelopment = {
+  DATABASE_URL: 'postgresql://u:p@127.0.0.1:5433/dev',
+  JWT_SECRET: 'd'.repeat(32),
+};
+
 function failingPaths(source: Record<string, string | undefined>): string[] {
   const result = parseEnv(source);
   return result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'));
@@ -17,9 +23,37 @@ function failingPaths(source: Record<string, string | undefined>): string[] {
 
 describe('environment configuration', () => {
   it('accepts a minimal development configuration with defaults', () => {
-    const result = parseEnv({ DATABASE_URL: 'postgresql://u:p@127.0.0.1:5433/dev' });
+    const result = parseEnv(minimalDevelopment);
     expect(result.success).toBe(true);
-    expect(result.data).toMatchObject({ NODE_ENV: 'development', PORT: 4000, CORS_ORIGINS: [] });
+    expect(result.data).toMatchObject({
+      NODE_ENV: 'development',
+      PORT: 4000,
+      CORS_ORIGINS: [],
+      ACCESS_TOKEN_TTL_SECONDS: 900,
+      REFRESH_TOKEN_IDLE_DAYS: 14,
+      REFRESH_TOKEN_ABSOLUTE_DAYS: 30,
+      TRUST_PROXY_HOPS: 0,
+    });
+  });
+
+  it('requires JWT_SECRET in every environment (authentication is always on)', () => {
+    expect(failingPaths({ DATABASE_URL: minimalDevelopment.DATABASE_URL })).toContain('JWT_SECRET');
+  });
+
+  it('rejects an absolute session lifetime shorter than the idle lifetime', () => {
+    expect(
+      failingPaths({
+        ...minimalDevelopment,
+        REFRESH_TOKEN_IDLE_DAYS: '20',
+        REFRESH_TOKEN_ABSOLUTE_DAYS: '10',
+      }),
+    ).toContain('REFRESH_TOKEN_ABSOLUTE_DAYS');
+  });
+
+  it('rejects an access-token lifetime outside 1-60 minutes', () => {
+    expect(failingPaths({ ...minimalDevelopment, ACCESS_TOKEN_TTL_SECONDS: '86400' })).toContain(
+      'ACCESS_TOKEN_TTL_SECONDS',
+    );
   });
 
   it('rejects a non-PostgreSQL database URL', () => {
@@ -42,6 +76,7 @@ describe('environment configuration', () => {
 
   it.each([
     ['JWT_SECRET', { JWT_SECRET: undefined }],
+    ['JWT_SECRET', { JWT_SECRET: 'replace_with_a_long_random_secret_at_least_32_chars' }],
     ['CORS_ORIGINS', { CORS_ORIGINS: 'https://ok.example.in,http://insecure.example.in' }],
     ['AI_SERVICE_URL', { AI_SERVICE_URL: 'http://ai.internal' }],
     ['AI_SERVICE_API_KEY', { AI_SERVICE_API_KEY: '' }],
@@ -63,7 +98,7 @@ describe('least-privilege database configuration', () => {
 
   it('development tolerates owner credentials in .env (used by Prisma Migrate)', () => {
     const result = parseEnv({
-      DATABASE_URL: 'postgresql://app:pw@127.0.0.1:5433/dev',
+      ...minimalDevelopment,
       MIGRATION_DATABASE_URL: 'postgresql://owner:pw@127.0.0.1:5433/dev',
     });
     expect(result.success).toBe(true);

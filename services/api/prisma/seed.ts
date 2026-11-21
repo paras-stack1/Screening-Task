@@ -6,10 +6,11 @@
  *
  * ASSUMPTION - to be confirmed with the RBSK programme team: the area levels and the role
  * definitions below are illustrative (docs/database-design.md sections 3.1 and 4.1).
- * No users are created here: accounts need password hashing (Phase 3, authentication).
+ * No users are created here. Create the first administrator with: npm run db:bootstrap-admin
  */
 import { PrismaClient } from '@prisma/client';
-import { PERMISSIONS, type PermissionCode } from '../src/modules/access-control/permissions';
+import { PERMISSIONS } from '../src/modules/access-control/permissions';
+import { ROLES } from '../src/modules/access-control/roles';
 import { createArea } from '../src/modules/areas/areaTree';
 
 const prisma = new PrismaClient();
@@ -28,49 +29,6 @@ const LEVELS = [
     allowsChildRegistration: true,
   },
 ] as const;
-
-const WORKER: PermissionCode[] = [
-  'child.read',
-  'child.create',
-  'child.update',
-  'consent.record',
-  'screening.conduct',
-  'referral.create',
-];
-
-const ROLES: Array<{ code: string; nameEn: string; nameHi: string; permissions: PermissionCode[] }> = [
-  { code: 'ASHA', nameEn: 'ASHA', nameHi: 'आशा', permissions: WORKER },
-  {
-    code: 'ANGANWADI_WORKER',
-    nameEn: 'Anganwadi Worker',
-    nameHi: 'आंगनवाड़ी कार्यकर्ता',
-    permissions: WORKER,
-  },
-  {
-    code: 'MHT_MEDICAL_OFFICER',
-    nameEn: 'RBSK Mobile Health Team Medical Officer',
-    nameHi: 'आरबीएसके मोबाइल हेल्थ टीम चिकित्सा अधिकारी',
-    permissions: [...WORKER, 'screening.review', 'referral.update'],
-  },
-  {
-    code: 'SUPERVISOR',
-    nameEn: 'Supervisor',
-    nameHi: 'पर्यवेक्षक',
-    permissions: ['child.read', 'referral.update', 'report.aggregate', 'assignment.manage'],
-  },
-  {
-    code: 'DISTRICT_ADMIN',
-    nameEn: 'District Administrator',
-    nameHi: 'ज़िला प्रशासक',
-    permissions: ['report.aggregate', 'assignment.manage', 'facility.manage'],
-  },
-  {
-    code: 'STATE_ADMIN',
-    nameEn: 'State Administrator',
-    nameHi: 'राज्य प्रशासक',
-    permissions: ['report.aggregate', 'assignment.manage', 'area.manage', 'facility.manage', 'audit.read'],
-  },
-];
 
 /** Synthetic demo tree: [code, levelCode, parentCode]. Names are placeholders, not real places. */
 const DEMO_AREAS: Array<[string, string, string | null]> = [
@@ -106,10 +64,17 @@ async function main() {
       create: { code: role.code, nameEn: role.nameEn, nameHi: role.nameHi },
     });
     const permissions = await prisma.permission.findMany({ where: { code: { in: role.permissions } } });
-    await prisma.rolePermission.createMany({
-      data: permissions.map((p) => ({ roleId: saved.id, permissionId: p.id })),
-      skipDuplicates: true,
-    });
+    // The code is the source of truth for seeded roles: add missing grants AND remove grants
+    // that were taken out of the code (otherwise a removed permission would silently remain).
+    await prisma.$transaction([
+      prisma.rolePermission.deleteMany({
+        where: { roleId: saved.id, permission: { code: { notIn: role.permissions } } },
+      }),
+      prisma.rolePermission.createMany({
+        data: permissions.map((p) => ({ roleId: saved.id, permissionId: p.id })),
+        skipDuplicates: true,
+      }),
+    ]);
   }
 
   if ((await prisma.area.count()) === 0) {

@@ -17,6 +17,8 @@ export default defineConfig({
       AI_SERVICE_URL: '',
       AI_SERVICE_API_KEY: '',
       LOG_LEVEL: 'silent',
+      // Synthetic test-only signing key (never used outside tests).
+      JWT_SECRET: 'unit-test-only-jwt-secret-0123456789abcdef',
     },
   },
 });

@@ -1,5 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { isProduction } from './env';
+
+/** The shared client or a transaction client - for functions that work in both. */
+export type Db = PrismaClient | Prisma.TransactionClient;
 
 /**
  * Single shared Prisma client for the whole process (Prisma manages its own

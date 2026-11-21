@@ -239,5 +239,13 @@ size/redirect limits, safer error handling. See [docs/architecture.md](docs/arch
 assignment-overlap exclusion, append-only audit), least-privilege runtime account, synthetic seed,
 area-scoped access-control module, and database tests for the design's scenarios.
 
-Not implemented yet (by design): login and user management, REST endpoints for children,
-guardians, consent, screening, referrals; dashboards; rate limiting.
+**Step 3 (authentication & authorization) - in progress, staged.**
+Stage 2 done: Argon2id passwords, login with generic errors and temporary lockout, 15-minute JWT
+access tokens, rotating refresh tokens with reuse detection, session revocation, password change,
+rate limiting ([docs/authentication.md](docs/authentication.md)).
+Stage 3 done: role-based permissions, area-scoped access for every child-linked record, read-only
+child list/profile, user and assignment administration, first-admin bootstrap
+([docs/authorization.md](docs/authorization.md)). Next: mobile app integration.
+
+Not implemented yet (by design): write endpoints for children, guardians, consent, screening,
+referrals; reports and dashboards.
