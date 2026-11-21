@@ -12,6 +12,7 @@ import { PrismaClient } from '@prisma/client';
 import { PERMISSIONS } from '../src/modules/access-control/permissions';
 import { ROLES } from '../src/modules/access-control/roles';
 import { createArea } from '../src/modules/areas/areaTree';
+import { ensureConsentTemplates } from '../src/modules/consent/consentNotices';
 
 const prisma = new PrismaClient();
 
@@ -96,12 +97,20 @@ async function main() {
     );
   }
 
+  // Consent notice versions as DRAFT rows (placeholder wording - never approved by the seed).
+  const drift = await ensureConsentTemplates(prisma);
+  if (drift.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn('Consent notice wording differs from the stored hash (investigate):', drift);
+  }
+
   const counts = {
     levels: await prisma.areaLevel.count(),
     permissions: await prisma.permission.count(),
     roles: await prisma.role.count(),
     areas: await prisma.area.count(),
     closureLinks: await prisma.areaClosure.count(),
+    consentTemplates: await prisma.consentTemplate.count(),
   };
   // eslint-disable-next-line no-console
   console.log('Seed complete (synthetic data):', counts);

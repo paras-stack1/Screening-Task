@@ -28,6 +28,6 @@ Rules:
 | facilities  | Anganwadi centres, schools, health facilities (referral targets)|
 | children    | Child registration, duplicates, profile, updates (Step 5)       |
 | guardians   | Guardians and child-guardian links (Step 5; docs/api/children.md)|
-| consent     | Recording and checking guardian consent before screening        |
+| consent     | Purpose-specific consent, withdrawal, enforcement (Step 5)       |
 | screening   | Screening questionnaires and results (AI support optional)      |
 | referrals   | Referral creation and follow-up tracking                        |

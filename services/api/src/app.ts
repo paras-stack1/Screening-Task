@@ -2,7 +2,7 @@ import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
 import { isDatabaseReachable, prisma } from './config/database';
-import { env } from './config/env';
+import { env, isProduction } from './config/env';
 import { authConfig, piiCrypto } from './config/security';
 import { aiServiceClient } from './integrations/ai-service/aiServiceClient';
 import { noStore, requireJsonBody } from './middleware/apiHeaders';
@@ -24,6 +24,8 @@ function defaultDependencies(): AppDependencies {
     },
     auth: { db: prisma, config: authConfig },
     pii: piiCrypto,
+    // Placeholder (DRAFT) consent notices are never accepted in production (decision I).
+    consentPolicy: { allowDraftNotices: !isProduction },
   };
 }
 

@@ -6,4 +6,5 @@ export * from './dates.js';
 export * from './people.js';
 export * from './children.js';
 export * from './guardians.js';
+export * from './consent.js';
 export * from './users.js';

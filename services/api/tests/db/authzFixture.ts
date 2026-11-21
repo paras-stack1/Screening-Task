@@ -202,7 +202,8 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
   const template = await prisma.consentTemplate.create({
     data: {
       purpose: 'PHOTO_CAPTURE',
-      version: 1,
+      // Version 0: never collides with the real notice registry (versions start at 1).
+      version: 0,
       languageCode: 'hi',
       textSha256: 'a'.repeat(64),
       status: 'APPROVED',
