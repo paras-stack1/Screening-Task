@@ -31,6 +31,16 @@ export class AppError extends Error {
     return new AppError(404, 'NOT_FOUND', message);
   }
 
+  /** 409: the request conflicts with the current state (duplicate, stale version, already done). */
+  static conflict(code: string, message: string, details?: unknown) {
+    return new AppError(409, code, message, details);
+  }
+
+  /** 422: well-formed request that breaks a business rule (e.g. a future date of birth). */
+  static unprocessable(code: string, message: string, details?: unknown) {
+    return new AppError(422, code, message, details);
+  }
+
   static unsupportedMediaType() {
     return new AppError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json');
   }

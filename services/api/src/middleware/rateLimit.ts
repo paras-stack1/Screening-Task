@@ -24,6 +24,13 @@ export interface RateLimitSettings {
   refreshPerIp: number;
   /** Password changes by one signed-in user. */
   passwordChangePerUser: number;
+  /**
+   * Child/guardian/consent reads by one signed-in user (decision Q): generous for field work,
+   * but stops scripted enumeration of records through search and paging.
+   */
+  childDataReadPerUser: number;
+  /** Child/guardian/consent writes by one signed-in user. */
+  childDataWritePerUser: number;
 }
 
 export const DEFAULT_RATE_LIMITS: RateLimitSettings = {
@@ -31,7 +38,27 @@ export const DEFAULT_RATE_LIMITS: RateLimitSettings = {
   loginPerIpAndAccount: 10,
   refreshPerIp: 300,
   passwordChangePerUser: 10,
+  childDataReadPerUser: 600,
+  childDataWritePerUser: 150,
 };
+
+function userKey(req: Request, res: Response): string {
+  const auth = res.locals.auth as { userId?: string } | undefined;
+  return auth?.userId ? `user:${auth.userId}` : clientIpKey(req);
+}
+
+/**
+ * Per-user limits for child-data routes. Create ONE set per app and share it between the
+ * children and guardian routers, so the counters cover all child data together. Must run after
+ * `authenticate` (keys on the user id).
+ */
+export function createDataRateLimiters(settings: RateLimitSettings = DEFAULT_RATE_LIMITS) {
+  const read = limiter(settings.childDataReadPerUser, userKey);
+  const write = limiter(settings.childDataWritePerUser, userKey);
+  const handler: RequestHandler = (req, res, next) =>
+    (req.method === 'GET' || req.method === 'HEAD' ? read : write)(req, res, next);
+  return handler;
+}
 
 function clientIpKey(req: Request): string {
   // ipKeyGenerator groups IPv6 addresses by /56 so one host cannot rotate through its subnet.

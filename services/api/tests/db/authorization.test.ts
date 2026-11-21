@@ -244,7 +244,9 @@ describe('IDOR / BOLA', () => {
     const res = await (await as('asha1')).get(`/children/${fx.child.C1}`);
     expect(res.status).toBe(200);
     expect(res.body.child.guardians).toHaveLength(1);
-    expect(JSON.stringify(res.body)).not.toMatch(/phone/i);
+    // Step 5: only a masked number (none saved here) - never ciphertext, hash or a full number.
+    expect(res.body.child.guardians[0].phoneMasked).toBeNull();
+    expect(JSON.stringify(res.body)).not.toMatch(/phoneEncrypted|phoneLookupHash|createdById|deletedAt/);
     const viewed = await prisma.auditLog.count({
       where: { action: 'child.viewed', actorUserId: fx.user.asha1, entityId: fx.child.C1 },
     });
@@ -308,8 +310,8 @@ describe('IDOR / BOLA', () => {
       data: { childId: fx.child.C1!, guardianId: shared.id, relationship: 'FATHER' },
     });
     await assertInScopeOrDeny(prisma, ctx, 'guardian', shared.id, 'child.read');
-    await prisma.childGuardian.update({
-      where: { childId_guardianId: { childId: fx.child.C1!, guardianId: shared.id } },
+    await prisma.childGuardian.updateMany({
+      where: { childId: fx.child.C1!, guardianId: shared.id, endedAt: null },
       data: { endedAt: clock.now() },
     });
     await expect(assertInScopeOrDeny(prisma, ctx, 'guardian', shared.id, 'child.read')).rejects.toMatchObject(
@@ -401,7 +403,17 @@ describe('no leakage through search, filters, pagination, sorting or counts', ()
     const res = await (await as('sup1')).get('/children');
     for (const item of res.body.items as object[]) {
       expect(Object.keys(item).sort()).toEqual(
-        ['areaId', 'areaName', 'dateOfBirth', 'dobIsEstimated', 'fullName', 'id', 'sexAtBirth'].sort(),
+        [
+          'areaId',
+          'areaName',
+          'areaNameHi',
+          'dateOfBirth',
+          'dobIsEstimated',
+          'fullName',
+          'id',
+          'registeredAt',
+          'sexAtBirth',
+        ].sort(),
       );
     }
   });

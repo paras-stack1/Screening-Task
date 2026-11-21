@@ -1,3 +1,4 @@
+import { createPiiCrypto, type PiiCrypto } from '../utils/piiCrypto';
 import { env, type Env } from './env';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -59,3 +60,9 @@ export function buildAuthConfig(source: Env): AuthConfig {
 }
 
 export const authConfig: AuthConfig = buildAuthConfig(env);
+
+/** Guardian phone encryption + lookup hashing with the configured keys (may be unavailable outside production). */
+export const piiCrypto: PiiCrypto = createPiiCrypto({
+  encryptionKey: env.PII_ENCRYPTION_KEY,
+  lookupKey: env.PII_LOOKUP_KEY,
+});

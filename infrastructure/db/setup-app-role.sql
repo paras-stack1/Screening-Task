@@ -39,6 +39,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE :"owner_user" IN SCHEMA public
 --    AuditLog is append-only for the app (a trigger also blocks UPDATE/DELETE for everyone).
 SELECT format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM %I', 'AuditLog', :'app_user')
  WHERE to_regclass('public."AuditLog"') IS NOT NULL \gexec
+--    Consent is append-only (Step 5): a trigger blocks row DELETE and non-withdrawal UPDATEs for
+--    everyone; TRUNCATE (which bypasses row triggers) is revoked from the app account.
+SELECT format('REVOKE DELETE, TRUNCATE ON public.%I FROM %I', 'Consent', :'app_user')
+ WHERE to_regclass('public."Consent"') IS NOT NULL \gexec
 --    The migration history table is the owner's business only.
 SELECT format('REVOKE ALL ON public.%I FROM %I', '_prisma_migrations', :'app_user')
  WHERE to_regclass('public._prisma_migrations') IS NOT NULL \gexec

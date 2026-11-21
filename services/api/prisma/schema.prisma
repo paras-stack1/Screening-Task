@@ -268,6 +268,8 @@ model User {
   assignmentStatusChanges  WorkerAreaAssignment[] @relation("AssignmentStatusChangedBy")
   childrenRegistered       Child[]
   childTransfers           ChildAreaTransfer[]
+  guardianLinksCreated     ChildGuardian[]        @relation("GuardianLinkCreatedBy")
+  guardianLinksEnded       ChildGuardian[]        @relation("GuardianLinkEndedBy")
   consentsRecorded         Consent[]              @relation("ConsentRecordedBy")
   consentsWithdrawn        Consent[]              @relation("ConsentWithdrawnBy")
   protocolsApproved        ScreeningProtocol[]
@@ -486,19 +488,33 @@ model Guardian {
   @@index([phoneLookupHash])
 }
 
+/// One row per link PERIOD (Step 5, decision B): ending a link keeps the row, and re-linking the
+/// same guardian creates a new row. SQL additions (not expressible in Prisma 6), see the
+/// 20261121150000_step5 migration:
+///   - at most one ACTIVE link per (childId, guardianId)        child_guardian_one_active_link
+///   - at most one ACTIVE primary contact per child             child_guardian_one_primary
+///   - endedById / endReason only on an ended link              child_guardian_end_complete
 model ChildGuardian {
+  id               String               @id @default(uuid()) @db.Uuid
   childId          String               @db.Uuid
   guardianId       String               @db.Uuid
   relationship     GuardianRelationship
   isPrimaryContact Boolean              @default(false)
+  /// Worker's declaration that this person may give consent - not a legal verification.
   canGiveConsent   Boolean              @default(false)
   createdAt        DateTime             @default(now()) @db.Timestamptz(3)
+  createdById      String?              @db.Uuid
   endedAt          DateTime?            @db.Timestamptz(3)
+  endedById        String?              @db.Uuid
+  /// Short reason. Must not contain personal data.
+  endReason        String?
 
-  child    Child    @relation(fields: [childId], references: [id], onDelete: Restrict)
-  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  child     Child    @relation(fields: [childId], references: [id], onDelete: Restrict)
+  guardian  Guardian @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  createdBy User?    @relation("GuardianLinkCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  endedBy   User?    @relation("GuardianLinkEndedBy", fields: [endedById], references: [id], onDelete: Restrict)
 
-  @@id([childId, guardianId])
+  @@index([childId, endedAt])
   @@index([guardianId])
 }
 
@@ -521,8 +537,10 @@ model ConsentTemplate {
   @@unique([purpose, version, languageCode])
 }
 
+/// Append-only (Step 5, decision B): a database trigger rejects DELETE and every UPDATE except a
+/// one-time withdrawal of a GRANTED record. The runtime account has no TRUNCATE right.
 model Consent {
-  id                String          @id @default(uuid()) @db.Uuid
+  id               String          @id @default(uuid()) @db.Uuid
   childId           String          @db.Uuid
   guardianId        String          @db.Uuid
   purpose           ConsentPurpose
@@ -535,6 +553,8 @@ model Consent {
   recordedAt        DateTime        @db.Timestamptz(3)
   withdrawnAt       DateTime?       @db.Timestamptz(3)
   withdrawnById     String?         @db.Uuid
+  /// How the guardian communicated the withdrawal (Step 5, decision B).
+  withdrawalMethod  ConsentMethod?
   withdrawalReason  String?
   createdAt         DateTime        @default(now()) @db.Timestamptz(3)
 

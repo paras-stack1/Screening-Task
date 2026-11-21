@@ -374,7 +374,11 @@ export function api(app: TestApp, token: string) {
   return {
     get: (path: string) => auth(request(app).get(`/api/v1${path}`)),
     post: (path: string, body?: object) => auth(request(app).post(`/api/v1${path}`)).send(body ?? {}),
-    delete: (path: string) => auth(request(app).delete(`/api/v1${path}`)),
+    patch: (path: string, body?: object) => auth(request(app).patch(`/api/v1${path}`)).send(body ?? {}),
+    delete: (path: string, body?: object) => {
+      const req = auth(request(app).delete(`/api/v1${path}`));
+      return body ? req.send(body) : req;
+    },
   };
 }
 

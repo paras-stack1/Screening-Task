@@ -2,5 +2,8 @@ export * from './common.js';
 export * from './health.js';
 export * from './ai.js';
 export * from './auth.js';
+export * from './dates.js';
+export * from './people.js';
 export * from './children.js';
+export * from './guardians.js';
 export * from './users.js';

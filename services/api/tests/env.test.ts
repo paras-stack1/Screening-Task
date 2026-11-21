@@ -8,6 +8,8 @@ const validProduction = {
   CORS_ORIGINS: 'https://admin.example.in',
   AI_SERVICE_URL: 'https://ai.internal.example.in',
   AI_SERVICE_API_KEY: 'k'.repeat(40),
+  PII_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
+  PII_LOOKUP_KEY: Buffer.alloc(32, 2).toString('base64'),
 };
 
 /** The smallest valid development configuration. */
@@ -72,6 +74,22 @@ describe('environment configuration', () => {
 
   it('allows an empty CORS list in production (blocks all browsers)', () => {
     expect(failingPaths({ ...validProduction, CORS_ORIGINS: '' })).toEqual([]);
+  });
+
+  it.each([
+    ['PII_ENCRYPTION_KEY', { PII_ENCRYPTION_KEY: undefined }],
+    ['PII_ENCRYPTION_KEY', { PII_ENCRYPTION_KEY: '' }],
+    ['PII_LOOKUP_KEY', { PII_LOOKUP_KEY: undefined }],
+    ['PII_LOOKUP_KEY', { PII_LOOKUP_KEY: Buffer.alloc(32, 1).toString('base64') }],
+    ['PII_ENCRYPTION_KEY', { PII_ENCRYPTION_KEY: Buffer.alloc(16, 1).toString('base64') }],
+    ['PII_ENCRYPTION_KEY', { PII_ENCRYPTION_KEY: 'not base64!' }],
+    ['PII_LOOKUP_KEY', { PII_LOOKUP_KEY: Buffer.alloc(8, 3).toString('base64') }],
+  ])('production requires valid, distinct phone-protection keys (%s)', (path, override) => {
+    expect(failingPaths({ ...validProduction, ...override })).toContain(path);
+  });
+
+  it('phone-protection keys are optional outside production', () => {
+    expect(failingPaths(minimalDevelopment)).toEqual([]);
   });
 
   it.each([

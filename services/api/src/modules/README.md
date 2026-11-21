@@ -26,8 +26,8 @@ Rules:
 | auth        | Login, JWT, refresh rotation, sessions, password change (done)   |
 | users       | ASHA / Anganwadi worker and supervisor accounts, roles          |
 | facilities  | Anganwadi centres, schools, health facilities (referral targets)|
-| children    | Child registration and profile                                  |
-| guardians   | Parent / guardian details linked to children                    |
+| children    | Child registration, duplicates, profile, updates (Step 5)       |
+| guardians   | Guardians and child-guardian links (Step 5; docs/api/children.md)|
 | consent     | Recording and checking guardian consent before screening        |
 | screening   | Screening questionnaires and results (AI support optional)      |
 | referrals   | Referral creation and follow-up tracking                        |

@@ -394,9 +394,9 @@ Summary only; full definitions are in §8.
 | `Child` | Registered child | `fullName`, `dateOfBirth` (date) + `dobIsEstimated`, `sexAtBirth`, current `areaId`. **No Aadhaar.** Soft delete. No unique constraint on name + DOB (twins exist); duplicates handled by a confirm-before-create check. |
 | `ChildAreaTransfer` | History of area changes | Who, when, from, to, reason. |
 | `Guardian` | Parent / guardian | Phone stored **encrypted** (`phoneEncrypted`) with a keyed hash (`phoneLookupHash`) for duplicate search - **proposed, see §12**. |
-| `ChildGuardian` | Many-to-many link | `relationship`, `isPrimaryContact`, `canGiveConsent` (not every relative may consent). |
+| `ChildGuardian` | Many-to-many link, one row per link period | `relationship`, `isPrimaryContact`, `canGiveConsent` (not every relative may consent; a worker declaration, not legal verification). Own `id` since Step 5 (D12): ending keeps the row, re-linking adds a row. At most one active link per pair and one active primary contact per child (partial unique indexes). |
 | `ConsentTemplate` | Versioned consent wording per purpose and language | Stores a hash of the approved text and an approval reference. Wording requires legal review. |
-| `Consent` | One decision by one guardian for one purpose | Purpose-specific (screening ≠ photo ≠ AI processing). Immutable except a one-time withdrawal. Effective consent = latest decision for (child, purpose) is `GRANTED` and not withdrawn. |
+| `Consent` | One decision by one guardian for one purpose | Purpose-specific (screening ≠ photo ≠ AI processing). Immutable except a one-time withdrawal of a `GRANTED` record - enforced by a database trigger since Step 5 (D12); `withdrawalMethod` records how it was withdrawn. Effective consent = latest decision for (child, purpose) is `GRANTED` and not withdrawn. |
 | `ScreeningProtocol` | Versioned, age-banded protocol | `sourceReference` required; `status` DRAFT / CLINICALLY_APPROVED / RETIRED. Only approved protocols can be used in production. |
 | `ScreeningQuestion` | Questions of a protocol | Category (4 Ds), answer type, translation keys. **Content to be supplied and approved by clinicians.** |
 | `ScreeningSession` | One screening visit | Snapshot of `areaId` and age in days at screening; DRAFT → IN_PROGRESS → COMPLETED / CANCELLED. |
@@ -898,18 +898,26 @@ model Guardian {
 }
 
 model ChildGuardian {
+  id               String               @id @default(uuid()) @db.Uuid
   childId          String               @db.Uuid
   guardianId       String               @db.Uuid
   relationship     GuardianRelationship
   isPrimaryContact Boolean              @default(false)
+  /// Worker's declaration that this person may give consent - not a legal verification.
   canGiveConsent   Boolean              @default(false)
   createdAt        DateTime             @default(now()) @db.Timestamptz(3)
+  createdById      String?              @db.Uuid
   endedAt          DateTime?            @db.Timestamptz(3)
+  endedById        String?              @db.Uuid
+  /// Short reason. Must not contain personal data.
+  endReason        String?
 
-  child    Child    @relation(fields: [childId], references: [id], onDelete: Restrict)
-  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  child     Child    @relation(fields: [childId], references: [id], onDelete: Restrict)
+  guardian  Guardian @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  createdBy User?    @relation("GuardianLinkCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  endedBy   User?    @relation("GuardianLinkEndedBy", fields: [endedById], references: [id], onDelete: Restrict)
 
-  @@id([childId, guardianId])
+  @@index([childId, endedAt])
   @@index([guardianId])
 }
 
@@ -1524,6 +1532,7 @@ All written in the same transaction as the change:
 | D9 | Facility types and referral urgency definitions | **Open - assumption:** illustrative; clinical/programme confirmation required. |
 | D10 | Database naming convention | **Decided:** Prisma defaults (camelCase, quoted identifiers). |
 | D11 | Conflict between §4.4 subset rule and D3 (no admin could provision field workers) | **Decided 2026-11-21:** subset rule for management permissions only; fieldwork permissions delegable within scope. Residual risk (admin creating a worker account to read children) is audited, not prevented - see authorization.md §10. |
+| D12 | Step 5 schema additions (child-guardian link history, consent integrity) | **Decided 2026-11-21 (Step 5 decision B):** migration `20261121150000_step5_guardian_links_consent_integrity` - `ChildGuardian.id` surrogate key + `createdById`/`endedById`/`endReason`; partial unique indexes `child_guardian_one_active_link` and `child_guardian_one_primary`; `Consent.withdrawalMethod`; trigger `consent_protect_history` (no DELETE; only a one-time withdrawal UPDATE of a GRANTED record); TRUNCATE/DELETE on `Consent` revoked from the runtime account. Additive; existing rows kept. Prisma 6 cannot express the partial indexes - review every generated migration so they are never dropped. |
 
 ---
 

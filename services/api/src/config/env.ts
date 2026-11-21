@@ -9,6 +9,29 @@ export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', '
 /** PostgreSQL sslmode values that actually enforce TLS. */
 const SECURE_DB_SSL_MODES = new Set(['require', 'verify-ca', 'verify-full']);
 
+/** A base64-encoded secret of the given decoded length; empty string = not set. */
+function base64Key(minBytes: number, maxBytes: number) {
+  return z.string().transform((value, ctx) => {
+    if (value === '') return undefined;
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
+      ctx.addIssue({ code: 'custom', message: 'must be base64' });
+      return z.NEVER;
+    }
+    const bytes = Buffer.from(value, 'base64');
+    if (bytes.length < minBytes || bytes.length > maxBytes) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          minBytes === maxBytes
+            ? `must decode to exactly ${minBytes} bytes`
+            : `must decode to ${minBytes}-${maxBytes} bytes`,
+      });
+      return z.NEVER;
+    }
+    return bytes;
+  });
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -45,6 +68,13 @@ const envSchema = z
       .transform((value) => value.replace(/\/+$/, '')),
     AI_SERVICE_API_KEY: z.string().default(''),
     AI_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+    /**
+     * Guardian phone protection (decision D5/F). Base64. PII_ENCRYPTION_KEY: exactly 32 bytes
+     * (AES-256-GCM). PII_LOOKUP_KEY: 32+ bytes (HMAC-SHA256 for duplicate search). Required in
+     * production; without them elsewhere, phone numbers cannot be stored (503).
+     */
+    PII_ENCRYPTION_KEY: base64Key(32, 32).optional(),
+    PII_LOOKUP_KEY: base64Key(32, 128).optional(),
     /** Defaults: "silent" under NODE_ENV=test, otherwise "info". */
     LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
     /** Owner credentials for Prisma Migrate. Only checked here so production can refuse them. */
@@ -77,6 +107,15 @@ const envSchema = z
     }
     if (!SECURE_DB_SSL_MODES.has(readSslMode(env.DATABASE_URL) ?? '')) {
       fail('DATABASE_URL', 'must set sslmode=require, verify-ca or verify-full in production');
+    }
+    if (!env.PII_ENCRYPTION_KEY) fail('PII_ENCRYPTION_KEY', 'is required in production');
+    if (!env.PII_LOOKUP_KEY) fail('PII_LOOKUP_KEY', 'is required in production');
+    if (
+      env.PII_ENCRYPTION_KEY &&
+      env.PII_LOOKUP_KEY &&
+      Buffer.compare(env.PII_ENCRYPTION_KEY, env.PII_LOOKUP_KEY) === 0
+    ) {
+      fail('PII_LOOKUP_KEY', 'must differ from PII_ENCRYPTION_KEY');
     }
     // Least privilege: the running API must not hold schema-owner credentials.
     if (env.MIGRATION_DATABASE_URL) {

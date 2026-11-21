@@ -3,7 +3,7 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import { isDatabaseReachable, prisma } from './config/database';
 import { env } from './config/env';
-import { authConfig } from './config/security';
+import { authConfig, piiCrypto } from './config/security';
 import { aiServiceClient } from './integrations/ai-service/aiServiceClient';
 import { noStore, requireJsonBody } from './middleware/apiHeaders';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -23,6 +23,7 @@ function defaultDependencies(): AppDependencies {
       checkAiService: () => aiServiceClient.getStatus(),
     },
     auth: { db: prisma, config: authConfig },
+    pii: piiCrypto,
   };
 }
 

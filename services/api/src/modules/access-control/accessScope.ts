@@ -166,7 +166,8 @@ export const scopedWhere = {
   ): Prisma.ChildAreaTransferWhereInput => ({ child: childScopeWhere(userId, permission, at) }),
 };
 
-export type ScopedEntity = keyof typeof scopedWhere | 'child';
+/** 'childGuardian': a link id checked through its child (always verified as a chain). */
+export type ScopedEntity = keyof typeof scopedWhere | 'child' | 'childGuardian';
 
 function isRootClient(db: Db): db is PrismaClient {
   return '$transaction' in db;

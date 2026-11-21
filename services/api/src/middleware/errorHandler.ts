@@ -1,4 +1,5 @@
 import type { ApiError } from '@balswasthya/shared-contracts';
+import { Prisma } from '@prisma/client';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { AppError } from '../utils/AppError';
@@ -42,6 +43,56 @@ const BODY_PARSER_ERRORS: Record<string, { code: string; message: string }> = {
 };
 
 /**
+ * Database failures a client can act on. Services handle the expected cases themselves (e.g. a
+ * duplicate link); this is the safety net for races they could not foresee - the response is a
+ * clear 409/503 instead of a 500, and never contains SQL or field values.
+ */
+function mapDatabaseError(
+  err: unknown,
+): { status: number; code: string; message: string; prismaCode: string } | null {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (err.code) {
+      case 'P2002':
+        return {
+          status: 409,
+          code: 'CONFLICT',
+          message: 'This change conflicts with an existing record. Reload and try again.',
+          prismaCode: err.code,
+        };
+      case 'P2034':
+        return {
+          status: 409,
+          code: 'TRANSACTION_CONFLICT',
+          message: 'Another change happened at the same time. Please try again.',
+          prismaCode: err.code,
+        };
+      case 'P1001':
+      case 'P1002':
+      case 'P1017':
+      case 'P2024':
+      case 'P2028':
+        return {
+          status: 503,
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'The service is temporarily unavailable. Please try again.',
+          prismaCode: err.code,
+        };
+      default:
+        return null;
+    }
+  }
+  if (err instanceof Prisma.PrismaClientInitializationError) {
+    return {
+      status: 503,
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'The service is temporarily unavailable. Please try again.',
+      prismaCode: err.errorCode ?? 'INIT',
+    };
+  }
+  return null;
+}
+
+/**
  * Global error handler. Always responds with the shared ApiError shape.
  * Internal details (stack traces, SQL errors) are logged, never sent to the client.
  */
@@ -70,6 +121,14 @@ export function errorHandler(err: unknown, _req: Request, res: Response<ApiError
   if (isBodyParserError(err)) {
     const known = BODY_PARSER_ERRORS[err.type] ?? { code: 'BAD_REQUEST', message: 'Invalid request body' };
     res.status(err.status).json({ error: { ...known, requestId } });
+    return;
+  }
+
+  const dbError = mapDatabaseError(err);
+  if (dbError) {
+    // Code only: Prisma messages can contain field values (personal data).
+    logger.warn('database_error', { requestId, prismaCode: dbError.prismaCode });
+    res.status(dbError.status).json({ error: { code: dbError.code, message: dbError.message, requestId } });
     return;
   }
 

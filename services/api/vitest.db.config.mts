@@ -25,6 +25,9 @@ export default defineConfig({
       JWT_SECRET: 'db-test-only-jwt-secret-0123456789abcdef',
       CORS_ORIGINS: 'http://localhost:8081',
       AI_SERVICE_URL: '',
+      // Synthetic test-only keys ("test-only-pii-encryption-key-32b" / "...lookup-hmac-key...").
+      PII_ENCRYPTION_KEY: 'dGVzdC1vbmx5LXBpaS1lbmNyeXB0aW9uLWtleS0zMmI=',
+      PII_LOOKUP_KEY: 'dGVzdC1vbmx5LXBpaS1sb29rdXAtaG1hYy1rZXktMDEyMzQ1Njc4OQ==',
     },
     hookTimeout: 120_000,
   },
