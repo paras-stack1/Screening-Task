@@ -1,6 +1,6 @@
 # BalSwasthya AI - Authorization (RBAC + Area Access)
 
-> **Status:** Step 3, Stage 3 implemented (2026-11-21). Builds on
+> **Status:** Step 3 complete (2026-11-21); this is Stage 3. Builds on
 > [database-design.md](database-design.md) sections 4-6 and [authentication.md](authentication.md).
 > Roles, role permissions and the area hierarchy are **illustrative assumptions** pending RBSK
 > programme confirmation (decisions D1, D2).

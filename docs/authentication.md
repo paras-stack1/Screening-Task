@@ -1,7 +1,9 @@
 # BalSwasthya AI - Authentication and Sessions
 
-> **Status:** Step 3, Stage 2 implemented (2026-11-21). Authorization (RBAC + area access, user
-> management) and the mobile-app integration are later stages and will extend this document.
+> **Status:** Step 3 complete (2026-11-21). Stage 2 (this document), Stage 3 authorization
+> ([authorization.md](authorization.md)) and Stage 4 mobile-app integration (delivered in Step 4:
+> [frontend/authentication.md](frontend/authentication.md); verified against the running API by
+> `apps/worker-app/tests/live/liveApi.test.ts`, 10/10 passed).
 > Decisions referenced as A-H were approved by the project lead on 2026-11-21.
 
 Related: [database-design.md](database-design.md) (schema, access-control rules),
@@ -155,7 +157,8 @@ Rotation (one transaction):
 **Concurrent / duplicate requests:** however many identical refresh requests arrive together, the
 family ends with exactly **one** current token and is not revoked; earlier responses' tokens are
 superseded. The app must therefore run only one refresh at a time and keep the token from the last
-successful response (Stage 4 implements a single-flight refresh). Presenting a superseded token
+successful response; the worker app does this with a single-flight refresh
+([frontend/authentication.md](frontend/authentication.md) section 4). Presenting a superseded token
 later is treated as reuse.
 
 **Revocation reasons** (`RefreshSession.revokedReason`): `ROTATED`, `SUPERSEDED`, `REUSE_DETECTED`,
@@ -167,7 +170,7 @@ later is treated as reuse.
 |---|---|---|
 | `POST /auth/logout` `{ refreshToken }` | none (works with an expired access token) | Revokes that token's family. Always `204`, also for unknown tokens (no oracle). |
 | `POST /auth/logout-all` | access token | Revokes every family of the user. `204`. |
-| `GET /auth/me` | access token | `{ user }` |
+| `GET /auth/me` | access token | `{ user, access }` - `access` = effective permissions and assignments (`meResponseSchema`); for UI adaptation only |
 | `GET /auth/sessions` | access token | Own active sessions: `sessionId`, `deviceLabel`, `lastActiveAt`, `expiresAt`, `current` |
 | `DELETE /auth/sessions/:sessionId` | access token | Revokes one **own** session. Another user's id -> `404`. |
 | `POST /auth/change-password` `{ currentPassword, newPassword }` | access token | See below |
@@ -250,7 +253,7 @@ turn) confirmed every one is caught by at least one test.
 | HS256 shared secret | Acceptable while only this API signs and verifies. Switch to an asymmetric key if another service must verify tokens. Rotating `JWT_SECRET` invalidates current access tokens (users refresh transparently). |
 | Account lockout | A third party who knows a login ID can lock it for up to 15 minutes at a time (bounded by design, mitigated by rate limits). |
 | Grace window (decision B) | A thief replaying a just-rotated token within 30 s gets a token, but the legitimate client's next refresh then triggers reuse detection and revokes both. |
-| No device binding | Refresh tokens are bearer tokens; protection relies on SecureStore on the device (Stage 4). |
+| No device binding | Refresh tokens are bearer tokens; protection relies on SecureStore on the device (Android Keystore / iOS Keychain, excluded from backups). |
 | Audit without IP | Investigations rely on request ids and server logs. |
-| `npm audit` | 4 high / 3 moderate findings in Prisma CLI config tooling and Expo build tooling; only fixes are Prisma 7 or an Expo downgrade. Accepted (decision H); not in the request path. |
+| `npm audit` | 4 high / 3 moderate findings in Prisma CLI config tooling and Expo build tooling; only fixes are Prisma 7 or an Expo downgrade. Accepted (decision H); not in the request path. Step 4 added 25 moderate findings, all one `minimatch`/`glob` issue inside Jest test tooling (dev only, not shipped). |
 | No self-service password reset | By design until an approved SMS/email channel exists. |
