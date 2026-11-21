@@ -48,19 +48,38 @@ Copy-Item services\api\.env.example services\api\.env
 Copy-Item apps\worker-app\.env.example apps\worker-app\.env
 ```
 
-3. **Edit the secrets** (use a text editor):
-   - In `.env`, set `POSTGRES_PASSWORD` to a new random value.
-   - In `services\api\.env`, put the **same** password inside `DATABASE_URL`, and set
-     `JWT_SECRET`. You can generate a secure value with:
+3. **Edit the secrets** (use a text editor). Generate each random value with:
 
    ```powershell
-   $b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
+   $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b).Replace('+','-').Replace('/','_').TrimEnd('=')
    ```
+
+   | File | Set | Notes |
+   |------|-----|-------|
+   | `.env` | `POSTGRES_PASSWORD` | Owner account (migrations only) |
+   | `.env` | `APP_DB_PASSWORD` | Runtime account the API uses |
+   | `services\api\.env` | `DATABASE_URL` | `balswasthya_app` + the `APP_DB_PASSWORD` value |
+   | `services\api\.env` | `MIGRATION_DATABASE_URL`, `TEST_DATABASE_URL` | `balswasthya` + the `POSTGRES_PASSWORD` value |
+   | `services\api\.env` | `JWT_SECRET` | 32+ characters |
 
 ```powershell
 # 4. Build the shared contracts package (the app and API import its compiled output).
 npm run build:contracts
+
+# 5. Database: start it, apply migrations (owner account), create the runtime account,
+#    load synthetic reference data.
+npm run db:up
+npm run db:migrate
+npm run db:setup-roles
+npm run db:seed
+
+# 6. (Optional, for `npm run test:db`) create the disposable test database once.
+docker exec balswasthya-postgres psql -U balswasthya -d balswasthya_dev -c "CREATE DATABASE balswasthya_test"
 ```
+
+**Two database accounts.** The API connects as `balswasthya_app`, which can read and write data
+but cannot change tables, read migration history or modify the audit log. Only Prisma Migrate uses
+the owner account. Details: [docs/database-design.md](docs/database-design.md).
 
 ---
 
@@ -155,14 +174,18 @@ To **delete** all local database data: `docker volume rm balswasthya_pgdata` (ir
 | Command (from repo root)                                   | What it does                                     |
 |------------------------------------------------------------|--------------------------------------------------|
 | `npm run check`                                            | **Run before every commit:** format check, typecheck, lint, tests |
-| `npm test`                                                 | API tests (Vitest + Supertest; no database needed) |
+| `npm test`                                                 | API unit tests (Vitest + Supertest; no database needed) |
+| `npm run test:db`                                          | Database tests: access-control scenarios and DB rules (needs Docker + `balswasthya_test`) |
+| `npm run db:migrate`                                       | Create/apply migrations in development (owner account) |
+| `npm run db:setup-roles`                                   | Create/update the least-privilege runtime account (idempotent; also rotates its password) |
+| `npm run db:seed`                                          | Load synthetic reference data (levels, roles, permissions, demo areas) |
 | `npm run lint`                                             | ESLint (API/contracts: typed rules; app: `expo lint`) |
 | `npm run format`                                           | Formats code with Prettier (`format:check` only checks) |
 | `npm run test:watch --workspace @balswasthya/api`          | Re-runs API tests on file changes                |
 | `npm run typecheck`                                        | Builds contracts, type-checks app + API          |
 | `npm run build --workspace @balswasthya/api`               | Compiles the API to `services/api/dist`          |
 | `npm run prisma:validate --workspace @balswasthya/api`     | Checks `schema.prisma`                           |
-| `npm run prisma:migrate --workspace @balswasthya/api`      | Creates/applies migrations (once models exist)   |
+| `npm run prisma:deploy --workspace @balswasthya/api`       | Applies committed migrations (non-destructive; staging/production) |
 | `npm run prisma:studio --workspace @balswasthya/api`       | Opens Prisma Studio database browser             |
 | `cd apps\worker-app; npx expo install <pkg>`               | Adds an Expo package with an SDK-compatible version |
 | `cd apps\worker-app; npx expo-doctor`                      | Diagnoses Expo dependency problems               |
@@ -173,8 +196,8 @@ To **delete** all local database data: `docker volume rm balswasthya_pgdata` (ir
 
 | File                         | Contains                                | Committed? |
 |------------------------------|-----------------------------------------|------------|
-| `.env`                       | Docker Postgres user/password/port      | **No**     |
-| `services/api/.env`          | `DATABASE_URL`, `JWT_SECRET`, AI key    | **No**     |
+| `.env`                       | Docker Postgres owner + runtime account passwords, port | **No** |
+| `services/api/.env`          | `DATABASE_URL` (runtime), `MIGRATION_DATABASE_URL` (owner), `TEST_DATABASE_URL`, `JWT_SECRET`, AI key | **No** |
 | `apps/worker-app/.env`       | `EXPO_PUBLIC_API_BASE_URL` only         | **No**     |
 | `*.env.example`              | Placeholder values, documentation       | Yes        |
 
@@ -192,6 +215,9 @@ Never put passwords, database URLs, JWT secrets or API keys there.
 | `failed to connect to the docker API` | Start Docker Desktop and wait until it says "Engine running". |
 | Port 5433 already in use | Change `POSTGRES_HOST_PORT` in `.env` **and** the port in `DATABASE_URL`. |
 | API exits with `Invalid environment configuration` | The message lists which variables are missing/invalid in `services/api/.env`. |
+| `password authentication failed for user "balswasthya_app"` | Run `npm run db:setup-roles` (it sets the password from `APP_DB_PASSWORD`), and check `DATABASE_URL` uses the same password. |
+| `npm run test:db` fails with `database "balswasthya_test" does not exist` | Create it once - see First-time setup step 6. |
+| Prisma refuses `migrate reset` ("invoked by Claude Code" / an AI agent) | Intended safety check. Run destructive commands yourself, only against a development database. |
 | App shows "Not connected" on a phone | See "Phone on Wi-Fi" above. |
 | `expo-doctor` reports duplicate `react` | Keep the root `overrides.react` equal to the app's `react` version, then delete `package-lock.json` and `node_modules` and run `npm install`. |
 
@@ -207,5 +233,11 @@ Prisma 6 connection, Docker PostgreSQL, AI placeholder, shared contracts, docs.
 pino logging with redaction, production configuration guard, readiness caching, AI client
 size/redirect limits, safer error handling. See [docs/architecture.md](docs/architecture.md) §3 and §7.
 
-Not implemented yet (by design): login, users, children, guardians, consent,
-screening forms, referrals, dashboards, database models, rate limiting.
+**Step 2 - Database design: approved.** [docs/database-design.md](docs/database-design.md) (v0.1).
+
+**Step 3 - Database foundation: done.** Full schema and first migration (with hierarchy trigger,
+assignment-overlap exclusion, append-only audit), least-privilege runtime account, synthetic seed,
+area-scoped access-control module, and database tests for the design's scenarios.
+
+Not implemented yet (by design): login and user management, REST endpoints for children,
+guardians, consent, screening, referrals; dashboards; rate limiting.

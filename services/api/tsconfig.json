@@ -18,5 +18,5 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src", "tests", "vitest.config.mts"]
+  "include": ["src", "tests", "prisma", "vitest.config.mts", "vitest.db.config.mts"]
 }

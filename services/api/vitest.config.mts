@@ -7,6 +7,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
+    exclude: ['tests/db/**'], // database tests run separately: npm run test:db
     environment: 'node',
     restoreMocks: true,
     env: {

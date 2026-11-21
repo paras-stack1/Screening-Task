@@ -2,7 +2,13 @@
 
 > **Status: APPROVED 2026-11-21 (v0.1).** Approved by the project lead with the proposed defaults for
 > decisions D3-D6 and D10 (§12). D1, D2 and D7-D9 remain assumptions pending confirmation by the
-> RBSK programme, legal and clinical teams. Implementation: step 3 (first migration).
+> RBSK programme, legal and clinical teams.
+>
+> **Implemented in step 3:** `services/api/prisma/schema.prisma`, migration
+> `services/api/prisma/migrations/*_init` (§8 + §9 SQL + append-only audit triggers), runtime account
+> `infrastructure/db/setup-app-role.sql`, access control
+> `services/api/src/modules/access-control/accessScope.ts`, area tree
+> `services/api/src/modules/areas/areaTree.ts`, scenario tests `services/api/tests/db/`.
 
 > ⚠️ **Assumption - to be confirmed with the RBSK programme team.**
 > The geographical hierarchy (State → District → Block → Sector → Village / Anganwadi Centre),
@@ -231,8 +237,11 @@ An assignment is **effective** at time *t* when all of these hold:
 
 ```
 status = 'ACTIVE'  AND  effectiveFrom <= t  AND  (effectiveTo IS NULL OR effectiveTo > t)
-AND the user's status = 'ACTIVE'
+AND the user's status = 'ACTIVE'  AND  the role's isActive = true
 ```
+
+(The role condition was made explicit during implementation in step 3; deactivating a role
+immediately removes the access it granted.)
 
 `status` and the date window are deliberately separate: dates describe the planned period, status
 records administrative action (a suspension does not rewrite the planned end date).
@@ -293,6 +302,7 @@ WHERE c."deletedAt" IS NULL
   AND EXISTS (
     SELECT 1
     FROM "WorkerAreaAssignment" a
+    JOIN "Role" r            ON r.id = a."roleId" AND r."isActive"
     JOIN "RolePermission" rp ON rp."roleId" = a."roleId"
     JOIN "Permission" p      ON p.id = rp."permissionId" AND p.code = :p
     JOIN "AreaClosure" ac    ON ac."ancestorId" = a."areaId" AND ac."descendantId" = c."areaId"
@@ -306,11 +316,12 @@ WHERE c."deletedAt" IS NULL
 
 ### 5.3 Enforcement in the API
 
-- One module, `access-control`, owns this logic. It exposes:
-  - `childScopeFilter(user, permission)` → a Prisma `where` fragment (relation filter equivalent to
-    the query above) that **every** child-related repository query must include;
-  - `assertCanAccessChild(user, childId, permission)` for single-record operations;
-  - `coveredAreaFilter(user, permission)` for reports.
+- One module, `access-control` (`services/api/src/modules/access-control/accessScope.ts`), owns
+  this logic. It exposes:
+  - `childScopeWhere(userId, permission, at?)` → a Prisma `where` fragment (relation filter
+    equivalent to the query above) that **every** child-related query must include;
+  - `findChildOrDeny(db, ctx, childId, permission)` for single-record operations (404 + audit);
+  - `countChildrenInScope(db, ctx)` for aggregate reports.
 - Repositories for child-linked entities take the access filter as a **required parameter**, so a
   query without it does not compile.
 - Every protected route declares its permission; a route without one is rejected at startup.
@@ -1396,8 +1407,10 @@ ALTER TABLE "ScreeningProtocol" ADD CONSTRAINT protocol_age_band
 ALTER TABLE "MediaMetadata" ADD CONSTRAINT media_size_positive CHECK ("sizeBytes" > 0);
 
 -- ------------------------------------------------------- 9.4 Insert-only audit log
--- Run with the application's runtime role (name to be decided, here: balswasthya_app).
--- REVOKE UPDATE, DELETE, TRUNCATE ON "AuditLog" FROM balswasthya_app;
+-- Implemented in step 3 as (a) triggers in the migration that reject UPDATE, DELETE and
+-- TRUNCATE for every account (bypassing them requires deliberately disabling the trigger, a
+-- schema change), and (b) REVOKE UPDATE, DELETE, TRUNCATE for the runtime account in
+-- infrastructure/db/setup-app-role.sql.
 ```
 
 ### 9.5 Closure-table maintenance (service layer, one transaction)
@@ -1522,5 +1535,13 @@ Performed on 2026-11-20 against this exact document (code blocks extracted autom
 | Integrity rules | Rejected: `effectiveTo` before `effectiveFrom`, district under village, second root, deleting an area with sub-areas. Accepted: village directly under block (level skipping) |
 | §9.4 insert-only audit (role with UPDATE/DELETE revoked) | Insert allowed; UPDATE and DELETE denied |
 
-**Not yet verified** (needs the API implementation): scenarios 12 and 14, the Prisma relation-filter
-form of the §5.2 query, and query performance at state scale (needs a realistic synthetic data volume).
+**Step 3 (2026-11-21):** the committed migration and the Prisma relation-filter implementation of
+§5.2 (`childScopeWhere`) pass automated tests for scenarios 1-13 plus extra deny-by-default cases
+(`npm run test:db`, 28 tests). Mutation testing - removing each access condition in turn (scope
+depth, user status, start/end dates, assignment status, role active, permission, soft delete) -
+made at least one test fail every time. The runtime account was checked from the host: data
+read/write allowed; audit-log update/delete/truncate, migration history, DDL, trigger disabling and
+role creation denied.
+
+**Still not verified:** scenario 14 (privilege-escalation rule - implemented with the assignment
+management API in Phase 3) and query performance at state scale (needs a large synthetic dataset).

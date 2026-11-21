@@ -151,6 +151,8 @@ application architecture does not change when their endpoints arrive:
 | Secrets            | Only in `services/api/.env` (git-ignored). Never in `EXPO_PUBLIC_*` variables.                 |
 | Mobile config      | Only the API base URL is public. Verified: the compiled app bundle contains no secrets.       |
 | Database exposure  | Docker binds PostgreSQL to `127.0.0.1` only.                                                   |
+| Database accounts  | API runs as `balswasthya_app` (data read/write only; no DDL; audit log append-only). Owner credentials are used only by Prisma Migrate (`directUrl`) and are refused by the production config guard. |
+| Access control     | Area-scoped, server-side: `modules/access-control/accessScope.ts`. See [database-design.md](database-design.md) §5. |
 | Logging            | Method, path, status, duration, request id. **No bodies, query strings, names, or identifiers.** |
 | Headers            | `helmet` defaults; `X-Powered-By` disabled.                                                    |
 | CORS               | Explicit browser-origin allow-list. Native apps send no Origin and are unaffected.             |
@@ -183,6 +185,7 @@ application architecture does not change when their endpoints arrive:
 | ESLint 9   | app   | `eslint-config-expo` via `expo lint` (includes React hooks rules). |
 | Prettier   | all code/config | Markdown is excluded (hand-formatted tables). |
 | Vitest + Supertest | API | `services/api/tests`. No database or network beyond a local fake AI server; synthetic env set in `vitest.config.mts`. |
+| Vitest (database) | API | `npm run test:db` - `services/api/tests/db`, against `balswasthya_test` (name must end in `_test`), migrated with `prisma migrate deploy`. Not part of `npm run check` because it needs Docker. |
 
 Security regression tests already in place: no path echo on 404, no leaked error details, no
 Prisma query values in logs, log redaction, request-size limits, AI timeout/size/redirect limits,

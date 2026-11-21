@@ -27,7 +27,11 @@
     "dev:web": "npm run web --workspace @balswasthya/worker-app",
     "typecheck": "npm run build:contracts && npm run typecheck --workspaces --if-present",
     "db:up": "docker compose -f infrastructure/docker-compose.yml --env-file .env up -d",
-    "db:down": "docker compose -f infrastructure/docker-compose.yml --env-file .env down"
+    "db:down": "docker compose -f infrastructure/docker-compose.yml --env-file .env down",
+    "db:setup-roles": "node infrastructure/db/setup-app-role.mjs",
+    "db:migrate": "npm run prisma:migrate --workspace @balswasthya/api",
+    "db:seed": "npm run prisma:seed --workspace @balswasthya/api",
+    "test:db": "npm run build:contracts && npm run test:db --workspace @balswasthya/api"
   },
   "devDependencies": {
     "@eslint/js": "~9.39.5",

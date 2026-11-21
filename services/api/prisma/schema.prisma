@@ -1,20 +1,938 @@
 // BalSwasthya AI - Prisma schema (Prisma ORM 6)
 //
-// Step 1 sets up only the datasource and client generator. Domain models
-// (User, Facility, Child, Guardian, Consent, Screening, Referral) will be
-// designed and migrated in a later step.
+// Source of truth for the design: docs/database-design.md (approved v0.1, 2026-11-21).
+// Change the design document first, then this file, then create a migration.
 //
-// Data-protection conventions for future models:
-//  - Use UUID primary keys (no guessable sequential ids exposed via the API).
-//  - Store consent as an explicit, timestamped, versioned record.
-//  - Keep createdAt/updatedAt on every table; prefer soft-delete for health records.
-//  - Development and test data must be synthetic only.
+// Two database accounts:
+//   DATABASE_URL            runtime account (balswasthya_app): data read/write only.
+//   MIGRATION_DATABASE_URL  owner account: used by Prisma Migrate (via directUrl) only.
+// Development and test data must be synthetic only.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  /// Prisma Migrate uses this privileged connection; the API never does.
+  directUrl = env("MIGRATION_DATABASE_URL")
+}
+
+// ===================================================================== Enums
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum AssignmentScope {
+  AREA_ONLY
+  AREA_AND_DESCENDANTS
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+/// Illustrative - align with programme forms.
+enum SexAtBirth {
+  FEMALE
+  MALE
+  OTHER
+  NOT_RECORDED
+}
+
+enum GuardianRelationship {
+  MOTHER
+  FATHER
+  GRANDPARENT
+  SIBLING
+  OTHER_RELATIVE
+  LEGAL_GUARDIAN
+  INSTITUTION_CARETAKER
+  OTHER
+}
+
+enum ConsentPurpose {
+  SCREENING
+  PHOTO_CAPTURE
+  VIDEO_CAPTURE
+  AUDIO_CAPTURE
+  AI_PROCESSING
+  REFERRAL_DATA_SHARING
+  SMS_REMINDERS
+}
+
+enum ConsentDecision {
+  GRANTED
+  REFUSED
+}
+
+/// Illustrative - to be confirmed with legal / programme team.
+enum ConsentMethod {
+  VERBAL_WITNESSED
+  SIGNATURE
+  THUMB_IMPRESSION
+  DIGITAL_ACKNOWLEDGEMENT
+}
+
+enum ApprovalStatus {
+  DRAFT
+  APPROVED
+  RETIRED
+}
+
+enum FourDCategory {
+  DEFECTS_AT_BIRTH
+  DEFICIENCIES
+  DISEASES
+  DEVELOPMENTAL_DELAYS_DISABILITIES
+}
+
+enum AnswerType {
+  YES_NO
+  SINGLE_CHOICE
+  MULTI_CHOICE
+  NUMBER
+  TEXT
+}
+
+enum SessionStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ObservationStatus {
+  ANSWERED
+  NOT_ASSESSED
+  UNABLE_TO_ASSESS
+}
+
+/// Illustrative - final list follows approved protocols.
+enum MeasurementType {
+  WEIGHT
+  HEIGHT
+  LENGTH
+  MUAC
+  HEAD_CIRCUMFERENCE
+  HAEMOGLOBIN
+}
+
+enum MeasurementQuality {
+  RELIABLE
+  QUESTIONABLE
+  NOT_RELIABLE
+}
+
+enum ResultOutcome {
+  REFERRAL_RECOMMENDED
+  FOLLOW_UP_RECOMMENDED
+  NO_CONCERN_IN_COMPLETED_ITEMS
+  INSUFFICIENT_DATA
+}
+
+enum ResultSource {
+  RULE_ENGINE
+  WORKER_OBSERVATION
+  AI_SUPPORT
+  CLINICIAN
+}
+
+enum ReviewStatus {
+  NOT_REQUIRED
+  PENDING
+  REVIEWED
+}
+
+enum AiAnalysisType {
+  IMAGE_QUALITY
+  IMAGE_ANALYSIS
+  SPEECH
+  MOVEMENT
+  DEVELOPMENTAL
+  GROWTH
+}
+
+enum AiAnalysisStatus {
+  REQUESTED
+  COMPLETED
+  FAILED
+  UNAVAILABLE
+}
+
+/// Illustrative - to be confirmed.
+enum FacilityType {
+  DEIC
+  PHC
+  CHC
+  DISTRICT_HOSPITAL
+  MEDICAL_COLLEGE
+  OTHER
+}
+
+/// Clinical definitions of each level to be confirmed.
+enum ReferralUrgency {
+  ROUTINE
+  PRIORITY
+  URGENT
+}
+
+enum ReferralStatus {
+  CREATED
+  APPOINTMENT_SCHEDULED
+  ATTENDED
+  COMPLETED
+  NOT_ATTENDED
+  CANCELLED
+}
+
+enum FollowUpStatus {
+  PENDING
+  DONE
+  MISSED
+  CANCELLED
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+  AUDIO
+}
+
+enum MediaStatus {
+  PENDING_UPLOAD
+  STORED
+  QUARANTINED
+  DELETED
+}
+
+enum SyncStatus {
+  RECEIVED
+  APPLIED
+  REJECTED
+  CONFLICT
+}
+
+enum NotificationType {
+  FOLLOW_UP_DUE
+  REFERRAL_UPDATE
+  SYSTEM
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+  FAILED
+}
+
+// ============================================================ Organisation & users
+
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  users User[]
+}
+
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  /// Employee code or mobile number - to be confirmed.
+  loginId            String     @unique
+  passwordHash       String
+  displayName        String
+  status             UserStatus @default(ACTIVE)
+  organizationId     String?    @db.Uuid
+  preferredLanguage  String     @default("hi")
+  failedLoginCount   Int        @default(0)
+  lockedUntil        DateTime?  @db.Timestamptz(3)
+  mustChangePassword Boolean    @default(true)
+  passwordChangedAt  DateTime?  @db.Timestamptz(3)
+  lastLoginAt        DateTime?  @db.Timestamptz(3)
+  createdAt          DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime   @updatedAt @db.Timestamptz(3)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  assignmentsHeld          WorkerAreaAssignment[] @relation("AssignmentHolder")
+  assignmentsCreated       WorkerAreaAssignment[] @relation("AssignmentCreatedBy")
+  assignmentStatusChanges  WorkerAreaAssignment[] @relation("AssignmentStatusChangedBy")
+  childrenRegistered       Child[]
+  childTransfers           ChildAreaTransfer[]
+  consentsRecorded         Consent[]              @relation("ConsentRecordedBy")
+  consentsWithdrawn        Consent[]              @relation("ConsentWithdrawnBy")
+  protocolsApproved        ScreeningProtocol[]
+  sessionsConducted        ScreeningSession[]
+  measurementsRecorded     Measurement[]
+  resultsReviewed          ScreeningResult[]
+  referralsCreated         Referral[]
+  referralStatusEvents     ReferralStatusEvent[]
+  followUpsAssigned        FollowUp[]             @relation("FollowUpAssignee")
+  followUpsCompleted       FollowUp[]             @relation("FollowUpCompletedBy")
+  mediaCaptured            MediaMetadata[]
+  notifications            Notification[]
+  refreshSessions          RefreshSession[]
+  syncOperations           SyncOperation[]
+
+  @@index([status])
+  @@index([organizationId])
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  nameEn      String
+  nameHi      String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  permissions RolePermission[]
+  assignments WorkerAreaAssignment[]
+}
+
+model Permission {
+  id          String @id @default(uuid()) @db.Uuid
+  /// Defined in API source code and seeded, e.g. "child.read".
+  code        String @unique
+  description String
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+// ================================================================ Area hierarchy
+
+model AreaLevel {
+  id                      String   @id @default(uuid()) @db.Uuid
+  code                    String   @unique
+  nameEn                  String
+  nameHi                  String
+  /// Smaller = higher in the tree. Use gaps (10, 20, ...) so levels can be inserted.
+  rank                    Int      @unique
+  allowsChildRegistration Boolean  @default(false)
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime @updatedAt @db.Timestamptz(3)
+
+  areas Area[]
+}
+
+model Area {
+  id            String    @id @default(uuid()) @db.Uuid
+  levelId       String    @db.Uuid
+  parentId      String?   @db.Uuid
+  code          String
+  /// Optional official code - source to be confirmed.
+  externalCode  String?
+  nameEn        String
+  nameHi        String?
+  /// Distance from the root (root = 0). Maintained together with AreaClosure.
+  depth         Int
+  isActive      Boolean   @default(true)
+  deactivatedAt DateTime? @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+
+  level    AreaLevel @relation(fields: [levelId], references: [id], onDelete: Restrict)
+  parent   Area?     @relation("AreaTree", fields: [parentId], references: [id], onDelete: Restrict)
+  subAreas Area[]    @relation("AreaTree")
+
+  /// Closure rows where this area is the DESCENDANT (i.e. its ancestors, incl. itself).
+  ancestorLinks   AreaClosure[] @relation("ClosureDescendant")
+  /// Closure rows where this area is the ANCESTOR (i.e. its descendants, incl. itself).
+  descendantLinks AreaClosure[] @relation("ClosureAncestor")
+
+  assignments        WorkerAreaAssignment[]
+  registeredChildren Child[]
+  transfersOut       ChildAreaTransfer[]    @relation("TransferFrom")
+  transfersIn        ChildAreaTransfer[]    @relation("TransferTo")
+  screeningSessions  ScreeningSession[]
+  referrals          Referral[]
+  facilities         Facility[]
+
+  @@unique([parentId, code])
+  @@unique([levelId, externalCode])
+  @@index([parentId])
+  @@index([levelId, isActive])
+}
+
+model AreaClosure {
+  ancestorId   String @db.Uuid
+  descendantId String @db.Uuid
+  /// 0 = the area itself.
+  depth        Int
+
+  ancestor   Area @relation("ClosureAncestor", fields: [ancestorId], references: [id], onDelete: Cascade)
+  descendant Area @relation("ClosureDescendant", fields: [descendantId], references: [id], onDelete: Cascade)
+
+  @@id([ancestorId, descendantId])
+  @@index([descendantId, ancestorId])
+}
+
+model WorkerAreaAssignment {
+  id                 String           @id @default(uuid()) @db.Uuid
+  userId             String           @db.Uuid
+  areaId             String           @db.Uuid
+  roleId             String           @db.Uuid
+  scope              AssignmentScope
+  status             AssignmentStatus @default(ACTIVE)
+  effectiveFrom      DateTime         @db.Timestamptz(3)
+  /// Exclusive end; null = open-ended.
+  effectiveTo        DateTime?        @db.Timestamptz(3)
+  reason             String?
+  createdById        String           @db.Uuid
+  createdAt          DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime         @updatedAt @db.Timestamptz(3)
+  statusChangedById  String?          @db.Uuid
+  statusChangedAt    DateTime?        @db.Timestamptz(3)
+  statusChangeReason String?
+
+  user            User  @relation("AssignmentHolder", fields: [userId], references: [id], onDelete: Restrict)
+  area            Area  @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  role            Role  @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  createdBy       User  @relation("AssignmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  statusChangedBy User? @relation("AssignmentStatusChangedBy", fields: [statusChangedById], references: [id], onDelete: Restrict)
+
+  @@index([userId, status, effectiveFrom])
+  @@index([areaId, status])
+  @@index([roleId])
+}
+
+// ===================================================================== Children
+
+model Child {
+  id             String     @id @default(uuid()) @db.Uuid
+  /// Current area. Must be an area whose level allowsChildRegistration.
+  areaId         String     @db.Uuid
+  fullName       String
+  dateOfBirth    DateTime   @db.Date
+  dobIsEstimated Boolean    @default(false)
+  sexAtBirth     SexAtBirth
+  createdById    String     @db.Uuid
+  createdAt      DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime   @updatedAt @db.Timestamptz(3)
+  deletedAt      DateTime?  @db.Timestamptz(3)
+  deletionReason String?
+
+  area      Area @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  guardians         ChildGuardian[]
+  consents          Consent[]
+  transfers         ChildAreaTransfer[]
+  screeningSessions ScreeningSession[]
+  measurements      Measurement[]
+  referrals         Referral[]
+  followUps         FollowUp[]
+  media             MediaMetadata[]
+
+  @@index([areaId, deletedAt])
+  @@index([areaId, dateOfBirth])
+}
+
+model ChildAreaTransfer {
+  id              String   @id @default(uuid()) @db.Uuid
+  childId         String   @db.Uuid
+  fromAreaId      String   @db.Uuid
+  toAreaId        String   @db.Uuid
+  transferredById String   @db.Uuid
+  transferredAt   DateTime @default(now()) @db.Timestamptz(3)
+  reason          String?
+
+  child         Child @relation(fields: [childId], references: [id], onDelete: Restrict)
+  fromArea      Area  @relation("TransferFrom", fields: [fromAreaId], references: [id], onDelete: Restrict)
+  toArea        Area  @relation("TransferTo", fields: [toAreaId], references: [id], onDelete: Restrict)
+  transferredBy User  @relation(fields: [transferredById], references: [id], onDelete: Restrict)
+
+  @@index([childId, transferredAt])
+}
+
+model Guardian {
+  id                String    @id @default(uuid()) @db.Uuid
+  fullName          String
+  /// AES-256-GCM ciphertext (application-level key) - proposed, see open decisions.
+  phoneEncrypted    Bytes?
+  /// HMAC-SHA256 of the normalised number, for duplicate search without decrypting.
+  phoneLookupHash   String?
+  preferredLanguage String    @default("hi")
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt         DateTime? @db.Timestamptz(3)
+
+  children ChildGuardian[]
+  consents Consent[]
+
+  @@index([phoneLookupHash])
+}
+
+model ChildGuardian {
+  childId          String               @db.Uuid
+  guardianId       String               @db.Uuid
+  relationship     GuardianRelationship
+  isPrimaryContact Boolean              @default(false)
+  canGiveConsent   Boolean              @default(false)
+  createdAt        DateTime             @default(now()) @db.Timestamptz(3)
+  endedAt          DateTime?            @db.Timestamptz(3)
+
+  child    Child    @relation(fields: [childId], references: [id], onDelete: Restrict)
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+
+  @@id([childId, guardianId])
+  @@index([guardianId])
+}
+
+// ====================================================================== Consent
+
+model ConsentTemplate {
+  id                String         @id @default(uuid()) @db.Uuid
+  purpose           ConsentPurpose
+  version           Int
+  languageCode      String
+  /// SHA-256 of the exact approved wording shown to the guardian.
+  textSha256        String
+  status            ApprovalStatus @default(DRAFT)
+  approvalReference String?
+  approvedAt        DateTime?      @db.Timestamptz(3)
+  createdAt         DateTime       @default(now()) @db.Timestamptz(3)
+
+  consents Consent[]
+
+  @@unique([purpose, version, languageCode])
+}
+
+model Consent {
+  id                String          @id @default(uuid()) @db.Uuid
+  childId           String          @db.Uuid
+  guardianId        String          @db.Uuid
+  purpose           ConsentPurpose
+  decision          ConsentDecision
+  method            ConsentMethod
+  templateId        String          @db.Uuid
+  /// Paper form number or similar - no personal data.
+  evidenceReference String?
+  recordedById      String          @db.Uuid
+  recordedAt        DateTime        @db.Timestamptz(3)
+  withdrawnAt       DateTime?       @db.Timestamptz(3)
+  withdrawnById     String?         @db.Uuid
+  withdrawalReason  String?
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
+
+  child       Child           @relation(fields: [childId], references: [id], onDelete: Restrict)
+  guardian    Guardian        @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  template    ConsentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  recordedBy  User            @relation("ConsentRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict)
+  withdrawnBy User?           @relation("ConsentWithdrawnBy", fields: [withdrawnById], references: [id], onDelete: Restrict)
+
+  media      MediaMetadata[]
+  aiAnalyses AiAnalysis[]
+
+  @@index([childId, purpose, recordedAt])
+  @@index([guardianId])
+}
+
+// ==================================================================== Screening
+
+model ScreeningProtocol {
+  id                   String         @id @default(uuid()) @db.Uuid
+  code                 String
+  version              Int
+  nameEn               String
+  nameHi               String
+  ageMinDays           Int
+  ageMaxDays           Int
+  /// Required: guideline document, edition and section the protocol is based on.
+  sourceReference      String
+  status               ApprovalStatus @default(DRAFT)
+  clinicalApprovedById String?        @db.Uuid
+  clinicalApprovedAt   DateTime?      @db.Timestamptz(3)
+  createdAt            DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(3)
+
+  clinicalApprovedBy User? @relation(fields: [clinicalApprovedById], references: [id], onDelete: Restrict)
+
+  questions ScreeningQuestion[]
+  sessions  ScreeningSession[]
+
+  @@unique([code, version])
+  @@index([status, ageMinDays, ageMaxDays])
+}
+
+model ScreeningQuestion {
+  id          String        @id @default(uuid()) @db.Uuid
+  protocolId  String        @db.Uuid
+  code        String
+  category    FourDCategory
+  sortOrder   Int
+  /// Translation keys - wording lives in the app's reviewed translation files.
+  promptKey   String
+  helpKey     String?
+  answerType  AnswerType
+  /// Allowed option codes for choice questions.
+  options     Json?
+  isRequired  Boolean       @default(true)
+
+  protocol     ScreeningProtocol      @relation(fields: [protocolId], references: [id], onDelete: Restrict)
+  observations ScreeningObservation[]
+
+  @@unique([protocolId, code])
+  @@index([protocolId, sortOrder])
+}
+
+model ScreeningSession {
+  id                String        @id @default(uuid()) @db.Uuid
+  childId           String        @db.Uuid
+  protocolId        String        @db.Uuid
+  conductedById     String        @db.Uuid
+  /// Snapshot of the child's area when the session started (for reporting history).
+  areaId            String        @db.Uuid
+  ageInDaysAtStart  Int
+  status            SessionStatus @default(DRAFT)
+  startedAt         DateTime      @db.Timestamptz(3)
+  completedAt       DateTime?     @db.Timestamptz(3)
+  cancelledAt       DateTime?     @db.Timestamptz(3)
+  cancelReason      String?
+  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
+
+  child       Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
+  protocol    ScreeningProtocol @relation(fields: [protocolId], references: [id], onDelete: Restrict)
+  conductedBy User              @relation(fields: [conductedById], references: [id], onDelete: Restrict)
+  area        Area              @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  observations ScreeningObservation[]
+  measurements Measurement[]
+  results      ScreeningResult[]
+  aiAnalyses   AiAnalysis[]
+  referrals    Referral[]
+  media        MediaMetadata[]
+
+  @@index([childId, startedAt])
+  @@index([areaId, status, startedAt])
+  @@index([conductedById, startedAt])
+}
+
+model ScreeningObservation {
+  id                String            @id @default(uuid()) @db.Uuid
+  sessionId         String            @db.Uuid
+  questionId        String            @db.Uuid
+  status            ObservationStatus
+  valueBoolean      Boolean?
+  valueCode         String?
+  valueCodes        String[]
+  valueNumber       Decimal?          @db.Decimal(10, 3)
+  valueText         String?
+  notAssessedReason String?
+  recordedAt        DateTime          @db.Timestamptz(3)
+
+  session  ScreeningSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  question ScreeningQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, questionId])
+  @@index([questionId])
+}
+
+model Measurement {
+  id           String             @id @default(uuid()) @db.Uuid
+  childId      String             @db.Uuid
+  sessionId    String?            @db.Uuid
+  type         MeasurementType
+  value        Decimal            @db.Decimal(8, 2)
+  /// e.g. "kg", "cm", "g/dL" - allowed units per type validated in the API.
+  unit         String
+  method       String?
+  deviceMake   String?
+  deviceModel  String?
+  deviceSerial String?
+  quality      MeasurementQuality
+  measuredAt   DateTime           @db.Timestamptz(3)
+  recordedById String             @db.Uuid
+  createdAt    DateTime           @default(now()) @db.Timestamptz(3)
+
+  child      Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
+  session    ScreeningSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  recordedBy User              @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@index([childId, type, measuredAt])
+  @@index([sessionId])
+}
+
+model ScreeningResult {
+  id             String        @id @default(uuid()) @db.Uuid
+  sessionId      String        @db.Uuid
+  category       FourDCategory
+  outcome        ResultOutcome
+  source         ResultSource
+  ruleSetVersion String?
+  aiAnalysisId   String?       @db.Uuid
+  /// Structured reasons (rule/question codes), never free-text diagnosis.
+  reasons        Json
+  limitations    Json?
+  reviewStatus   ReviewStatus  @default(PENDING)
+  reviewedById   String?       @db.Uuid
+  reviewedAt     DateTime?     @db.Timestamptz(3)
+  reviewNotes    String?
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+
+  session    ScreeningSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  aiAnalysis AiAnalysis?      @relation(fields: [aiAnalysisId], references: [id], onDelete: Restrict)
+  reviewedBy User?            @relation(fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([sessionId])
+  @@index([reviewStatus, createdAt])
+}
+
+model AiAnalysis {
+  id                  String           @id @default(uuid()) @db.Uuid
+  sessionId           String           @db.Uuid
+  /// The AI_PROCESSING consent that authorised this call.
+  consentId           String           @db.Uuid
+  analysisType        AiAnalysisType
+  requestId           String           @unique
+  contractVersion     String
+  modelName           String?
+  modelVersion        String?
+  /// true = development mock response, never shown as a real result.
+  isMock              Boolean
+  status              AiAnalysisStatus
+  inputQuality        String?
+  output              Json?
+  humanReviewRequired Boolean          @default(true)
+  errorCode           String?
+  requestedAt         DateTime         @db.Timestamptz(3)
+  completedAt         DateTime?        @db.Timestamptz(3)
+
+  session ScreeningSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  consent Consent          @relation(fields: [consentId], references: [id], onDelete: Restrict)
+
+  results ScreeningResult[]
+
+  @@index([sessionId])
+  @@index([consentId])
+}
+
+// ===================================================== Facilities, referrals, follow-up
+
+model Facility {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  type      FacilityType
+  areaId    String       @db.Uuid
+  address   String?
+  /// Facility's official phone - not personal data.
+  phone     String?
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
+
+  area      Area       @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  referrals Referral[]
+
+  @@index([areaId, type, isActive])
+}
+
+model Referral {
+  id                String          @id @default(uuid()) @db.Uuid
+  childId           String          @db.Uuid
+  sessionId         String?         @db.Uuid
+  facilityId        String          @db.Uuid
+  /// Snapshot of the child's area at referral time.
+  areaId            String          @db.Uuid
+  category          FourDCategory?
+  urgency           ReferralUrgency
+  status            ReferralStatus  @default(CREATED)
+  reasonCode        String?
+  notes             String?
+  appointmentAt     DateTime?       @db.Timestamptz(3)
+  closedAt          DateTime?       @db.Timestamptz(3)
+  /// Device-generated id; makes offline re-submission idempotent.
+  clientOperationId String?         @unique @db.Uuid
+  createdById       String          @db.Uuid
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
+
+  child     Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
+  session   ScreeningSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  facility  Facility          @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  area      Area              @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  createdBy User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  statusEvents ReferralStatusEvent[]
+  followUps    FollowUp[]
+
+  @@index([childId])
+  @@index([areaId, status])
+  @@index([facilityId, status])
+}
+
+model ReferralStatusEvent {
+  id          String          @id @default(uuid()) @db.Uuid
+  referralId  String          @db.Uuid
+  fromStatus  ReferralStatus?
+  toStatus    ReferralStatus
+  changedById String          @db.Uuid
+  changedAt   DateTime        @default(now()) @db.Timestamptz(3)
+  note        String?
+
+  referral  Referral @relation(fields: [referralId], references: [id], onDelete: Restrict)
+  changedBy User     @relation(fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@index([referralId, changedAt])
+}
+
+model FollowUp {
+  id            String         @id @default(uuid()) @db.Uuid
+  childId       String         @db.Uuid
+  referralId    String?        @db.Uuid
+  dueDate       DateTime       @db.Date
+  status        FollowUpStatus @default(PENDING)
+  /// Optional; access is still decided by the child's area.
+  assignedToId  String?        @db.Uuid
+  completedAt   DateTime?      @db.Timestamptz(3)
+  completedById String?        @db.Uuid
+  outcomeNote   String?
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
+
+  child       Child     @relation(fields: [childId], references: [id], onDelete: Restrict)
+  referral    Referral? @relation(fields: [referralId], references: [id], onDelete: Restrict)
+  assignedTo  User?     @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+  completedBy User?     @relation("FollowUpCompletedBy", fields: [completedById], references: [id], onDelete: Restrict)
+
+  @@index([assignedToId, status, dueDate])
+  @@index([childId])
+  @@index([status, dueDate])
+}
+
+// ======================================================================== Media
+
+model MediaMetadata {
+  id             String         @id @default(uuid()) @db.Uuid
+  childId        String         @db.Uuid
+  sessionId      String?        @db.Uuid
+  /// The purpose-specific consent that authorised capture.
+  consentId      String         @db.Uuid
+  type           MediaType
+  purpose        ConsentPurpose
+  /// Random key in private object storage. Never a public URL.
+  storageKey     String         @unique
+  mimeType       String
+  sizeBytes      Int
+  sha256         String
+  status         MediaStatus    @default(PENDING_UPLOAD)
+  capturedById   String         @db.Uuid
+  capturedAt     DateTime       @db.Timestamptz(3)
+  retentionUntil DateTime?      @db.Timestamptz(3)
+  deletedAt      DateTime?      @db.Timestamptz(3)
+  deletionReason String?
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+
+  child      Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
+  session    ScreeningSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  consent    Consent           @relation(fields: [consentId], references: [id], onDelete: Restrict)
+  capturedBy User              @relation(fields: [capturedById], references: [id], onDelete: Restrict)
+
+  @@index([childId])
+  @@index([consentId])
+  @@index([status, retentionUntil])
+}
+
+// ================================================= Sessions, sync, notifications, audit
+
+model RefreshSession {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @db.Uuid
+  /// SHA-256 of the refresh token. The token itself is never stored.
+  tokenHash     String    @unique
+  /// All rotations of one login share a family; reuse of an old token revokes the family.
+  familyId      String    @db.Uuid
+  deviceLabel   String?
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt     DateTime  @db.Timestamptz(3)
+  lastUsedAt    DateTime? @db.Timestamptz(3)
+  revokedAt     DateTime? @db.Timestamptz(3)
+  revokedReason String?
+  replacedById  String?   @unique @db.Uuid
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  replacedBy RefreshSession? @relation("TokenRotation", fields: [replacedById], references: [id], onDelete: Restrict)
+  replaces   RefreshSession? @relation("TokenRotation")
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+  @@index([expiresAt])
+}
+
+model SyncOperation {
+  id                String     @id @default(uuid()) @db.Uuid
+  userId            String     @db.Uuid
+  clientOperationId String     @db.Uuid
+  deviceId          String
+  operationType     String
+  entityType        String
+  entityId          String?    @db.Uuid
+  status            SyncStatus @default(RECEIVED)
+  receivedAt        DateTime   @default(now()) @db.Timestamptz(3)
+  appliedAt         DateTime?  @db.Timestamptz(3)
+  errorCode         String?
+  /// Response returned on first apply; replayed for duplicates. IDs and status only.
+  responseSnapshot  Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, clientOperationId])
+  @@index([userId, receivedAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  type      NotificationType
+  /// IDs only - no names or health details.
+  payload   Json
+  readAt    DateTime?        @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, readAt, createdAt])
+}
+
+/// Insert-only (see SQL additions). No foreign keys, so it is independent of operational tables.
+model AuditLog {
+  id          String       @id @default(uuid()) @db.Uuid
+  occurredAt  DateTime     @default(now()) @db.Timestamptz(3)
+  actorUserId String?      @db.Uuid
+  action      String
+  entityType  String
+  entityId    String?      @db.Uuid
+  areaId      String?      @db.Uuid
+  outcome     AuditOutcome
+  requestId   String?
+  /// Field names and non-personal values only (e.g. assignment before/after).
+  details     Json?
+
+  @@index([entityType, entityId, occurredAt])
+  @@index([actorUserId, occurredAt])
+  @@index([action, occurredAt])
 }

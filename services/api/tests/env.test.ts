@@ -51,3 +51,21 @@ describe('environment configuration', () => {
     expect(failingPaths({ ...validProduction, ...override })).toContain(path);
   });
 });
+
+describe('least-privilege database configuration', () => {
+  it('production refuses to run with owner (migration) credentials present', () => {
+    const withOwner = {
+      ...validProduction,
+      MIGRATION_DATABASE_URL: 'postgresql://owner:pw@db.internal:5432/balswasthya?sslmode=require',
+    };
+    expect(failingPaths(withOwner)).toContain('MIGRATION_DATABASE_URL');
+  });
+
+  it('development tolerates owner credentials in .env (used by Prisma Migrate)', () => {
+    const result = parseEnv({
+      DATABASE_URL: 'postgresql://app:pw@127.0.0.1:5433/dev',
+      MIGRATION_DATABASE_URL: 'postgresql://owner:pw@127.0.0.1:5433/dev',
+    });
+    expect(result.success).toBe(true);
+  });
+});

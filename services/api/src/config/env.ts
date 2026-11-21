@@ -39,6 +39,8 @@ const envSchema = z
     AI_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
     /** Defaults: "silent" under NODE_ENV=test, otherwise "info". */
     LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
+    /** Owner credentials for Prisma Migrate. Only checked here so production can refuse them. */
+    MIGRATION_DATABASE_URL: z.string().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;
@@ -63,6 +65,10 @@ const envSchema = z
     }
     if (!SECURE_DB_SSL_MODES.has(readSslMode(env.DATABASE_URL) ?? '')) {
       fail('DATABASE_URL', 'must set sslmode=require, verify-ca or verify-full in production');
+    }
+    // Least privilege: the running API must not hold schema-owner credentials.
+    if (env.MIGRATION_DATABASE_URL) {
+      fail('MIGRATION_DATABASE_URL', 'must not be set for the running API in production');
     }
   });
 
