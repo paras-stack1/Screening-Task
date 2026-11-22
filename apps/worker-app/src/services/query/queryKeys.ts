@@ -17,4 +17,15 @@ export const queryKeys = {
   consentNotices: (userId: string, language: string) => [userId, 'consent-notices', language] as const,
   recentChildren: (userId: string) => [userId, 'children', 'recent'] as const,
   guardian: (userId: string, guardianId: string) => [userId, 'children', 'guardian', guardianId] as const,
+  /** Prefix of every screening query: invalidated after any screening change. In memory only. */
+  screeningData: (userId: string) => [userId, 'screening'] as const,
+  screeningSummary: (userId: string) => [userId, 'screening', 'summary'] as const,
+  screeningMine: (userId: string, status: string) => [userId, 'screening', 'mine', status] as const,
+  screeningEligibility: (userId: string, childId: string) =>
+    [userId, 'screening', 'eligibility', childId] as const,
+  screeningSession: (userId: string, sessionId: string) =>
+    [userId, 'screening', 'session', sessionId] as const,
+  /** Protocol versions are immutable once used, so they may be cached for the app session. */
+  screeningProtocol: (userId: string, protocolId: string) =>
+    [userId, 'screening-protocol', protocolId] as const,
 };

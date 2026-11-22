@@ -16,6 +16,10 @@ const NO_DEVANAGARI_EXPECTED = new Set<TranslationKey>([
   'profile.areaWithLevel',
   'consent.record.confirmMessage',
   'consent.record.savedLine',
+  // Placeholders and symbols only (value, unit, separators).
+  'screening.measurement.value',
+  'screening.measurement.valueConverted',
+  'screening.measurement.meta',
 ]);
 
 describe('translation files', () => {

@@ -62,15 +62,18 @@ describe('dashboard', () => {
     await waitFor(() => expect(within(metric()).getByText('0')).toBeOnTheScreen());
   });
 
-  it('never invents the three metrics the API cannot provide (decision C)', async () => {
+  it('shows the real screened-today count and never invents follow-ups or referrals (decision C)', async () => {
     context.backend.setChildrenTotal(5);
     await seedSavedSession(context);
     await renderApp('/');
     await waitFor(() => expect(within(metric()).getByText('5')).toBeOnTheScreen());
-    for (const label of ['Screened today', 'Pending follow-ups', 'Pending referrals']) {
+    // Step 6: "Screened today" comes from GET /screenings/summary (0 is a real value here).
+    await waitFor(() =>
+      expect(within(screen.getByTestId('metric-screened-today')).getByText('0')).toBeOnTheScreen(),
+    );
+    for (const label of ['Pending follow-ups', 'Pending referrals']) {
       expect(screen.getByLabelText(`${label}: not available yet`)).toBeOnTheScreen();
     }
-    expect(screen.queryByText('0')).toBeNull();
   });
 
   it('does not request children for a role without child.read (decision Q)', async () => {
@@ -96,13 +99,14 @@ describe('dashboard', () => {
     await waitFor(() => expect(within(metric()).getByText('12')).toBeOnTheScreen());
   });
 
-  it('Register is available to a worker with child.create; screening and follow-ups are not yet', async () => {
+  it('Register and Start screening follow the permissions; follow-ups are not available yet', async () => {
     await seedSavedSession(context);
-    await renderApp('/');
+    const app = await renderApp('/');
     expect(await screen.findByRole('button', { name: 'Register a child' })).toBeEnabled();
-    for (const title of ['Start screening', 'Manage follow-ups']) {
-      expect(await screen.findByRole('button', { name: `${title}. Coming soon` })).toBeDisabled();
-    }
+    expect(await screen.findByRole('button', { name: 'Manage follow-ups. Coming soon' })).toBeDisabled();
+    await fireEvent.press(await screen.findByRole('button', { name: 'Start screening' }));
+    expect(await screen.findByTestId('screening-home')).toBeOnTheScreen();
+    expect(app.getPathname()).toBe('/screening');
   });
 
   it('shows the four RBSK categories without results', async () => {
@@ -263,6 +267,7 @@ describe('performance: no unnecessary network calls', () => {
         'GET /auth/me',
         'GET /children?page=1&pageSize=5&sort=-createdAt',
         'GET /children?pageSize=1',
+        'GET /screenings/summary',
         'POST /auth/refresh',
       ]),
     );

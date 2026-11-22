@@ -56,6 +56,15 @@ export default function AppTabsLayout() {
           }}
         />
       ))}
+      {/*
+        Screening has its own stack, opened from the dashboard and the child profile - no tab
+        button. NOTE: `href: null` is not used: in this expo-router version it makes every
+        /screening URL unreachable (found by the navigation tests).
+      */}
+      <Tabs.Screen
+        name="screening"
+        options={{ headerShown: false, title: t('screening.home.title'), tabBarButton: () => null }}
+      />
     </Tabs>
   );
 }

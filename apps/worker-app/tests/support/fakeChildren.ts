@@ -610,6 +610,10 @@ export function createFakeChildren() {
   return {
     route,
     consents,
+    /** Current status of one purpose (same rules as the API), for the screening fake. */
+    consentStatus(childId: string, purpose: string) {
+      return statuses(childId).find((s) => s.purpose === purpose)!;
+    },
     /** Simulates a new notice version: earlier templateIds become outdated. */
     bumpNoticeVersion(purpose: string) {
       noticeVersion.set(purpose, noticeVersion.get(purpose)! + 1);

@@ -4,6 +4,7 @@
  * logout, the mustChangePassword gate, generic 401s and the error envelope.
  */
 import { createFakeChildren } from './fakeChildren';
+import { createFakeScreening } from './fakeScreening';
 
 export const TEST_BASE_URL = 'https://api.test/api/v1';
 
@@ -79,6 +80,8 @@ export function createFakeBackend() {
   let childrenTotal = 0;
   /** Step 5 children / guardians API (tests/support/fakeChildren.ts). */
   const childStore = createFakeChildren();
+  /** Step 6 screening API (tests/support/fakeScreening.ts). */
+  const screeningStore = createFakeScreening(childStore);
 
   const user = (input: Partial<FakeUser> & { loginId: string; password: string }): FakeUser => {
     const created: FakeUser = {
@@ -207,6 +210,12 @@ export function createFakeBackend() {
       if (!owner.permissions.includes('child.read')) return error(403, 'FORBIDDEN');
       return json(200, { items: [], page: 1, pageSize: 1, total: childrenTotal });
     }
+    const screeningResult = screeningStore.route(method, path, body, {
+      id: owner.id,
+      name: owner.displayName,
+      permissions: owner.permissions,
+    });
+    if (screeningResult) return json(screeningResult.status, screeningResult.body);
     const childResult = childStore.route(method, path, body, owner.permissions);
     if (childResult) return json(childResult.status, childResult.body);
     if (method === 'GET' && path === '/probe') return json(200, { ok: true, user: owner.id });
@@ -244,6 +253,7 @@ export function createFakeBackend() {
     calls,
     user,
     children: childStore,
+    screening: screeningStore,
     /** Next response(s) for a path, consumed in order. */
     override(path: string, ...responses: Override[]) {
       overrides.set(path, [...(overrides.get(path) ?? []), ...responses]);

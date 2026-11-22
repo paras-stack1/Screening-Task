@@ -8,23 +8,36 @@ import {
   MetricCard,
   SectionHeader,
   type IconName,
+  type MetricState,
 } from '../../../components';
 import { useTranslation, type TranslationKey } from '../../../localization';
 import { spacing, type FourDCategory } from '../../../theme';
 import { useChildPermissions, useRecentChildren } from '../../children/hooks';
 import { formatIndiaDate } from '../../children/labels';
 import { childRoutes } from '../../children/routes';
+import { useScreeningPermissions, useScreeningSummary } from '../../screening/hooks';
+import { screeningRoutes } from '../../screening/routes';
 import { useRegisteredChildren } from '../hooks/useDashboardMetrics';
 
 /**
- * Metrics. Only "Registered children" has a backend source today; the other three are shown as
- * "Not available yet" (decision C) - never as 0 and never invented.
+ * Metrics. "Registered children" and (Step 6) "Screened today" come from the API; follow-ups and
+ * referrals are shown as "Not available yet" (decision C) - never as 0 and never invented.
  */
 export function MetricsSection() {
   const { t } = useTranslation();
   const children = useRegisteredChildren();
+  const screening = useScreeningPermissions();
+  const summary = useScreeningSummary(screening.canConduct);
+  const screenedToday: MetricState = !screening.loaded
+    ? { status: 'loading' }
+    : !screening.canConduct
+      ? { status: 'unavailable' }
+      : summary.isError || (summary.isPending && summary.fetchStatus === 'paused')
+        ? { status: 'error' }
+        : summary.isPending
+          ? { status: 'loading' }
+          : { status: 'ready', value: summary.data.completedToday };
   const unavailable: { label: TranslationKey; icon: IconName }[] = [
-    { label: 'dashboard.metrics.screenedToday', icon: 'clipboard-pulse-outline' },
     { label: 'dashboard.metrics.pendingFollowUps', icon: 'calendar-check-outline' },
     { label: 'dashboard.metrics.pendingReferrals', icon: 'hospital-building' },
   ];
@@ -40,6 +53,15 @@ export function MetricsSection() {
           unavailableLabel={children.notForRole ? t('dashboard.metrics.notForRole') : undefined}
           testID="metric-registered-children"
         />
+        <MetricCard
+          label={t('dashboard.metrics.screenedToday')}
+          icon="clipboard-pulse-outline"
+          state={screenedToday}
+          unavailableLabel={
+            screening.loaded && !screening.canConduct ? t('dashboard.metrics.notForRole') : undefined
+          }
+          testID="metric-screened-today"
+        />
         {unavailable.map((metric) => (
           <MetricCard
             key={metric.label}
@@ -49,6 +71,14 @@ export function MetricsSection() {
           />
         ))}
       </View>
+      {summary.isError ? (
+        <AppButton
+          variant="secondary"
+          icon="sync"
+          label={t('common.retry')}
+          onPress={() => void summary.refetch()}
+        />
+      ) : null}
       {children.state.status === 'error' ? (
         <AppButton variant="secondary" icon="sync" label={t('common.retry')} onPress={children.retry} />
       ) : null}
@@ -58,14 +88,17 @@ export function MetricsSection() {
 
 /**
  * Main tasks. Register is available to workers with child.create (from /auth/me - a display
- * decision only; the API checks again). Screening and follow-ups stay "Coming soon" (decision D).
+ * decision only; the API checks again). Screening (Step 6) needs screening.conduct. Follow-ups stay
+ * "Coming soon" (decision D).
  */
 export function ActionsSection() {
   const { t } = useTranslation();
   const router = useRouter();
   const permissions = useChildPermissions();
+  const screening = useScreeningPermissions();
   const handlers: Record<string, (() => void) | undefined> = {
     register: permissions.canCreate ? () => router.push(childRoutes.register()) : undefined,
+    screening: screening.canConduct ? () => router.push(screeningRoutes.home) : undefined,
   };
   const actions: { key: string; icon: IconName; title: TranslationKey; description: TranslationKey }[] = [
     {
@@ -99,7 +132,7 @@ export function ActionsSection() {
           description={t(action.description)}
           onPress={handlers[action.key]}
           unavailableLabel={
-            action.key !== 'register'
+            action.key === 'followUps'
               ? undefined
               : permissions.loaded
                 ? t('dashboard.metrics.notForRole')

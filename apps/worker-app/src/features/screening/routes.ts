@@ -1,0 +1,18 @@
+import type { FourDCategoryCode } from '@balswasthya/shared-contracts';
+import type { Href } from 'expo-router';
+
+/**
+ * Links to the screening screens. Only opaque ids and category codes go into URLs - never names,
+ * ages or answers. Plain paths, built in one place (see children/routes.ts for why).
+ */
+const seg = (value: string) => encodeURIComponent(value);
+
+export const screeningRoutes = {
+  home: '/screening' as Href,
+  selectChild: '/screening/select-child' as Href,
+  start: (childId: string) => `/screening/start/${seg(childId)}` as Href,
+  session: (sessionId: string) => `/screening/${seg(sessionId)}` as Href,
+  category: (sessionId: string, category: FourDCategoryCode) =>
+    `/screening/${seg(sessionId)}/category/${category}` as Href,
+  measurements: (sessionId: string) => `/screening/${seg(sessionId)}/measurements` as Href,
+};

@@ -318,9 +318,8 @@ describe('child profile and changes', () => {
     expect(screen.getByText('+91 ••••••2222')).toBeOnTheScreen();
     expect(screen.queryByText(/9811112222/)).toBeNull();
     expect(screen.getByText('Can give consent (worker statement)')).toBeOnTheScreen();
-    expect(
-      screen.getByText('Screening is not available in the app yet. No screening results are shown.'),
-    ).toBeOnTheScreen();
+    // Step 6: an entry point to screening, never a result.
+    expect(screen.getByText('Health screening for this child. No diagnosis is made.')).toBeOnTheScreen();
   });
 
   it.each([

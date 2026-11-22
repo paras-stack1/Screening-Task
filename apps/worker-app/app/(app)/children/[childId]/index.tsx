@@ -22,6 +22,8 @@ import {
 } from '../../../../src/features/children/labels';
 import { childRoutes } from '../../../../src/features/children/routes';
 import { ConsentOverview } from '../../../../src/features/consent/ConsentOverview';
+import { useScreeningPermissions } from '../../../../src/features/screening/hooks';
+import { screeningRoutes } from '../../../../src/features/screening/routes';
 import { useTranslation } from '../../../../src/localization';
 import { apiErrorMessageKey } from '../../../../src/services/api/errorMessages';
 import { isApiError } from '../../../../src/services/api/errors';
@@ -36,6 +38,7 @@ export default function ChildProfileScreen() {
   const { t, language } = useTranslation();
   const router = useRouter();
   const permissions = useChildPermissions();
+  const screening = useScreeningPermissions();
   const child = useChild(childId ?? '');
 
   if (child.isPending) {
@@ -130,8 +133,17 @@ export default function ChildProfileScreen() {
       <ConsentOverview childId={data.id} />
 
       <SectionHeader title={t('children.profile.screeningTitle')} />
-      <AppCard testID="screening-placeholder">
-        <AppText color="textSecondary">{t('children.profile.screeningNotAvailable')}</AppText>
+      <AppCard testID="profile-screening" style={styles.screeningCard}>
+        <AppText color="textSecondary">{t('children.profile.screeningIntro')}</AppText>
+        {screening.canConduct ? (
+          <AppButton
+            variant="secondary"
+            icon="stethoscope"
+            label={t('children.profile.startScreening')}
+            onPress={() => router.push(screeningRoutes.start(data.id))}
+            testID="profile-start-screening"
+          />
+        ) : null}
       </AppCard>
     </ScreenContainer>
   );
@@ -191,4 +203,5 @@ function GuardianLinkCard({
 const styles = StyleSheet.create({
   field: { gap: spacing.xxs, paddingVertical: spacing.xs },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  screeningCard: { gap: spacing.sm },
 });

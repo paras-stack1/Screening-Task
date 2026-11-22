@@ -7,6 +7,22 @@
 |---|---|---|---|---|
 | S6-001 | 6C | Medium | Categories in a session were ordered by start time; two categories started in the same millisecond came back in an arbitrary order | Fixed |
 | S6-002 | 6C | Medium | A database integrity-rule violation that the service did not pre-check reached the client as 500 `INTERNAL_ERROR` | Fixed |
+| S6-003 | 6D | Medium | Hiding the screening section from the tab bar with `href: null` made every `/screening` URL unreachable (silently redirected to the dashboard) | Fixed |
+
+## S6-003 - Screening screens unreachable
+
+- **Reproduction:** press "Start screening" on the dashboard: the dashboard stays visible;
+  `renderApp('/screening/select-child')` ends at `/`.
+- **Root cause:** in this expo-router version, `Tabs.Screen options={{ href: null }}` removes the
+  route from linking, not just from the tab bar.
+- **Affected files:** `apps/worker-app/app/(app)/_layout.tsx`.
+- **Impact:** the whole screening flow could not be opened (no data impact). Found by the
+  dashboard navigation test before release.
+- **Fix:** hide only the tab button (`tabBarButton: () => null`); a comment in the layout
+  explains why `href: null` must not be used.
+- **Regression test:** `tests/screens/appScreens.test.tsx` "Register and Start screening …" (the
+  dashboard card opens `/screening`), plus every `tests/screens/screening.test.tsx` test that
+  opens a `/screening` URL.
 
 ## S6-001 - Non-deterministic category order
 
