@@ -31,13 +31,18 @@ export interface AuthorizeDependencies {
  * Denials answer 403 and are audited.
  */
 export function createRequirePermission({ db, now = () => new Date() }: AuthorizeDependencies) {
-  return function requirePermission(permission: PermissionCode): RequestHandler {
+  /** One permission, or a list of which ANY one is enough (e.g. reading protocol content). */
+  return function requirePermission(permission: PermissionCode | readonly PermissionCode[]): RequestHandler {
+    const anyOf: readonly PermissionCode[] = typeof permission === 'string' ? [permission] : permission;
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
         const auth = getAuth(res);
-        if (await hasPermissionAnywhere(db, auth.userId, permission, now())) {
-          next();
-          return;
+        const at = now();
+        for (const code of anyOf) {
+          if (await hasPermissionAnywhere(db, auth.userId, code, at)) {
+            next();
+            return;
+          }
         }
         await recordAudit(db, {
           actorUserId: auth.userId,

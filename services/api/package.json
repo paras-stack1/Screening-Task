@@ -20,7 +20,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
-    "db:bootstrap-admin": "tsx --env-file=.env prisma/bootstrap-admin.ts"
+    "db:bootstrap-admin": "tsx --env-file=.env prisma/bootstrap-admin.ts",
+    "db:protocol-status": "tsx --env-file=.env prisma/protocol-status.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

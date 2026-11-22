@@ -5,6 +5,11 @@ import { createChildrenRouter } from '../modules/children/children.routes';
 import { createChildConsentsRouter, createConsentNoticesRouter } from '../modules/consent/consent.routes';
 import type { ConsentPolicySettings } from '../modules/consent/consentPolicy';
 import { createGuardiansRouter } from '../modules/guardians/guardians.routes';
+import type { ScreeningPolicySettings } from '../modules/screening/protocolSelection';
+import {
+  createScreeningEligibilityRouter,
+  createScreeningProtocolsRouter,
+} from '../modules/screening/protocols.routes';
 import { createAssignmentsRouter, createRolesRouter, createUsersRouter } from '../modules/users/users.routes';
 import type { PiiCrypto } from '../utils/piiCrypto';
 import { createHealthRouter, type HealthDependencies } from './health.routes';
@@ -17,6 +22,8 @@ export interface ApiRouterDependencies {
   pii: PiiCrypto;
   /** Consent rules that depend on the environment (draft notices outside production only). */
   consentPolicy: ConsentPolicySettings;
+  /** Screening content rules that depend on the environment (draft protocols outside production only). */
+  screeningPolicy: ScreeningPolicySettings;
 }
 
 /**
@@ -34,13 +41,16 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
     ...deps.auth,
     pii: deps.pii,
     consentPolicy: deps.consentPolicy,
+    screeningPolicy: deps.screeningPolicy,
     dataRateLimit: createDataRateLimiters(deps.auth.rateLimits),
   };
   router.use('/health', createHealthRouter(deps.health));
   router.use('/auth', createAuthRouter(deps.auth));
   router.use('/consent-notices', createConsentNoticesRouter(childData));
-  // Before '/children' so the nested consent routes are matched first.
+  // Before '/children' so the nested consent and screening routes are matched first.
   router.use('/children/:childId/consents', createChildConsentsRouter(childData));
+  router.use('/children/:childId/screening-eligibility', createScreeningEligibilityRouter(childData));
+  router.use('/screening-protocols', createScreeningProtocolsRouter(childData));
   router.use('/children', createChildrenRouter(childData));
   router.use('/guardians', createGuardiansRouter(childData));
   router.use('/users', createUsersRouter(deps.auth));

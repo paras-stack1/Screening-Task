@@ -43,6 +43,15 @@ SELECT format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM %I', 'AuditLog'
 --    everyone; TRUNCATE (which bypasses row triggers) is revoked from the app account.
 SELECT format('REVOKE DELETE, TRUNCATE ON public.%I FROM %I', 'Consent', :'app_user')
  WHERE to_regclass('public."Consent"') IS NOT NULL \gexec
+--    Screening records (Step 6): triggers block deleting sessions, categories and measurements
+--    and changing final sessions for everyone; DELETE is also revoked where no delete is ever
+--    legitimate, and TRUNCATE (which bypasses row triggers) is revoked on every screening table.
+SELECT format('REVOKE DELETE, TRUNCATE ON public.%I FROM %I', t, :'app_user')
+  FROM unnest(ARRAY['ScreeningSession', 'ScreeningSessionCategory', 'Measurement']) AS t
+ WHERE to_regclass(format('public.%I', t)) IS NOT NULL \gexec
+SELECT format('REVOKE TRUNCATE ON public.%I FROM %I', t, :'app_user')
+  FROM unnest(ARRAY['ScreeningProtocol', 'ScreeningQuestion', 'ScreeningObservation']) AS t
+ WHERE to_regclass(format('public.%I', t)) IS NOT NULL \gexec
 --    The migration history table is the owner's business only.
 SELECT format('REVOKE ALL ON public.%I FROM %I', '_prisma_migrations', :'app_user')
  WHERE to_regclass('public._prisma_migrations') IS NOT NULL \gexec

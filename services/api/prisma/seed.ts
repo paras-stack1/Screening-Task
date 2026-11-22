@@ -13,6 +13,7 @@ import { PERMISSIONS } from '../src/modules/access-control/permissions';
 import { ROLES } from '../src/modules/access-control/roles';
 import { createArea } from '../src/modules/areas/areaTree';
 import { ensureConsentTemplates } from '../src/modules/consent/consentNotices';
+import { ensureDemoProtocols } from '../src/modules/screening/demoProtocols';
 
 const prisma = new PrismaClient();
 
@@ -104,6 +105,16 @@ async function main() {
     console.warn('Consent notice wording differs from the stored hash (investigate):', drift);
   }
 
+  // Screening DEMONSTRATION protocols as DRAFT (placeholder questions - never approvable).
+  const protocolDrift = await ensureDemoProtocols(prisma);
+  if (protocolDrift.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      'Demonstration protocol content differs from the stored content (investigate):',
+      protocolDrift,
+    );
+  }
+
   const counts = {
     levels: await prisma.areaLevel.count(),
     permissions: await prisma.permission.count(),
@@ -111,6 +122,7 @@ async function main() {
     areas: await prisma.area.count(),
     closureLinks: await prisma.areaClosure.count(),
     consentTemplates: await prisma.consentTemplate.count(),
+    screeningProtocols: await prisma.screeningProtocol.count(),
   };
   // eslint-disable-next-line no-console
   console.log('Seed complete (synthetic data):', counts);

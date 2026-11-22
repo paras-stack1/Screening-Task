@@ -108,10 +108,41 @@ enum SessionStatus {
   CANCELLED
 }
 
+/// Explicit answer states (Step 6 decision G). An unanswered question has NO row: missing data
+/// is never stored as, or read as, "No". UNKNOWN != NO; NOT_ASSESSED != NO.
 enum ObservationStatus {
   ANSWERED
+  UNKNOWN
   NOT_ASSESSED
+  /// Covers "declined" and "could not be completed".
   UNABLE_TO_ASSESS
+}
+
+/// Clinical-content lifecycle of a screening protocol (Step 6 decision B). Separate from
+/// ApprovalStatus, which consent notices use. Only ACTIVE protocols are operational.
+enum ProtocolStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  RETIRED
+}
+
+/// Progress of one Four-D category inside a session. "Not started" = no row.
+enum CategoryProgress {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ResponseSource {
+  WORKER_OBSERVED
+  GUARDIAN_REPORTED
+}
+
+enum MeasurementSource {
+  MEASURED
+  GUARDIAN_REPORTED
+  FROM_RECORD
 }
 
 /// Illustrative - final list follows approved protocols.
@@ -263,27 +294,29 @@ model User {
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
-  assignmentsHeld          WorkerAreaAssignment[] @relation("AssignmentHolder")
-  assignmentsCreated       WorkerAreaAssignment[] @relation("AssignmentCreatedBy")
-  assignmentStatusChanges  WorkerAreaAssignment[] @relation("AssignmentStatusChangedBy")
-  childrenRegistered       Child[]
-  childTransfers           ChildAreaTransfer[]
-  guardianLinksCreated     ChildGuardian[]        @relation("GuardianLinkCreatedBy")
-  guardianLinksEnded       ChildGuardian[]        @relation("GuardianLinkEndedBy")
-  consentsRecorded         Consent[]              @relation("ConsentRecordedBy")
-  consentsWithdrawn        Consent[]              @relation("ConsentWithdrawnBy")
-  protocolsApproved        ScreeningProtocol[]
-  sessionsConducted        ScreeningSession[]
-  measurementsRecorded     Measurement[]
-  resultsReviewed          ScreeningResult[]
-  referralsCreated         Referral[]
-  referralStatusEvents     ReferralStatusEvent[]
-  followUpsAssigned        FollowUp[]             @relation("FollowUpAssignee")
-  followUpsCompleted       FollowUp[]             @relation("FollowUpCompletedBy")
-  mediaCaptured            MediaMetadata[]
-  notifications            Notification[]
-  refreshSessions          RefreshSession[]
-  syncOperations           SyncOperation[]
+  assignmentsHeld         WorkerAreaAssignment[] @relation("AssignmentHolder")
+  assignmentsCreated      WorkerAreaAssignment[] @relation("AssignmentCreatedBy")
+  assignmentStatusChanges WorkerAreaAssignment[] @relation("AssignmentStatusChangedBy")
+  childrenRegistered      Child[]
+  childTransfers          ChildAreaTransfer[]
+  guardianLinksCreated    ChildGuardian[]        @relation("GuardianLinkCreatedBy")
+  guardianLinksEnded      ChildGuardian[]        @relation("GuardianLinkEndedBy")
+  consentsRecorded        Consent[]              @relation("ConsentRecordedBy")
+  consentsWithdrawn       Consent[]              @relation("ConsentWithdrawnBy")
+  protocolsApproved       ScreeningProtocol[]
+  sessionsConducted       ScreeningSession[]     @relation("SessionConductedBy")
+  sessionsCancelled       ScreeningSession[]     @relation("SessionCancelledBy")
+  observationsRecorded    ScreeningObservation[]
+  measurementsRecorded    Measurement[]
+  resultsReviewed         ScreeningResult[]
+  referralsCreated        Referral[]
+  referralStatusEvents    ReferralStatusEvent[]
+  followUpsAssigned       FollowUp[]             @relation("FollowUpAssignee")
+  followUpsCompleted      FollowUp[]             @relation("FollowUpCompletedBy")
+  mediaCaptured           MediaMetadata[]
+  notifications           Notification[]
+  refreshSessions         RefreshSession[]
+  syncOperations          SyncOperation[]
 
   @@index([status])
   @@index([organizationId])
@@ -540,7 +573,7 @@ model ConsentTemplate {
 /// Append-only (Step 5, decision B): a database trigger rejects DELETE and every UPDATE except a
 /// one-time withdrawal of a GRANTED record. The runtime account has no TRUNCATE right.
 model Consent {
-  id               String          @id @default(uuid()) @db.Uuid
+  id                String          @id @default(uuid()) @db.Uuid
   childId           String          @db.Uuid
   guardianId        String          @db.Uuid
   purpose           ConsentPurpose
@@ -564,8 +597,9 @@ model Consent {
   recordedBy  User            @relation("ConsentRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict)
   withdrawnBy User?           @relation("ConsentWithdrawnBy", fields: [withdrawnById], references: [id], onDelete: Restrict)
 
-  media      MediaMetadata[]
-  aiAnalyses AiAnalysis[]
+  media             MediaMetadata[]
+  aiAnalyses        AiAnalysis[]
+  screeningSessions ScreeningSession[]
 
   @@index([childId, purpose, recordedAt])
   @@index([guardianId])
@@ -573,43 +607,74 @@ model Consent {
 
 // ==================================================================== Screening
 
+/// One versioned protocol = one Four-D category + one age band (Step 6 decision A).
+/// SQL additions (migration 20261122120000_step6_screening_foundation), not expressible in Prisma:
+///   - screening_protocol_protect: content frozen once the protocol leaves DRAFT; status moves
+///     only along DRAFT -> IN_REVIEW -> APPROVED -> ACTIVE -> RETIRED (IN_REVIEW -> DRAFT allowed)
+///   - CHECKs: approval fields + content hash required from APPROVED on; demonstration content
+///     can never be approved; retiredAt iff RETIRED
+///   - screening_protocol_one_active_per_band: ACTIVE protocols of a category never overlap in age
 model ScreeningProtocol {
   id                   String         @id @default(uuid()) @db.Uuid
   code                 String
   version              Int
+  category             FourDCategory
   nameEn               String
   nameHi               String
+  descriptionEn        String?
+  descriptionHi        String?
+  /// Inclusive age band in completed days.
   ageMinDays           Int
   ageMaxDays           Int
   /// Required: guideline document, edition and section the protocol is based on.
   sourceReference      String
-  status               ApprovalStatus @default(DRAFT)
+  status               ProtocolStatus @default(DRAFT)
+  /// Engineering placeholder content: never operational, can never be approved.
+  isDemonstration      Boolean        @default(false)
+  /// SHA-256 of the canonical protocol content and questions, fixed when it leaves DRAFT.
+  contentSha256        String?
   clinicalApprovedById String?        @db.Uuid
   clinicalApprovedAt   DateTime?      @db.Timestamptz(3)
+  /// Clinical approval document / committee minute reference.
+  approvalReference    String?
+  effectiveFrom        DateTime?      @db.Timestamptz(3)
+  retiredAt            DateTime?      @db.Timestamptz(3)
   createdAt            DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime       @updatedAt @db.Timestamptz(3)
 
   clinicalApprovedBy User? @relation(fields: [clinicalApprovedById], references: [id], onDelete: Restrict)
 
-  questions ScreeningQuestion[]
-  sessions  ScreeningSession[]
+  questions         ScreeningQuestion[]
+  /// Pre-Step-6 link (one protocol per session). Deprecated, always null since Step 6.
+  sessions          ScreeningSession[]
+  sessionCategories ScreeningSessionCategory[]
 
   @@unique([code, version])
   @@index([status, ageMinDays, ageMaxDays])
+  @@index([category, status, ageMinDays, ageMaxDays])
 }
 
+/// Questions of a protocol version. Immutable once the protocol leaves DRAFT (trigger
+/// screening_question_protect); category must equal the protocol's category.
 model ScreeningQuestion {
   id          String        @id @default(uuid()) @db.Uuid
   protocolId  String        @db.Uuid
   code        String
   category    FourDCategory
+  /// Questions are shown one section at a time.
+  sectionCode String
   sortOrder   Int
-  /// Translation keys - wording lives in the app's reviewed translation files.
+  /// Stable text code (not displayed). Approved wording is `prompt`, frozen with the version.
   promptKey   String
   helpKey     String?
+  /// { "hi": "...", "en": "..." } - the exact approved wording (Step 6 decision C).
+  prompt      Json
+  help        Json?
   answerType  AnswerType
-  /// Allowed option codes for choice questions.
+  /// Choice questions: [{ "code": "...", "label": { "hi": "...", "en": "..." } }].
   options     Json?
+  /// Protocol-defined input rules, e.g. { "min": 0, "max": 30, "maxDecimals": 0, "unit": "days" }.
+  validation  Json?
   isRequired  Boolean       @default(true)
 
   protocol     ScreeningProtocol      @relation(fields: [protocolId], references: [id], onDelete: Restrict)
@@ -619,27 +684,46 @@ model ScreeningQuestion {
   @@index([protocolId, sortOrder])
 }
 
+/// One screening visit. SQL additions: one open (DRAFT/IN_PROGRESS) session per child; final
+/// (COMPLETED/CANCELLED) sessions and everything in them are immutable; no deletes; `version`
+/// must increase by exactly 1 on every update (optimistic locking); the screening consent must be
+/// a GRANTED, not withdrawn SCREENING consent of the same child.
 model ScreeningSession {
-  id                String        @id @default(uuid()) @db.Uuid
-  childId           String        @db.Uuid
-  protocolId        String        @db.Uuid
-  conductedById     String        @db.Uuid
+  id                  String        @id @default(uuid()) @db.Uuid
+  childId             String        @db.Uuid
+  /// Deprecated (pre-Step-6 single protocol per session). Always null; see categories.
+  protocolId          String?       @db.Uuid
+  conductedById       String        @db.Uuid
   /// Snapshot of the child's area when the session started (for reporting history).
-  areaId            String        @db.Uuid
-  ageInDaysAtStart  Int
-  status            SessionStatus @default(DRAFT)
-  startedAt         DateTime      @db.Timestamptz(3)
-  completedAt       DateTime?     @db.Timestamptz(3)
-  cancelledAt       DateTime?     @db.Timestamptz(3)
-  cancelReason      String?
-  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
+  areaId              String        @db.Uuid
+  /// Server-calculated (India calendar date), never taken from the app.
+  ageInDaysAtStart    Int
+  dateOfBirthAtStart  DateTime      @db.Date
+  dobEstimatedAtStart Boolean
+  /// The SCREENING consent the session relied on when it started.
+  screeningConsentId  String        @db.Uuid
+  status              SessionStatus @default(DRAFT)
+  startedAt           DateTime      @db.Timestamptz(3)
+  completedAt         DateTime?     @db.Timestamptz(3)
+  cancelledAt         DateTime?     @db.Timestamptz(3)
+  cancelledById       String?       @db.Uuid
+  /// Short reason. Must not contain personal data.
+  cancelReason        String?
+  /// Optimistic lock: clients send the version they saw; stale writes are refused (409).
+  version             Int           @default(1)
+  /// Device-generated id; makes a repeated "start screening" idempotent.
+  clientOperationId   String?       @unique @db.Uuid
+  createdAt           DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @db.Timestamptz(3)
 
-  child       Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
-  protocol    ScreeningProtocol @relation(fields: [protocolId], references: [id], onDelete: Restrict)
-  conductedBy User              @relation(fields: [conductedById], references: [id], onDelete: Restrict)
-  area        Area              @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  child            Child              @relation(fields: [childId], references: [id], onDelete: Restrict)
+  protocol         ScreeningProtocol? @relation(fields: [protocolId], references: [id], onDelete: Restrict)
+  conductedBy      User               @relation("SessionConductedBy", fields: [conductedById], references: [id], onDelete: Restrict)
+  cancelledBy      User?              @relation("SessionCancelledBy", fields: [cancelledById], references: [id], onDelete: Restrict)
+  area             Area               @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  screeningConsent Consent            @relation(fields: [screeningConsentId], references: [id], onDelete: Restrict)
 
+  categories   ScreeningSessionCategory[]
   observations ScreeningObservation[]
   measurements Measurement[]
   results      ScreeningResult[]
@@ -650,48 +734,95 @@ model ScreeningSession {
   @@index([childId, startedAt])
   @@index([areaId, status, startedAt])
   @@index([conductedById, startedAt])
+  @@index([conductedById, status, updatedAt])
 }
 
+/// One Four-D category screened in a session, with the exact protocol version used
+/// (Step 6 decision A). A category that was never started has no row ("not assessed").
+model ScreeningSessionCategory {
+  id                    String           @id @default(uuid()) @db.Uuid
+  sessionId             String           @db.Uuid
+  category              FourDCategory
+  protocolId            String           @db.Uuid
+  /// Protocol status when the category started: proves whether approved content was used.
+  protocolStatusAtStart ProtocolStatus
+  status                CategoryProgress @default(IN_PROGRESS)
+  /// Free-text worker observations for this category. Never logged.
+  notes                 String?
+  startedAt             DateTime         @db.Timestamptz(3)
+  completedAt           DateTime?        @db.Timestamptz(3)
+  createdAt             DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime         @updatedAt @db.Timestamptz(3)
+
+  session      ScreeningSession       @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  protocol     ScreeningProtocol      @relation(fields: [protocolId], references: [id], onDelete: Restrict)
+  observations ScreeningObservation[]
+
+  @@unique([sessionId, category])
+  @@index([protocolId])
+}
+
+/// The answer to one question (the "screening response"). No row = not answered.
 model ScreeningObservation {
   id                String            @id @default(uuid()) @db.Uuid
   sessionId         String            @db.Uuid
+  sessionCategoryId String            @db.Uuid
   questionId        String            @db.Uuid
   status            ObservationStatus
+  source            ResponseSource
   valueBoolean      Boolean?
   valueCode         String?
   valueCodes        String[]
   valueNumber       Decimal?          @db.Decimal(10, 3)
   valueText         String?
   notAssessedReason String?
+  /// Never logged.
+  notes             String?
+  recordedById      String            @db.Uuid
   recordedAt        DateTime          @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @db.Timestamptz(3)
 
-  session  ScreeningSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  question ScreeningQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  session         ScreeningSession         @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  sessionCategory ScreeningSessionCategory @relation(fields: [sessionCategoryId], references: [id], onDelete: Restrict)
+  question        ScreeningQuestion        @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  recordedBy      User                     @relation(fields: [recordedById], references: [id], onDelete: Restrict)
 
   @@unique([sessionId, questionId])
   @@index([questionId])
+  @@index([sessionCategoryId])
 }
 
+/// Insert-only (Step 6 decision I): a correction is a NEW row that supersedes the old one, with a
+/// reason; nothing is overwritten. A trigger keeps childId equal to the session's child.
 model Measurement {
-  id           String             @id @default(uuid()) @db.Uuid
-  childId      String             @db.Uuid
-  sessionId    String?            @db.Uuid
-  type         MeasurementType
-  value        Decimal            @db.Decimal(8, 2)
-  /// e.g. "kg", "cm", "g/dL" - allowed units per type validated in the API.
-  unit         String
-  method       String?
-  deviceMake   String?
-  deviceModel  String?
-  deviceSerial String?
-  quality      MeasurementQuality
-  measuredAt   DateTime           @db.Timestamptz(3)
-  recordedById String             @db.Uuid
-  createdAt    DateTime           @default(now()) @db.Timestamptz(3)
+  id               String             @id @default(uuid()) @db.Uuid
+  childId          String             @db.Uuid
+  sessionId        String?            @db.Uuid
+  type             MeasurementType
+  /// The value exactly as entered, in `unit` (never converted on storage).
+  value            Decimal            @db.Decimal(8, 2)
+  /// Allowed units per type are validated in the API (kg/g, cm/mm).
+  unit             String
+  source           MeasurementSource
+  method           String?
+  deviceMake       String?
+  deviceModel      String?
+  deviceSerial     String?
+  quality          MeasurementQuality
+  measuredAt       DateTime           @db.Timestamptz(3)
+  recordedById     String             @db.Uuid
+  /// The measurement this row corrects.
+  supersedesId     String?            @unique @db.Uuid
+  correctionReason String?
+  /// Never logged.
+  notes            String?
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
 
-  child      Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
-  session    ScreeningSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  recordedBy User              @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  child        Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
+  session      ScreeningSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  recordedBy   User              @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  supersedes   Measurement?      @relation("MeasurementCorrection", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersededBy Measurement?      @relation("MeasurementCorrection")
 
   @@index([childId, type, measuredAt])
   @@index([sessionId])

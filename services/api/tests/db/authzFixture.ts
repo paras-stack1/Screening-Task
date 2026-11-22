@@ -209,10 +209,20 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
       status: 'APPROVED',
     },
   });
+  const screeningTemplate = await prisma.consentTemplate.create({
+    data: {
+      purpose: 'SCREENING',
+      version: 0,
+      languageCode: 'hi',
+      textSha256: 'c'.repeat(64),
+      status: 'APPROVED',
+    },
+  });
   const protocol = await prisma.screeningProtocol.create({
     data: {
       code: 'SYN',
       version: 1,
+      category: 'DEFICIENCIES',
       nameEn: 'Synthetic',
       nameHi: 'Synthetic',
       ageMinDays: 0,
@@ -225,8 +235,10 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
       protocolId: protocol.id,
       code: 'Q1',
       category: 'DEFICIENCIES',
+      sectionCode: 'S1',
       sortOrder: 1,
       promptKey: 'q1',
+      prompt: { hi: 'Synthetic', en: 'Synthetic' },
       answerType: 'YES_NO',
     },
   });
@@ -269,22 +281,48 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
         recordedAt: new Date(now),
       },
     });
+    const screeningConsent = await prisma.consent.create({
+      data: {
+        childId,
+        guardianId: guardian.id,
+        purpose: 'SCREENING',
+        decision: 'GRANTED',
+        method: 'SIGNATURE',
+        templateId: screeningTemplate.id,
+        recordedById: by,
+        recordedAt: new Date(now),
+      },
+    });
     const session = await prisma.screeningSession.create({
       data: {
         childId,
-        protocolId: protocol.id,
         conductedById: by,
         areaId: childArea,
         ageInDaysAtStart: 900,
+        dateOfBirthAtStart: new Date('2024-06-01'),
+        dobEstimatedAtStart: false,
+        screeningConsentId: screeningConsent.id,
+        startedAt: new Date(now),
+      },
+    });
+    const sessionCategory = await prisma.screeningSessionCategory.create({
+      data: {
+        sessionId: session.id,
+        category: 'DEFICIENCIES',
+        protocolId: protocol.id,
+        protocolStatusAtStart: 'DRAFT',
         startedAt: new Date(now),
       },
     });
     const observation = await prisma.screeningObservation.create({
       data: {
         sessionId: session.id,
+        sessionCategoryId: sessionCategory.id,
         questionId: question.id,
         status: 'ANSWERED',
+        source: 'WORKER_OBSERVED',
         valueBoolean: false,
+        recordedById: by,
         recordedAt: new Date(now),
       },
     });
@@ -295,6 +333,7 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
         type: 'WEIGHT',
         value: 11.5,
         unit: 'kg',
+        source: 'MEASURED',
         quality: 'RELIABLE',
         measuredAt: new Date(now),
         recordedById: by,

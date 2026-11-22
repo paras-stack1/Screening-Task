@@ -72,5 +72,27 @@ export function ageOn(birth: CalendarDate, on: CalendarDate): { years: number; m
   return { years: Math.floor(months / 12), months: months % 12 };
 }
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Whole calendar days from `from` to `to` (negative if `to` is earlier). Exact: both dates are
+ * taken as UTC midnights, where every day is 86 400 000 ms (no daylight saving, no device
+ * timezone), and leap days are counted by the calendar itself.
+ */
+export function daysBetween(from: CalendarDate, to: CalendarDate): number {
+  const a = Date.UTC(from.year, from.month - 1, from.day);
+  const b = Date.UTC(to.year, to.month - 1, to.day);
+  return Math.round((b - a) / MS_PER_DAY);
+}
+
+/**
+ * Age in completed days on a date (Step 6 decision O): the day of birth is day 0. Returns null
+ * when `on` is before the birth date - an age is never invented for an impossible date.
+ */
+export function ageInDaysOn(birth: CalendarDate, on: CalendarDate): number | null {
+  const days = daysBetween(birth, on);
+  return days < 0 ? null : days;
+}
+
 /** Age limits for registration. ASSUMPTION (RBSK covers 0-18 years) - requires programme confirmation. */
 export const CHILD_MAX_AGE_YEARS = 18;

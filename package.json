@@ -32,7 +32,8 @@
     "db:migrate": "npm run prisma:migrate --workspace @balswasthya/api",
     "db:seed": "npm run prisma:seed --workspace @balswasthya/api",
     "test:db": "npm run build:contracts && npm run test:db --workspace @balswasthya/api",
-    "db:bootstrap-admin": "npm run db:bootstrap-admin --workspace @balswasthya/api --"
+    "db:bootstrap-admin": "npm run db:bootstrap-admin --workspace @balswasthya/api --",
+    "db:protocol-status": "npm run db:protocol-status --workspace @balswasthya/api --"
   },
   "devDependencies": {
     "@eslint/js": "~9.39.5",

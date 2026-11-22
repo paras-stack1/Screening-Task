@@ -179,13 +179,29 @@ describe('geographical access through GET /children', () => {
   it('child moved V2 -> V3: access follows the child (D4); history stays attached', async () => {
     await inRollback(prisma, async (tx) => {
       await tx.child.update({ where: { id: fx.child.C2 }, data: { areaId: fx.area.V3 } });
+      // Sessions require a granted SCREENING consent of the same child (Step 6 trigger).
+      const guardian = await tx.guardian.create({ data: { fullName: 'Synthetic Guardian C2' } });
+      const consent = await tx.consent.create({
+        data: {
+          childId: fx.child.C2!,
+          guardianId: guardian.id,
+          purpose: 'SCREENING',
+          decision: 'GRANTED',
+          method: 'SIGNATURE',
+          templateId: (await tx.consentTemplate.findFirstOrThrow({ where: { purpose: 'SCREENING' } })).id,
+          recordedById: fx.user.asha1!,
+          recordedAt: clock.now(),
+        },
+      });
       const session = await tx.screeningSession.create({
         data: {
           childId: fx.child.C2!,
-          protocolId: (await tx.screeningProtocol.findFirstOrThrow()).id,
           conductedById: fx.user.asha1!,
           areaId: fx.area.V2!, // historical snapshot: screened while the child lived in V2
           ageInDaysAtStart: 800,
+          dateOfBirthAtStart: new Date('2024-06-01'),
+          dobEstimatedAtStart: false,
+          screeningConsentId: consent.id,
           startedAt: clock.now(),
         },
       });

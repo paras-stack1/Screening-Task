@@ -26,6 +26,8 @@ function defaultDependencies(): AppDependencies {
     pii: piiCrypto,
     // Placeholder (DRAFT) consent notices are never accepted in production (decision I).
     consentPolicy: { allowDraftNotices: !isProduction },
+    // Draft and demonstration screening protocols are never usable in production (Step 6 decision F).
+    screeningPolicy: { allowDraftProtocols: !isProduction },
   };
 }
 
