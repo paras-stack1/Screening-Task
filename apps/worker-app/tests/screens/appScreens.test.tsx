@@ -257,11 +257,15 @@ describe('performance: no unnecessary network calls', () => {
     await seedSavedSession(context);
     await renderApp('/');
     await waitFor(() => expect(within(metric()).getByText('0')).toBeOnTheScreen());
-    expect(context.backend.calls.map((call) => `${call.method} ${call.path}`).sort()).toEqual([
-      'GET /auth/me',
-      'GET /children?pageSize=1',
-      'POST /auth/refresh',
-    ]);
+    // Step 5 decision T: the dashboard also loads the 5 most recently registered children.
+    await waitFor(() =>
+      expect(context.backend.calls.map((call) => `${call.method} ${call.path}`).sort()).toEqual([
+        'GET /auth/me',
+        'GET /children?page=1&pageSize=5&sort=-createdAt',
+        'GET /children?pageSize=1',
+        'POST /auth/refresh',
+      ]),
+    );
   });
 
   it('moving between tabs reuses cached data instead of refetching', async () => {

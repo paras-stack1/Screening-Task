@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import {
   ActionCard,
   AppButton,
+  AppText,
   FourDCategoryCard,
   MetricCard,
   SectionHeader,
@@ -10,7 +11,8 @@ import {
 } from '../../../components';
 import { useTranslation, type TranslationKey } from '../../../localization';
 import { spacing, type FourDCategory } from '../../../theme';
-import { useChildPermissions } from '../../children/hooks';
+import { useChildPermissions, useRecentChildren } from '../../children/hooks';
+import { formatIndiaDate } from '../../children/labels';
 import { childRoutes } from '../../children/routes';
 import { useRegisteredChildren } from '../hooks/useDashboardMetrics';
 
@@ -137,3 +139,44 @@ const styles = StyleSheet.create({
   // Two columns on phones; cards wrap to one column when text is large (minWidth on the cards).
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });
+
+/**
+ * Five most recently registered children in the worker's areas (decision T). Real API data only
+ * (GET /children sorted by registration time); hidden for roles without child.read.
+ */
+export function RecentChildrenSection() {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const permissions = useChildPermissions();
+  const recent = useRecentChildren(permissions.canRead);
+  if (!permissions.canRead) return null;
+
+  return (
+    <View style={styles.section} testID="recent-children">
+      <SectionHeader title={t('dashboard.recent.title')} />
+      {recent.isPending ? (
+        <AppText color="textSecondary">{t('common.loading')}</AppText>
+      ) : recent.isError ? (
+        <AppButton
+          variant="secondary"
+          icon="sync"
+          label={t('common.retry')}
+          onPress={() => void recent.refetch()}
+        />
+      ) : recent.data.items.length === 0 ? (
+        <AppText color="textSecondary">{t('dashboard.recent.empty')}</AppText>
+      ) : (
+        recent.data.items.map((child) => (
+          <ActionCard
+            key={child.id}
+            icon="account-child-outline"
+            title={child.fullName}
+            description={t('dashboard.recent.registeredOn', { date: formatIndiaDate(child.registeredAt) })}
+            onPress={() => router.push(childRoutes.profile(child.id))}
+            testID={`recent-child-${child.id}`}
+          />
+        ))
+      )}
+    </View>
+  );
+}

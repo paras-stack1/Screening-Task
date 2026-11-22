@@ -1,4 +1,7 @@
 import {
+  CONSENT_PURPOSES,
+  recordConsentRequestSchema,
+  withdrawConsentRequestSchema,
   addGuardianLinkRequestSchema,
   compareCalendarDates,
   maskIndianMobile,
@@ -180,6 +183,212 @@ export function createFakeChildren() {
     });
   }
 
+  // ------------------------------------------------------------------ consent (docs/api/consent.md)
+  interface Consent {
+    id: string;
+    childId: string;
+    guardianId: string;
+    purpose: string;
+    decision: string;
+    method: string;
+    templateId: string;
+    noticeVersion: number;
+    noticeLanguage: string;
+    evidenceReference: string | null;
+    recordedAt: string;
+    withdrawnAt: string | null;
+    withdrawalMethod: string | null;
+    withdrawalReason: string | null;
+  }
+  const consents: Consent[] = [];
+  /** Current notice version per purpose; bump it to simulate a wording change. */
+  const noticeVersion = new Map<string, number>(CONSENT_PURPOSES.map((p) => [p, 1]));
+  const missingNotices = new Set<string>();
+  const templates = new Map<string, { purpose: string; version: number; language: string }>();
+  function templateId(purpose: string, version: number, language: string) {
+    const index = CONSENT_PURPOSES.indexOf(purpose as (typeof CONSENT_PURPOSES)[number]);
+    const id = `00000000-0000-4000-9000-${String(index * 1000 + version * 10 + (language === 'hi' ? 1 : 2)).padStart(12, '0')}`;
+    templates.set(id, { purpose, version, language });
+    return id;
+  }
+
+  function notices(language: string) {
+    return CONSENT_PURPOSES.filter((p) => !missingNotices.has(p)).map((purpose) => {
+      const version = noticeVersion.get(purpose)!;
+      return {
+        templateId: templateId(purpose, version, language),
+        purpose,
+        version,
+        language,
+        title: `Synthetic notice ${purpose}`,
+        body: `[PLACEHOLDER] Synthetic wording for ${purpose} v${version} (${language})`,
+        optional: purpose !== 'SCREENING',
+        isPlaceholder: true,
+        approvalStatus: 'DRAFT',
+      };
+    });
+  }
+
+  function consentDto(c: Consent) {
+    return {
+      id: c.id,
+      purpose: c.purpose,
+      decision: c.decision,
+      method: c.method,
+      noticeVersion: c.noticeVersion,
+      noticeLanguage: c.noticeLanguage,
+      noticeWasPlaceholder: true,
+      evidenceReference: c.evidenceReference,
+      guardianId: c.guardianId,
+      guardianName: guardians.get(c.guardianId)?.fullName ?? '',
+      recordedAt: c.recordedAt,
+      recordedByName: 'Sunita Devi',
+      withdrawnAt: c.withdrawnAt,
+      withdrawnByName: c.withdrawnAt ? 'Sunita Devi' : null,
+      withdrawalMethod: c.withdrawalMethod,
+      withdrawalReason: c.withdrawalReason,
+    };
+  }
+
+  const newestFirst = (childId: string) =>
+    consents.filter((c) => c.childId === childId).sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
+
+  /** Same rules as the API: latest decision wins; only a still-valid grant permits. */
+  function statuses(childId: string) {
+    return CONSENT_PURPOSES.map((purpose) => {
+      const latest = newestFirst(childId).find((c) => c.purpose === purpose);
+      if (!latest) {
+        return {
+          purpose,
+          status: 'NOT_RECORDED',
+          reason: null,
+          permitted: false,
+          consentId: null,
+          guardianName: null,
+          recordedAt: null,
+        };
+      }
+      const link = activeLinks(childId).find((l) => l.guardianId === latest.guardianId);
+      let status = 'GRANTED';
+      let reason: string | null = null;
+      if (latest.decision === 'REFUSED') status = 'REFUSED';
+      else if (latest.withdrawnAt) status = 'WITHDRAWN';
+      else if (!link) [status, reason] = ['NOT_VALID', 'GUARDIAN_NO_LONGER_LINKED'];
+      else if (!link.canGiveConsent) [status, reason] = ['NOT_VALID', 'GUARDIAN_NOT_AUTHORISED'];
+      return {
+        purpose,
+        status,
+        reason,
+        permitted: status === 'GRANTED',
+        consentId: latest.id,
+        guardianName: guardians.get(latest.guardianId)?.fullName ?? null,
+        recordedAt: latest.recordedAt,
+      };
+    });
+  }
+
+  function addConsent(
+    input: Omit<Consent, 'id' | 'recordedAt' | 'withdrawnAt' | 'withdrawalMethod' | 'withdrawalReason'>,
+  ) {
+    const consent: Consent = {
+      ...input,
+      id: uuid(),
+      recordedAt: tick(),
+      withdrawnAt: null,
+      withdrawalMethod: null,
+      withdrawalReason: null,
+    };
+    consents.push(consent);
+    return consent;
+  }
+
+  function consentRoute(
+    method: string,
+    parts: string[],
+    query: URLSearchParams,
+    rawBody: unknown,
+    can: (p: string) => boolean,
+  ): Result | null {
+    if (parts[0] === 'consent-notices' && method === 'GET') {
+      if (!can('consent.record')) return err(403, 'FORBIDDEN');
+      const language = query.get('language');
+      if (language !== 'hi' && language !== 'en') return err(400, 'VALIDATION_ERROR');
+      return { status: 200, body: { items: notices(language) } };
+    }
+    if (parts[0] !== 'children' || parts[2] !== 'consents') return null;
+    const child = children.get(parts[1]!);
+    if (method === 'GET' && parts.length === 3) {
+      if (!can('child.read')) return err(403, 'FORBIDDEN');
+      if (!child) return err(404, 'NOT_FOUND');
+      return {
+        status: 200,
+        body: { statuses: statuses(child.id), history: newestFirst(child.id).map(consentDto) },
+      };
+    }
+    if (!can('consent.record')) return err(403, 'FORBIDDEN');
+    if (!child) return err(404, 'NOT_FOUND');
+    const mayDecide = (guardianId: string) => {
+      const link = activeLinks(child.id).find((l) => l.guardianId === guardianId);
+      if (!link) return err(422, 'GUARDIAN_NOT_LINKED');
+      if (!link.canGiveConsent) return err(422, 'GUARDIAN_NOT_AUTHORISED');
+      return null;
+    };
+    if (method === 'POST' && parts.length === 3) {
+      const parsed = recordConsentRequestSchema.safeParse(rawBody);
+      if (!parsed.success) return err(400, 'VALIDATION_ERROR');
+      const { clientOperationId, ...content } = parsed.data;
+      return idempotent(clientOperationId, JSON.stringify({ childId: child.id, ...content }), () => {
+        const body = parsed.data;
+        const denied = mayDecide(body.guardianId);
+        if (denied) return denied;
+        const template = templates.get(body.templateId);
+        if (!template || template.purpose !== body.purpose) return err(422, 'NOTICE_MISMATCH');
+        if (template.version !== noticeVersion.get(body.purpose)) return err(409, 'NOTICE_OUTDATED');
+        const consent = addConsent({
+          childId: child.id,
+          guardianId: body.guardianId,
+          purpose: body.purpose,
+          decision: body.decision,
+          method: body.method,
+          templateId: body.templateId,
+          noticeVersion: template.version,
+          noticeLanguage: template.language,
+          evidenceReference: body.evidenceReference ?? null,
+        });
+        const response = () => ({
+          consent: consentDto(consent),
+          status: statuses(child.id).find((st) => st.purpose === consent.purpose),
+        });
+        replay.set(consent.id, response);
+        return { status: 201, body: response(), entityId: consent.id };
+      });
+    }
+    if (method === 'POST' && parts[4] === 'withdraw') {
+      const consent = consents.find((c) => c.id === parts[3] && c.childId === child.id);
+      if (!consent) return err(404, 'NOT_FOUND');
+      const parsed = withdrawConsentRequestSchema.safeParse(rawBody);
+      if (!parsed.success) return err(400, 'VALIDATION_ERROR');
+      const denied = mayDecide(parsed.data.guardianId);
+      if (denied) return denied;
+      if (consent.decision !== 'GRANTED') return err(409, 'NOT_WITHDRAWABLE');
+      if (consent.withdrawnAt) return err(409, 'ALREADY_WITHDRAWN');
+      if (newestFirst(child.id).find((c) => c.purpose === consent.purpose)?.id !== consent.id) {
+        return err(409, 'NOT_CURRENT_CONSENT');
+      }
+      consent.withdrawnAt = tick();
+      consent.withdrawalMethod = parsed.data.method;
+      consent.withdrawalReason = parsed.data.reason ?? null;
+      return {
+        status: 200,
+        body: {
+          consent: consentDto(consent),
+          status: statuses(child.id).find((st) => st.purpose === consent.purpose),
+        },
+      };
+    }
+    return null;
+  }
+
   function route(method: string, fullPath: string, rawBody: unknown, permissions: string[]): Result | null {
     const [path, queryString = ''] = fullPath.split('?');
     const query = new URLSearchParams(queryString);
@@ -209,6 +418,8 @@ export function createFakeChildren() {
       }
     }
 
+    const consentResult = consentRoute(method, parts, query, rawBody, can);
+    if (consentResult) return consentResult;
     if (parts[0] !== 'children') return null;
 
     if (parts.length === 1 && method === 'GET') {
@@ -398,6 +609,28 @@ export function createFakeChildren() {
 
   return {
     route,
+    consents,
+    /** Simulates a new notice version: earlier templateIds become outdated. */
+    bumpNoticeVersion(purpose: string) {
+      noticeVersion.set(purpose, noticeVersion.get(purpose)! + 1);
+    },
+    removeNotice(purpose: string) {
+      missingNotices.add(purpose);
+    },
+    /** Seeds a consent decision (synthetic). */
+    seedConsent(childId: string, guardianId: string, purpose: string, decision: 'GRANTED' | 'REFUSED') {
+      return addConsent({
+        childId,
+        guardianId,
+        purpose,
+        decision,
+        method: 'SIGNATURE',
+        templateId: templateId(purpose, 1, 'hi'),
+        noticeVersion: 1,
+        noticeLanguage: 'hi',
+        evidenceReference: null,
+      });
+    },
     /** Seeds a registered child with one guardian (synthetic). */
     seedChild(
       input: Partial<Child> & { fullName: string },

@@ -1,6 +1,6 @@
 # Worker App (Frontend) - Architecture
 
-> Status: Step 4 complete; Step 5 children/guardians screens added (stage 5D, 2026-11-22). App: `apps/worker-app`.
+> Status: Step 4 complete; Step 5 children, guardian and consent screens added (stages 5D-5E, 2026-11-22). App: `apps/worker-app`.
 > Stack: Expo SDK 58, React Native 0.88, React 19.3, TypeScript 6 (strict), Expo Router 58,
 > TanStack Query 5, React Hook Form 7 + Zod 4, Expo SecureStore, expo-network.
 
@@ -14,6 +14,7 @@
 | Offline foundation | [offline.md](offline.md) |
 | Accessibility | [accessibility.md](accessibility.md) |
 | Children, guardians, registration (Step 5) | [children.md](children.md) |
+| Consent screens (Step 5) | [consent.md](consent.md) |
 | Tests | [testing.md](testing.md) |
 
 ## 1. Folder structure

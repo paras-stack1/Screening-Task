@@ -337,6 +337,124 @@ export const en = {
   'children.guardian.childrenSubtitle': 'Only children in your areas are shown.',
   'children.guardian.edit': 'Change guardian details',
   'children.guardian.sharedNote': 'Changes apply to all children of this guardian.',
+
+  'dashboard.recent.title': 'Recently registered',
+  'dashboard.recent.empty': 'No children registered yet.',
+  'dashboard.recent.registeredOn': 'Registered on {{date}}',
+
+  'consent.purpose.SCREENING': 'Health check (programme participation)',
+  'consent.purpose.PHOTO_CAPTURE': 'Photographs',
+  'consent.purpose.VIDEO_CAPTURE': 'Video recording',
+  'consent.purpose.AUDIO_CAPTURE': 'Voice recording',
+  'consent.purpose.AI_PROCESSING': 'Computer-assisted checking',
+  'consent.purpose.REFERRAL_DATA_SHARING': 'Sharing with a referral facility',
+  'consent.purpose.SMS_REMINDERS': 'Text message reminders',
+
+  'consent.method.VERBAL_WITNESSED': 'Spoken, with a witness',
+  'consent.method.SIGNATURE': 'Signature on paper form',
+  'consent.method.THUMB_IMPRESSION': 'Thumb impression on paper form',
+  'consent.method.DIGITAL_ACKNOWLEDGEMENT': 'Confirmed on this phone by the guardian',
+
+  'consent.decision.GRANTED': 'Agreed',
+  'consent.decision.REFUSED': 'Did not agree',
+
+  'consent.status.NOT_RECORDED': 'Not recorded',
+  'consent.status.GRANTED': 'Agreed',
+  'consent.status.REFUSED': 'Did not agree',
+  'consent.status.WITHDRAWN': 'Withdrawn',
+  'consent.status.NOT_VALID': 'No longer valid',
+
+  'consent.reason.GUARDIAN_NO_LONGER_LINKED': 'The guardian who agreed is no longer linked to the child.',
+  'consent.reason.GUARDIAN_NOT_AUTHORISED':
+    'The guardian who agreed is no longer marked as able to give consent.',
+  'consent.reason.NOTICE_RETIRED': 'The notice has changed. Ask again with the new notice.',
+  'consent.reason.NOTICE_NOT_APPROVED':
+    'Recorded with wording that is not approved. Ask again with the approved notice.',
+
+  'consent.overview.title': 'Consent',
+  'consent.overview.subtitle': 'Each purpose needs its own decision. Only "Agreed" allows that activity.',
+  'consent.overview.attention':
+    'Some consent was withdrawn or is no longer valid. Those activities are not allowed.',
+  'consent.overview.record': 'Record a consent decision',
+  'consent.overview.history': 'Consent history',
+
+  'consent.record.title': 'Record consent',
+  'consent.record.intro':
+    'Record one decision for one purpose. Explain the notice in simple words and let the guardian decide freely.',
+  'consent.record.step1': '1. Guardian',
+  'consent.record.guardianQuestion': 'Who is giving the decision?',
+  'consent.record.guardianHint': 'Only guardians marked as able to give consent are shown.',
+  'consent.record.noEligibleGuardian':
+    'No linked guardian is marked as able to give consent. Update the guardian details first.',
+  'consent.record.step2': '2. Purpose and notice',
+  'consent.record.step2Hint': 'Each purpose is separate. Agreeing to one does not mean agreeing to another.',
+  'consent.record.purposeQuestion': 'What is the decision about?',
+  'consent.record.noticeLanguage': 'Language of the notice',
+  'consent.record.noticeMissing':
+    'No notice is available for this purpose in this language. Consent cannot be recorded for it now.',
+  'consent.record.placeholder':
+    'PLACEHOLDER WORDING - NOT APPROVED. Do not use with families until the approved notice is available.',
+  'consent.record.noticeVersion': 'Notice version {{version}} ({{language}})',
+  'consent.record.optional': 'Optional: saying no does not affect other services.',
+  'consent.record.participation': 'This is about taking part in the health check programme.',
+  'consent.record.step3': '3. Decision',
+  'consent.record.explained': 'I have read and explained this notice to the guardian',
+  'consent.record.decisionQuestion': "The guardian's decision",
+  'consent.record.decisionGranted': 'Agreed',
+  'consent.record.decisionRefused': 'Did not agree',
+  'consent.record.methodQuestion': 'How was the decision given?',
+  'consent.record.methodHint': 'Recording a method does not by itself make the consent legally valid.',
+  'consent.record.evidence': 'Paper form number',
+  'consent.record.evidenceHint': 'Optional. Do not write names or phone numbers.',
+  'consent.record.save': 'Record decision',
+  'consent.record.confirmTitle': 'Record this decision?',
+  'consent.record.confirmMessage': '{{guardian}} - {{purpose}}: {{decision}}',
+  'consent.record.confirm': 'Yes, record',
+  'consent.record.saved': 'The decision has been recorded.',
+  'consent.record.savedLine': '{{guardian}}: {{decision}}',
+  'consent.record.another': 'Record another decision',
+  'consent.record.backToProfile': 'Back to child profile',
+  'consent.record.errors.guardianRequired': 'Choose the guardian',
+  'consent.record.errors.purposeRequired': 'Choose the purpose',
+  'consent.record.errors.explainedRequired': 'Confirm that you explained the notice',
+  'consent.record.errors.decisionRequired': "Choose the guardian's decision",
+  'consent.record.errors.methodRequired': 'Choose how the decision was given',
+  'consent.record.errors.outdated':
+    'The notice has changed. Read and explain the new notice, then record again.',
+  'consent.record.errors.notApproved': 'This notice is not approved. Consent cannot be recorded with it.',
+  'consent.record.errors.guardian':
+    'This guardian cannot give consent for the child. Check the guardian details.',
+  'consent.record.errors.noticeUnavailable':
+    'The notice is not available right now. Nothing was recorded. Try again later.',
+
+  'consent.history.title': 'Consent history',
+  'consent.history.statusTitle': 'Current status',
+  'consent.history.timelineTitle': 'All decisions',
+  'consent.history.timelineSubtitle': 'Newest first. Decisions are never deleted or changed.',
+  'consent.history.empty': 'No consent decision has been recorded.',
+  'consent.history.guardian': 'Guardian',
+  'consent.history.method': 'Method',
+  'consent.history.notice': 'Notice',
+  'consent.history.placeholderNotice': 'Recorded with placeholder (not approved) wording.',
+  'consent.history.recorded': 'Recorded',
+  'consent.history.recordedBy': '{{date}} by {{name}}',
+  'consent.history.withdrawnLine': 'Withdrawn on {{date}} by {{name}} ({{method}})',
+  'consent.history.withdraw': 'Record withdrawal',
+
+  'consent.withdraw.title': 'Withdraw consent',
+  'consent.withdraw.grantedLine': 'Agreed by {{name}} on {{date}}',
+  'consent.withdraw.explain':
+    'From now on this activity is not allowed. The earlier decision stays in the history. Other purposes are not changed.',
+  'consent.withdraw.guardianQuestion': 'Who is withdrawing?',
+  'consent.withdraw.methodQuestion': 'How was the withdrawal given?',
+  'consent.withdraw.reason': 'Reason (optional)',
+  'consent.withdraw.save': 'Withdraw consent',
+  'consent.withdraw.confirmTitle': 'Withdraw consent for {{purpose}}?',
+  'consent.withdraw.confirmMessage': 'This activity will no longer be allowed for this child.',
+  'consent.withdraw.notFound': 'This consent record was not found.',
+  'consent.withdraw.errors.alreadyWithdrawn': 'This consent has already been withdrawn.',
+  'consent.withdraw.errors.notCurrent':
+    'A newer decision exists for this purpose. Go back and check the history.',
 } as const;
 
 export type TranslationKey = keyof typeof en;

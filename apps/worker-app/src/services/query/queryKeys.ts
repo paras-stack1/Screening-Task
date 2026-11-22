@@ -13,5 +13,8 @@ export const queryKeys = {
   childLinks: (userId: string, childId: string, includeEnded: boolean) =>
     [userId, 'children', 'links', childId, includeEnded] as const,
   registrationAreas: (userId: string) => [userId, 'children', 'registration-areas'] as const,
+  childConsents: (userId: string, childId: string) => [userId, 'children', 'consents', childId] as const,
+  consentNotices: (userId: string, language: string) => [userId, 'consent-notices', language] as const,
+  recentChildren: (userId: string) => [userId, 'children', 'recent'] as const,
   guardian: (userId: string, guardianId: string) => [userId, 'children', 'guardian', guardianId] as const,
 };

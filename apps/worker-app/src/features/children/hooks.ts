@@ -89,6 +89,40 @@ export function useGuardian(guardianId: string) {
   });
 }
 
+/** Consent status per purpose + full history. The API decides what is permitted; the app only displays it. */
+export function useChildConsents(childId: string) {
+  const children = useChildrenApi();
+  const userId = useUserId();
+  return useQuery({
+    queryKey: queryKeys.childConsents(userId, childId),
+    queryFn: ({ signal }) => children.consents(childId, { signal }),
+    enabled: userId !== 'none' && Boolean(childId),
+  });
+}
+
+/** Current notice wording per purpose in one language (always refetched: wording may change). */
+export function useConsentNotices(language: 'hi' | 'en', enabled = true) {
+  const children = useChildrenApi();
+  const userId = useUserId();
+  return useQuery({
+    queryKey: queryKeys.consentNotices(userId, language),
+    queryFn: ({ signal }) => children.consentNotices(language, { signal }).then((r) => r.items),
+    enabled: enabled && userId !== 'none',
+    staleTime: 0,
+  });
+}
+
+/** Five most recently registered children in the worker's areas (dashboard). */
+export function useRecentChildren(enabled: boolean) {
+  const children = useChildrenApi();
+  const userId = useUserId();
+  return useQuery({
+    queryKey: queryKeys.recentChildren(userId),
+    queryFn: ({ signal }) => children.list({ page: 1, pageSize: 5, sort: '-createdAt' }, { signal }),
+    enabled: enabled && userId !== 'none',
+  });
+}
+
 /** After any child, guardian or link change: every child-data query is refetched. */
 export function useInvalidateChildData() {
   const queryClient = useQueryClient();

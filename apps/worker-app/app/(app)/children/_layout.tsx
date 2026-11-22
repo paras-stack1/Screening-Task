@@ -22,6 +22,12 @@ export default function ChildrenLayout() {
       <Stack.Screen name="[childId]/edit" options={{ title: t('children.edit.title') }} />
       <Stack.Screen name="[childId]/add-guardian" options={{ title: t('children.addGuardian.title') }} />
       <Stack.Screen name="[childId]/link/[relationshipId]" options={{ title: t('children.link.title') }} />
+      <Stack.Screen name="[childId]/consent/index" options={{ title: t('consent.history.title') }} />
+      <Stack.Screen name="[childId]/consent/record" options={{ title: t('consent.record.title') }} />
+      <Stack.Screen
+        name="[childId]/consent/withdraw/[consentId]"
+        options={{ title: t('consent.withdraw.title') }}
+      />
       <Stack.Screen name="guardian/[guardianId]" options={{ title: t('children.guardian.title') }} />
     </Stack>
   );

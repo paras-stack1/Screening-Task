@@ -21,6 +21,7 @@ import {
   sexLabel,
 } from '../../../../src/features/children/labels';
 import { childRoutes } from '../../../../src/features/children/routes';
+import { ConsentOverview } from '../../../../src/features/consent/ConsentOverview';
 import { useTranslation } from '../../../../src/localization';
 import { apiErrorMessageKey } from '../../../../src/services/api/errorMessages';
 import { isApiError } from '../../../../src/services/api/errors';
@@ -125,6 +126,8 @@ export default function ChildProfileScreen() {
         <Field label={t('children.profile.registeredOn')} value={formatIndiaDate(data.registeredAt)} />
         <Field label={t('children.profile.registeredBy')} value={data.registeredByName} />
       </AppCard>
+
+      <ConsentOverview childId={data.id} />
 
       <SectionHeader title={t('children.profile.screeningTitle')} />
       <AppCard testID="screening-placeholder">

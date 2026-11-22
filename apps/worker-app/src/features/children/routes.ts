@@ -20,4 +20,8 @@ export const childRoutes = {
   link: (childId: string, relationshipId: string) =>
     `/children/${seg(childId)}/link/${seg(relationshipId)}` as Href,
   guardian: (guardianId: string) => `/children/guardian/${seg(guardianId)}` as Href,
+  consentHistory: (childId: string) => `/children/${seg(childId)}/consent` as Href,
+  recordConsent: (childId: string) => `/children/${seg(childId)}/consent/record` as Href,
+  withdrawConsent: (childId: string, consentId: string) =>
+    `/children/${seg(childId)}/consent/withdraw/${seg(consentId)}` as Href,
 };

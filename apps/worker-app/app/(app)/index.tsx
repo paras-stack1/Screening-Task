@@ -5,6 +5,7 @@ import {
   ActionsSection,
   FourDSection,
   MetricsSection,
+  RecentChildrenSection,
 } from '../../src/features/dashboard/components/DashboardSections';
 import { useTranslation } from '../../src/localization';
 import { colors } from '../../src/theme';
@@ -20,6 +21,7 @@ export default function DashboardScreen() {
       <DashboardHeader displayName={user.displayName} />
       <MetricsSection />
       <ActionsSection />
+      <RecentChildrenSection />
       <FourDSection />
       <AppCard accentColor={colors.secondary}>
         <AppText variant="bodySmall">{t('app.screeningDisclaimer')}</AppText>

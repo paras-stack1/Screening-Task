@@ -5,6 +5,11 @@ import {
   guardianLinkListResponseSchema,
   guardianLinkResponseSchema,
   registrationAreasResponseSchema,
+  childConsentsResponseSchema,
+  consentNoticesResponseSchema,
+  consentRecordResponseSchema,
+  type RecordConsentRequest,
+  type WithdrawConsentRequest,
   type AddGuardianLinkRequest,
   type RegisterChildRequest,
   type UpdateChildRequest,
@@ -59,6 +64,19 @@ export function createChildrenApi(api: ApiClient) {
       ),
     guardian: (guardianId: string, options?: RequestOptions) =>
       api.get(`/guardians/${id(guardianId)}`, guardianDetailResponseSchema, options),
+    // ------------------------------------------------------------ consent (docs/api/consent.md)
+    consents: (childId: string, options?: RequestOptions) =>
+      api.get(`/children/${id(childId)}/consents`, childConsentsResponseSchema, options),
+    consentNotices: (language: 'hi' | 'en', options?: RequestOptions) =>
+      api.get(`/consent-notices?language=${language}`, consentNoticesResponseSchema, options),
+    recordConsent: (childId: string, body: RecordConsentRequest) =>
+      api.post(`/children/${id(childId)}/consents`, body, consentRecordResponseSchema),
+    withdrawConsent: (childId: string, consentId: string, body: WithdrawConsentRequest) =>
+      api.post(
+        `/children/${id(childId)}/consents/${id(consentId)}/withdraw`,
+        body,
+        consentRecordResponseSchema,
+      ),
     updateGuardian: (guardianId: string, body: UpdateGuardianRequest) =>
       api.patch(`/guardians/${id(guardianId)}`, body, guardianDetailResponseSchema),
   };

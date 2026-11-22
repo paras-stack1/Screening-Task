@@ -11,7 +11,12 @@ import {
 const keys = Object.keys(en) as TranslationKey[];
 const DEVANAGARI = /[ऀ-ॿ]/;
 /** Keys whose Hindi value legitimately contains no Devanagari (placeholders only). */
-const NO_DEVANAGARI_EXPECTED = new Set<TranslationKey>(['metric.a11y.value', 'profile.areaWithLevel']);
+const NO_DEVANAGARI_EXPECTED = new Set<TranslationKey>([
+  'metric.a11y.value',
+  'profile.areaWithLevel',
+  'consent.record.confirmMessage',
+  'consent.record.savedLine',
+]);
 
 describe('translation files', () => {
   it('Hindi has exactly the English keys', () => {
