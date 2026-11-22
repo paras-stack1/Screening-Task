@@ -81,6 +81,27 @@ function mapDatabaseError(
         return null;
     }
   }
+  // Database triggers and CHECK constraints (e.g. the Step 6 screening integrity rules) surface as
+  // unknown request errors carrying the PostgreSQL SQLSTATE. Services check these rules first;
+  // this only answers a missed case clearly. The database text is never sent to the client.
+  if (err instanceof Prisma.PrismaClientUnknownRequestError) {
+    if (err.message.includes('code: "23514"')) {
+      return {
+        status: 409,
+        code: 'INTEGRITY_RULE_VIOLATION',
+        message: 'This change is not allowed by a data-integrity rule. Reload and try again.',
+        prismaCode: 'SQLSTATE_23514',
+      };
+    }
+    if (err.message.includes('code: "40001"')) {
+      return {
+        status: 409,
+        code: 'TRANSACTION_CONFLICT',
+        message: 'Another change happened at the same time. Please try again.',
+        prismaCode: 'SQLSTATE_40001',
+      };
+    }
+  }
   if (err instanceof Prisma.PrismaClientInitializationError) {
     return {
       status: 503,

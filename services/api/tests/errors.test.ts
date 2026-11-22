@@ -96,6 +96,31 @@ describe('error responses', () => {
     expect(JSON.stringify(logSpy.mock.calls)).not.toContain('Asha');
   });
 
+  it('maps a database integrity-rule violation (trigger / CHECK) to 409 without the database text', async () => {
+    const unknown = (sqlstate: string) =>
+      new Prisma.PrismaClientUnknownRequestError(
+        `Error occurred during query execution: ConnectorError { kind: QueryError(PostgresError { code: "${sqlstate}", message: "Screening session is COMPLETED (child Asha)" }) }`,
+        { clientVersion: Prisma.prismaVersion.client },
+      );
+    const testApp = harness((router) => {
+      router.get('/rule', () => {
+        throw unknown('23514');
+      });
+      router.get('/race', () => {
+        throw unknown('40001');
+      });
+      router.get('/other', () => {
+        throw unknown('42P01');
+      });
+    });
+    const rule = await request(testApp).get('/rule');
+    expect([rule.status, rule.body.error.code]).toEqual([409, 'INTEGRITY_RULE_VIOLATION']);
+    expect(rule.text).not.toContain('Asha');
+    const race = await request(testApp).get('/race');
+    expect([race.status, race.body.error.code]).toEqual([409, 'TRANSACTION_CONFLICT']);
+    expect((await request(testApp).get('/other')).status).toBe(500);
+  });
+
   it('maps AppError to its status and code', async () => {
     const testApp = harness((router) =>
       router.get('/missing', () => {

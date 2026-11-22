@@ -25,7 +25,7 @@ export interface ProtocolsServiceDependencies {
 const summaryInclude = { _count: { select: { questions: true } } } satisfies Prisma.ScreeningProtocolInclude;
 type SummaryRow = Prisma.ScreeningProtocolGetPayload<{ include: typeof summaryInclude }>;
 
-function toSummary(row: ScreeningProtocol, questionCount: number): ScreeningProtocolSummary {
+export function toSummary(row: ScreeningProtocol, questionCount: number): ScreeningProtocolSummary {
   return {
     id: row.id,
     code: row.code,

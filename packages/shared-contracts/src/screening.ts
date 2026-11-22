@@ -260,3 +260,313 @@ export const screeningEligibilityResponseSchema = z.object({
   usesUnapprovedContent: z.boolean(),
 });
 export type ScreeningEligibilityResponse = z.infer<typeof screeningEligibilityResponseSchema>;
+
+// =====================================================================================
+// Sessions (stage 6C). Every write carries the session `expectedVersion` the client last saw:
+// a stale write is refused with 409 VERSION_CONFLICT instead of overwriting newer data.
+// Server-derived values (worker, age, area, consent, timestamps, completion state) are never
+// accepted from the client: strict schemas reject unknown fields (mass assignment).
+// =====================================================================================
+
+export const SESSION_STATUSES = ['DRAFT', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
+export const sessionStatusSchema = z.enum(SESSION_STATUSES);
+export type SessionStatus = z.infer<typeof sessionStatusSchema>;
+
+export const CATEGORY_PROGRESS = ['IN_PROGRESS', 'COMPLETED'] as const;
+
+const expectedVersionSchema = z.number().int().min(1);
+const notesSchema = z.string().trim().min(1).max(500);
+
+export const startScreeningRequestSchema = z.strictObject({
+  clientOperationId: z.uuid(),
+  childId: z.uuid(),
+});
+export type StartScreeningRequest = z.infer<typeof startScreeningRequestSchema>;
+
+export const startCategoryRequestSchema = z.strictObject({
+  expectedVersion: expectedVersionSchema,
+  category: fourDCategorySchema,
+});
+export type StartCategoryRequest = z.infer<typeof startCategoryRequestSchema>;
+
+/** Value of an ANSWERED response; its type must match the question's answer type. */
+export const responseValueSchema = z.union([
+  z.boolean(),
+  z.number().finite(),
+  z.string().max(2000),
+  z.array(z.string().max(64)).min(1).max(20),
+]);
+export type ResponseValue = z.infer<typeof responseValueSchema>;
+
+export const responseInputSchema = z
+  .strictObject({
+    questionId: z.uuid(),
+    status: observationStatusSchema,
+    source: responseSourceSchema,
+    value: responseValueSchema.optional(),
+    notAssessedReason: z.string().trim().min(1).max(200).optional(),
+    notes: notesSchema.optional(),
+  })
+  .superRefine((r, ctx) => {
+    if (r.status === 'ANSWERED' && r.value === undefined) {
+      ctx.addIssue({ code: 'custom', message: 'An answered question needs a value', path: ['value'] });
+    }
+    if (r.status !== 'ANSWERED' && r.value !== undefined) {
+      ctx.addIssue({ code: 'custom', message: 'Only an answered question has a value', path: ['value'] });
+    }
+    if (r.notAssessedReason && r.status !== 'NOT_ASSESSED' && r.status !== 'UNABLE_TO_ASSESS') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A reason is only for not assessed / unable to assess',
+        path: ['notAssessedReason'],
+      });
+    }
+  });
+export type ResponseInput = z.infer<typeof responseInputSchema>;
+
+/** Saves one section: upserts `responses`; `cleared` returns questions to "not answered". */
+export const saveResponsesRequestSchema = z
+  .strictObject({
+    expectedVersion: expectedVersionSchema,
+    responses: z.array(responseInputSchema).max(100).default([]),
+    cleared: z.array(z.uuid()).max(100).default([]),
+  })
+  .superRefine((r, ctx) => {
+    const ids = [...r.responses.map((x) => x.questionId), ...r.cleared];
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: 'custom', message: 'Each question may appear only once', path: ['responses'] });
+    }
+    if (ids.length === 0) {
+      ctx.addIssue({ code: 'custom', message: 'Nothing to save', path: ['responses'] });
+    }
+  });
+export type SaveResponsesRequest = z.input<typeof saveResponsesRequestSchema>;
+
+export const updateCategoryRequestSchema = z
+  .strictObject({
+    expectedVersion: expectedVersionSchema,
+    /** COMPLETED = finish the category; IN_PROGRESS = reopen it while the session is open. */
+    status: z.enum(CATEGORY_PROGRESS).optional(),
+    /** Category-level worker observations; null clears them. */
+    notes: notesSchema.nullable().optional(),
+  })
+  .refine((r) => r.status !== undefined || r.notes !== undefined, { message: 'Nothing to update' });
+export type UpdateCategoryRequest = z.infer<typeof updateCategoryRequestSchema>;
+
+// -------------------------------------------------------------------- measurements
+
+/** Measurement types offered in Step 6 (decision I). HAEMOGLOBIN is not offered. */
+export const SCREENING_MEASUREMENT_TYPES = [
+  'WEIGHT',
+  'HEIGHT',
+  'LENGTH',
+  'MUAC',
+  'HEAD_CIRCUMFERENCE',
+] as const;
+export const screeningMeasurementTypeSchema = z.enum(SCREENING_MEASUREMENT_TYPES);
+export type ScreeningMeasurementType = z.infer<typeof screeningMeasurementTypeSchema>;
+
+export const MEASUREMENT_UNITS = ['kg', 'g', 'cm', 'mm'] as const;
+export const measurementUnitSchema = z.enum(MEASUREMENT_UNITS);
+export type MeasurementUnit = z.infer<typeof measurementUnitSchema>;
+
+export const MEASUREMENT_SOURCES = ['MEASURED', 'GUARDIAN_REPORTED', 'FROM_RECORD'] as const;
+export const MEASUREMENT_QUALITIES = ['RELIABLE', 'QUESTIONABLE', 'NOT_RELIABLE'] as const;
+
+/**
+ * A measurement value is a plain decimal STRING ("12.35"), so it is stored exactly as entered:
+ * no binary floating point, no "NaN", no "Infinity", no exponent, no sign. Unit-specific
+ * precision and plausibility are checked by the server.
+ */
+export const decimalStringSchema = z
+  .string()
+  .regex(/^(0|[1-9]\d{0,5})(\.\d{1,3})?$/, 'Enter a number such as 12.5 (no signs, spaces or letters)');
+
+const measurementFields = {
+  value: decimalStringSchema,
+  unit: measurementUnitSchema,
+  source: z.enum(MEASUREMENT_SOURCES),
+  quality: z.enum(MEASUREMENT_QUALITIES),
+  /** When it was measured (ISO date-time with offset). Not in the future. */
+  measuredAt: z.iso.datetime({ offset: true }),
+  method: z.string().trim().min(1).max(64).optional(),
+  deviceMake: z.string().trim().min(1).max(64).optional(),
+  deviceModel: z.string().trim().min(1).max(64).optional(),
+  deviceSerial: z.string().trim().min(1).max(64).optional(),
+  notes: notesSchema.optional(),
+};
+
+export const addMeasurementRequestSchema = z.strictObject({
+  expectedVersion: expectedVersionSchema,
+  type: screeningMeasurementTypeSchema,
+  ...measurementFields,
+});
+export type AddMeasurementRequest = z.infer<typeof addMeasurementRequestSchema>;
+
+/** A correction keeps the original row and adds a superseding one (the type cannot change). */
+export const correctMeasurementRequestSchema = z.strictObject({
+  expectedVersion: expectedVersionSchema,
+  correctionReason: z.string().trim().min(3).max(200),
+  ...measurementFields,
+});
+export type CorrectMeasurementRequest = z.infer<typeof correctMeasurementRequestSchema>;
+
+// ------------------------------------------------------------------------ lifecycle
+
+export const completeSessionRequestSchema = z.strictObject({ expectedVersion: expectedVersionSchema });
+export type CompleteSessionRequest = z.infer<typeof completeSessionRequestSchema>;
+
+export const cancelSessionRequestSchema = z.strictObject({
+  expectedVersion: expectedVersionSchema,
+  /** Short, no personal data. */
+  reason: z.string().trim().min(3).max(200),
+});
+export type CancelSessionRequest = z.infer<typeof cancelSessionRequestSchema>;
+
+export const screeningListQuerySchema = z.strictObject({
+  status: sessionStatusSchema.optional(),
+  childId: z.uuid().optional(),
+  /** Only sessions conducted by the caller. */
+  mine: z.enum(['true', 'false']).optional(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type ScreeningListQuery = z.infer<typeof screeningListQuerySchema>;
+
+export const screeningHistoryQuerySchema = z.strictObject({
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type ScreeningHistoryQuery = z.infer<typeof screeningHistoryQuerySchema>;
+
+// ------------------------------------------------------------------------ responses
+
+export const categoryCompletenessSchema = z.object({
+  totalQuestions: z.number(),
+  requiredQuestions: z.number(),
+  /** Required questions with an explicit state (answer, unknown, not assessed, unable). */
+  requiredAddressed: z.number(),
+  answered: z.number(),
+  unknown: z.number(),
+  notAssessed: z.number(),
+  /** Questions with no record at all. Never counted as "No". */
+  notAnswered: z.number(),
+});
+export type CategoryCompleteness = z.infer<typeof categoryCompletenessSchema>;
+
+export const screeningResponseSchema = z.object({
+  id: z.string(),
+  questionId: z.string(),
+  questionCode: z.string(),
+  status: observationStatusSchema,
+  source: responseSourceSchema,
+  value: responseValueSchema.nullable(),
+  notAssessedReason: z.string().nullable(),
+  notes: z.string().nullable(),
+  recordedAt: z.string(),
+  updatedAt: z.string(),
+  recordedByName: z.string(),
+});
+export type ScreeningResponse = z.infer<typeof screeningResponseSchema>;
+
+export const sessionCategorySchema = z.object({
+  id: z.string(),
+  category: fourDCategorySchema,
+  status: z.enum(CATEGORY_PROGRESS),
+  protocol: screeningProtocolSummarySchema,
+  protocolStatusAtStart: protocolStatusSchema,
+  /** True only if ACTIVE, non-demonstration content was used. */
+  usedApprovedContent: z.boolean(),
+  notes: z.string().nullable(),
+  startedAt: z.string(),
+  completedAt: z.string().nullable(),
+  completeness: categoryCompletenessSchema,
+  responses: z.array(screeningResponseSchema),
+});
+export type SessionCategory = z.infer<typeof sessionCategorySchema>;
+
+export const screeningMeasurementSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  /** Exactly as entered. */
+  value: z.string(),
+  unit: z.string(),
+  /** Explicit conversion for display (kg or cm); the stored value is never converted. */
+  converted: z.object({ value: z.string(), unit: z.string() }),
+  source: z.string(),
+  quality: z.string(),
+  method: z.string().nullable(),
+  deviceMake: z.string().nullable(),
+  deviceModel: z.string().nullable(),
+  deviceSerial: z.string().nullable(),
+  notes: z.string().nullable(),
+  measuredAt: z.string(),
+  recordedAt: z.string(),
+  recordedByName: z.string(),
+  supersedesId: z.string().nullable(),
+  correctionReason: z.string().nullable(),
+  /** False when a later correction replaced it (it stays in the history). */
+  isCurrent: z.boolean(),
+});
+export type ScreeningMeasurement = z.infer<typeof screeningMeasurementSchema>;
+
+export const screeningSessionSummarySchema = z.object({
+  id: z.string(),
+  childId: z.string(),
+  childName: z.string(),
+  status: sessionStatusSchema,
+  version: z.number(),
+  /** India calendar date the screening started. */
+  screeningDate: z.string(),
+  startedAt: z.string(),
+  updatedAt: z.string(),
+  completedAt: z.string().nullable(),
+  cancelledAt: z.string().nullable(),
+  conductedByName: z.string(),
+  isMine: z.boolean(),
+  ageInDaysAtStart: z.number(),
+  dobEstimatedAtStart: z.boolean(),
+  categories: z.array(z.object({ category: fourDCategorySchema, status: z.enum(CATEGORY_PROGRESS) })),
+  usesUnapprovedContent: z.boolean(),
+});
+export type ScreeningSessionSummary = z.infer<typeof screeningSessionSummarySchema>;
+
+export const screeningSessionDetailSchema = screeningSessionSummarySchema.extend({
+  dateOfBirthAtStart: z.string(),
+  ageAtStart: z.object({ years: z.number(), months: z.number() }),
+  screeningConsentId: z.string(),
+  cancelReason: z.string().nullable(),
+  cancelledByName: z.string().nullable(),
+  /** True for the conducting worker while the session is open. */
+  canEdit: z.boolean(),
+  sessionCategories: z.array(sessionCategorySchema),
+  /** Four-D categories never started in this session: reported as NOT assessed. */
+  categoriesNotAssessed: z.array(fourDCategorySchema),
+  measurements: z.array(screeningMeasurementSchema),
+  /**
+   * Always false in Step 6: no approved screening rules exist, so no outcome or referral
+   * recommendation is generated (decision P).
+   */
+  screeningRulesApplied: z.literal(false),
+});
+export type ScreeningSessionDetail = z.infer<typeof screeningSessionDetailSchema>;
+
+export const screeningSessionResponseSchema = z.object({ session: screeningSessionDetailSchema });
+export type ScreeningSessionResponse = z.infer<typeof screeningSessionResponseSchema>;
+
+export const screeningListResponseSchema = z.object({
+  items: z.array(screeningSessionSummarySchema),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+});
+export type ScreeningListResponse = z.infer<typeof screeningListResponseSchema>;
+
+/** GET /screenings/summary - the caller's own real counts (never estimated). */
+export const screeningDashboardSummarySchema = z.object({
+  date: z.string(),
+  completedToday: z.number(),
+  inProgress: z.number(),
+  drafts: z.number(),
+});
+export type ScreeningDashboardSummary = z.infer<typeof screeningDashboardSummarySchema>;

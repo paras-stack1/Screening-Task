@@ -10,6 +10,7 @@ import {
   createScreeningEligibilityRouter,
   createScreeningProtocolsRouter,
 } from '../modules/screening/protocols.routes';
+import { createChildScreeningsRouter, createScreeningsRouter } from '../modules/screening/screenings.routes';
 import { createAssignmentsRouter, createRolesRouter, createUsersRouter } from '../modules/users/users.routes';
 import type { PiiCrypto } from '../utils/piiCrypto';
 import { createHealthRouter, type HealthDependencies } from './health.routes';
@@ -50,7 +51,9 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   // Before '/children' so the nested consent and screening routes are matched first.
   router.use('/children/:childId/consents', createChildConsentsRouter(childData));
   router.use('/children/:childId/screening-eligibility', createScreeningEligibilityRouter(childData));
+  router.use('/children/:childId/screenings', createChildScreeningsRouter(childData));
   router.use('/screening-protocols', createScreeningProtocolsRouter(childData));
+  router.use('/screenings', createScreeningsRouter(childData));
   router.use('/children', createChildrenRouter(childData));
   router.use('/guardians', createGuardiansRouter(childData));
   router.use('/users', createUsersRouter(deps.auth));
