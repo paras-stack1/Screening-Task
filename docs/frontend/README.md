@@ -1,6 +1,6 @@
 # Worker App (Frontend) - Architecture
 
-> Status: Step 4 complete, submitted for review (2026-11-21). App: `apps/worker-app`.
+> Status: Step 4 complete; Step 5 children/guardians screens added (stage 5D, 2026-11-22). App: `apps/worker-app`.
 > Stack: Expo SDK 58, React Native 0.88, React 19.3, TypeScript 6 (strict), Expo Router 58,
 > TanStack Query 5, React Hook Form 7 + Zod 4, Expo SecureStore, expo-network.
 
@@ -13,6 +13,7 @@
 | Sign-in, tokens, refresh, API client | [authentication.md](authentication.md) |
 | Offline foundation | [offline.md](offline.md) |
 | Accessibility | [accessibility.md](accessibility.md) |
+| Children, guardians, registration (Step 5) | [children.md](children.md) |
 | Tests | [testing.md](testing.md) |
 
 ## 1. Folder structure
@@ -22,7 +23,7 @@ apps/worker-app/
   app/                       Routes only (Expo Router). Thin screens composed from src/.
     _layout.tsx              Providers, start-up states, Stack.Protected guards
     login.tsx  change-password.tsx  +not-found.tsx
-    (app)/                   Signed-in tabs: index (Home), notifications, profile, settings
+    (app)/                   Signed-in tabs: index (Home), children (own stack), notifications, profile, settings
   src/
     config/env.ts            Validated public config (API URL, HTTPS rule)
     theme/                   Tokens: colors, typography, spacing, radius, shadows
@@ -36,6 +37,7 @@ apps/worker-app/
       appServices.tsx        Creates the single instance of each service
     features/
       auth/                  SessionManager, auth API, AuthProvider, forms, validation
+      children/              Children API, query hooks, forms, validation, labels, routes
       dashboard/             Metrics hook, dashboard sections
       profile/               Role / area display names
   tests/                     Jest + Testing Library (mirrors src/), fake backend, live suite

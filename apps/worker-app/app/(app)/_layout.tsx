@@ -6,15 +6,17 @@ import { colors, MAX_FONT_SCALE } from '../../src/theme';
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-const TABS: { name: string; title: TranslationKey; icon: IconName }[] = [
+const TABS: { name: string; title: TranslationKey; icon: IconName; ownHeader?: boolean }[] = [
   { name: 'index', title: 'nav.dashboard', icon: 'home-outline' },
+  // The children section has its own stack (list -> profile -> edit) with its own headers.
+  { name: 'children', title: 'nav.children', icon: 'account-child-outline', ownHeader: true },
   { name: 'notifications', title: 'nav.notifications', icon: 'bell-outline' },
   { name: 'profile', title: 'nav.profile', icon: 'account-circle-outline' },
   { name: 'settings', title: 'nav.settings', icon: 'cog-outline' },
 ];
 
 /**
- * Signed-in area: four bottom tabs, kept deliberately few. Only reachable with an authenticated
+ * Signed-in area: five bottom tabs, kept deliberately few. Only reachable with an authenticated
  * session that does not need a password change (see app/_layout.tsx).
  */
 export default function AppTabsLayout() {
@@ -40,6 +42,7 @@ export default function AppTabsLayout() {
           name={tab.name}
           options={{
             title: t(tab.title),
+            headerShown: !tab.ownHeader,
             tabBarAccessibilityLabel: t(tab.title),
             tabBarIcon: ({ color, size }) => (
               <MaterialCommunityIcons

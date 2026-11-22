@@ -3,6 +3,8 @@
  * It mimics the behaviours the app depends on: rotation, reuse detection (family revoked),
  * logout, the mustChangePassword gate, generic 401s and the error envelope.
  */
+import { createFakeChildren } from './fakeChildren';
+
 export const TEST_BASE_URL = 'https://api.test/api/v1';
 
 interface FakeUser {
@@ -75,6 +77,8 @@ export function createFakeBackend() {
   let accessLifetimeSeconds = 900;
   /** `total` returned by GET /children for any caller with child.read. */
   let childrenTotal = 0;
+  /** Step 5 children / guardians API (tests/support/fakeChildren.ts). */
+  const childStore = createFakeChildren();
 
   const user = (input: Partial<FakeUser> & { loginId: string; password: string }): FakeUser => {
     const created: FakeUser = {
@@ -198,10 +202,13 @@ export function createFakeBackend() {
         access: { permissions: owner.permissions, assignments: owner.assignments },
       });
     }
-    if (method === 'GET' && path.split('?')[0] === '/children') {
+    // Step 4 dashboard tests use a bare total while no children are seeded.
+    if (method === 'GET' && path.split('?')[0] === '/children' && childStore.children.size === 0) {
       if (!owner.permissions.includes('child.read')) return error(403, 'FORBIDDEN');
       return json(200, { items: [], page: 1, pageSize: 1, total: childrenTotal });
     }
+    const childResult = childStore.route(method, path, body, owner.permissions);
+    if (childResult) return json(childResult.status, childResult.body);
     if (method === 'GET' && path === '/probe') return json(200, { ok: true, user: owner.id });
     if (method === 'POST' && path === '/probe') return json(200, { ok: true });
     return error(404, 'NOT_FOUND');
@@ -236,6 +243,7 @@ export function createFakeBackend() {
     fetchFn,
     calls,
     user,
+    children: childStore,
     /** Next response(s) for a path, consumed in order. */
     override(path: string, ...responses: Override[]) {
       overrides.set(path, [...(overrides.get(path) ?? []), ...responses]);

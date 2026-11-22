@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import {
   ActionCard,
@@ -9,6 +10,8 @@ import {
 } from '../../../components';
 import { useTranslation, type TranslationKey } from '../../../localization';
 import { spacing, type FourDCategory } from '../../../theme';
+import { useChildPermissions } from '../../children/hooks';
+import { childRoutes } from '../../children/routes';
 import { useRegisteredChildren } from '../hooks/useDashboardMetrics';
 
 /**
@@ -51,9 +54,17 @@ export function MetricsSection() {
   );
 }
 
-/** Main tasks. Disabled with "Coming soon" until their modules exist (decision D). */
+/**
+ * Main tasks. Register is available to workers with child.create (from /auth/me - a display
+ * decision only; the API checks again). Screening and follow-ups stay "Coming soon" (decision D).
+ */
 export function ActionsSection() {
   const { t } = useTranslation();
+  const router = useRouter();
+  const permissions = useChildPermissions();
+  const handlers: Record<string, (() => void) | undefined> = {
+    register: permissions.canCreate ? () => router.push(childRoutes.register()) : undefined,
+  };
   const actions: { key: string; icon: IconName; title: TranslationKey; description: TranslationKey }[] = [
     {
       key: 'register',
@@ -84,6 +95,14 @@ export function ActionsSection() {
           icon={action.icon}
           title={t(action.title)}
           description={t(action.description)}
+          onPress={handlers[action.key]}
+          unavailableLabel={
+            action.key !== 'register'
+              ? undefined
+              : permissions.loaded
+                ? t('dashboard.metrics.notForRole')
+                : t('common.loading')
+          }
           testID={`action-${action.key}`}
         />
       ))}

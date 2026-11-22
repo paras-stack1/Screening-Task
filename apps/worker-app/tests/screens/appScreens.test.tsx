@@ -76,7 +76,13 @@ describe('dashboard', () => {
   it('does not request children for a role without child.read (decision Q)', async () => {
     await seedSavedSession(context, ADMIN);
     await renderApp('/');
-    expect(await screen.findByText('Not available for your role')).toBeOnTheScreen();
+    expect(
+      await screen.findByLabelText('Registered children: Not available for your role'),
+    ).toBeOnTheScreen();
+    // Register is shown as unavailable for this role, never as an active button.
+    expect(
+      screen.getByRole('button', { name: 'Register a child. Not available for your role' }),
+    ).toBeDisabled();
     expect(context.backend.calls.filter((call) => call.path.startsWith('/children'))).toHaveLength(0);
   });
 
@@ -90,10 +96,11 @@ describe('dashboard', () => {
     await waitFor(() => expect(within(metric()).getByText('12')).toBeOnTheScreen());
   });
 
-  it('shows the three main tasks as not yet available (decision D)', async () => {
+  it('Register is available to a worker with child.create; screening and follow-ups are not yet', async () => {
     await seedSavedSession(context);
     await renderApp('/');
-    for (const title of ['Register a child', 'Start screening', 'Manage follow-ups']) {
+    expect(await screen.findByRole('button', { name: 'Register a child' })).toBeEnabled();
+    for (const title of ['Start screening', 'Manage follow-ups']) {
       expect(await screen.findByRole('button', { name: `${title}. Coming soon` })).toBeDisabled();
     }
   });

@@ -24,5 +24,6 @@ export { OfflineBanner } from './feedback/OfflineBanner';
 export { StatusBadge, type StatusTone } from './feedback/StatusBadge';
 export { SyncStatusIndicator, type SyncStatus } from './feedback/SyncStatusIndicator';
 export { AppInput, type AppInputProps } from './forms/AppInput';
+export { ChoiceGroup, type ChoiceOption } from './forms/ChoiceGroup';
 export { LanguageSelector } from './forms/LanguageSelector';
 export { PasswordInput, type PasswordInputProps } from './forms/PasswordInput';
