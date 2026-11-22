@@ -1,6 +1,6 @@
 # Step 5 - Final report: child registration, guardians and consent
 
-Branch `feat/step-5-children` (stages 5B `b99b680`, 5C `7c4a5a0`, 5D `1da4e86`, 5E uncommitted).
+Branch `feat/step-5-children` (stages 5B `b99b680`, 5C `7c4a5a0`, 5D `1da4e86`, 5E `033deea`).
 Decisions A-X approved 2026-11-21. All data used in development and tests is synthetic.
 
 > Automated tests do not establish complete security or legal compliance. Independent security,
