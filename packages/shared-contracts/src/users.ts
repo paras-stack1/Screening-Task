@@ -88,11 +88,65 @@ export const userDetailResponseSchema = z.object({
   assignments: z.array(assignmentViewSchema),
 });
 
+export type UserDetailResponse = z.infer<typeof userDetailResponseSchema>;
+
+/**
+ * A row of GET /users (admin portal stage PC): the account plus its CURRENT (not revoked, not
+ * ended) assignments that lie inside the caller's user.manage areas - assignments elsewhere are
+ * not revealed.
+ */
+export const userListItemSchema = userViewSchema.extend({
+  currentAssignments: z.array(
+    z.object({
+      roleCode: z.string(),
+      areaName: z.string(),
+      areaNameHi: z.string().nullable(),
+      status: z.enum(['ACTIVE', 'SUSPENDED']),
+    }),
+  ),
+});
+export type UserListItem = z.infer<typeof userListItemSchema>;
+
+export const userListResponseSchema = z.object({
+  items: z.array(userListItemSchema),
+  page: z.number().int(),
+  pageSize: z.number().int(),
+  total: z.number().int(),
+});
+export type UserListResponse = z.infer<typeof userListResponseSchema>;
+
+export const roleViewSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  nameEn: z.string(),
+  nameHi: z.string(),
+  permissions: z.array(z.string()),
+});
+export type RoleView = z.infer<typeof roleViewSchema>;
+export const roleListResponseSchema = z.object({ roles: z.array(roleViewSchema) });
+export type RoleListResponse = z.infer<typeof roleListResponseSchema>;
+
+/**
+ * Permissions that are MANAGEMENT powers: an administrator may only grant a role whose management
+ * permissions they hold themselves over that area (the API decides; the portal uses this list
+ * only to hide roles that would certainly be refused). Fieldwork permissions can be granted
+ * without being held (decision D11).
+ */
+export const MANAGEMENT_PERMISSIONS = [
+  'report.aggregate',
+  'assignment.manage',
+  'user.manage',
+  'area.manage',
+  'facility.manage',
+  'audit.read',
+] as const;
+
 /** Shown ONCE to the administrator, who passes it to the worker in person. Never stored. */
 export const temporaryPasswordResponseSchema = z.object({
   user: userViewSchema,
   temporaryPassword: z.string(),
 });
+export type TemporaryPasswordResponse = z.infer<typeof temporaryPasswordResponseSchema>;
 
 export const effectiveAccessSchema = z.object({
   permissions: z.array(z.string()),

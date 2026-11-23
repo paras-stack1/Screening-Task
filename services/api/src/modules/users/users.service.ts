@@ -2,6 +2,7 @@ import type {
   ChangeUserStatusRequest,
   CreateUserRequest,
   UserListQuery,
+  UserListResponse,
   UserView,
 } from '@balswasthya/shared-contracts';
 import { Prisma, type PrismaClient, type User } from '@prisma/client';
@@ -51,19 +52,17 @@ export function createUsersService(db: PrismaClient) {
 
   return {
     /** Users with a current assignment inside the actor's user.manage areas (never the actor). */
-    async list(ctx: AdminContext, query: UserListQuery) {
+    async list(ctx: AdminContext, query: UserListQuery): Promise<UserListResponse> {
+      // Current assignments inside the actor's user.manage areas (used to find AND to show).
+      const currentInScope: Prisma.WorkerAreaAssignmentWhereInput = {
+        status: { not: 'REVOKED' },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: ctx.at } }],
+        area: areaScopeWhere(ctx.actorId, 'user.manage', ctx.at),
+      };
       const where: Prisma.UserWhereInput = {
         AND: [
           { id: { not: ctx.actorId } },
-          {
-            assignmentsHeld: {
-              some: {
-                status: { not: 'REVOKED' },
-                OR: [{ effectiveTo: null }, { effectiveTo: { gt: ctx.at } }],
-                area: areaScopeWhere(ctx.actorId, 'user.manage', ctx.at),
-              },
-            },
-          },
+          { assignmentsHeld: { some: currentInScope } },
           query.status ? { status: query.status } : {},
           query.search
             ? {
@@ -78,13 +77,38 @@ export function createUsersService(db: PrismaClient) {
       const [rows, total] = await Promise.all([
         db.user.findMany({
           where,
+          include: {
+            assignmentsHeld: {
+              where: currentInScope,
+              select: {
+                status: true,
+                role: { select: { code: true } },
+                area: { select: { nameEn: true, nameHi: true } },
+              },
+              orderBy: { effectiveFrom: 'asc' },
+            },
+          },
           orderBy: [{ displayName: 'asc' }, { id: 'asc' }],
           skip: (query.page - 1) * query.pageSize,
           take: query.pageSize,
         }),
         db.user.count({ where }),
       ]);
-      return { items: rows.map(toUserView), page: query.page, pageSize: query.pageSize, total };
+      return {
+        items: rows.map(({ assignmentsHeld, ...user }) => ({
+          ...toUserView(user),
+          currentAssignments: assignmentsHeld.map((a) => ({
+            roleCode: a.role.code,
+            areaName: a.area.nameEn,
+            areaNameHi: a.area.nameHi,
+            // REVOKED rows are filtered out above.
+            status: a.status as 'ACTIVE' | 'SUSPENDED',
+          })),
+        })),
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+      };
     },
 
     async get(ctx: AdminContext, userId: string) {

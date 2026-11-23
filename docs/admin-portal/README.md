@@ -1,7 +1,7 @@
 # Admin Web Portal
 
 > Status: decisions P1-P12 **approved 2026-11-23** (portal before Step 6G-2).
-> Stage **PA done** (commit `790aac7`), stage **PB done**; PC-PE not started. Branch
+> Stages **PA** (`790aac7`), **PB** (`934e4d7`) and **PC** done; PD-PE not started. Branch
 > `feat/admin-portal` (based on `feat/step-6-screening` at 6G-1, commit `9324319`).
 
 A separate browser portal for office administrators: create worker accounts, give them a role
@@ -30,7 +30,7 @@ and an area, change or end assignments. It never shows child health data.
 |---|---|---|
 | PA | API: area tree, browser sign-in with cookie, CORS, tests | **Done** - see [api.md](api.md) |
 | PB | Portal shell: sign in, change password, admin-only access, layout | **Done** - section 4 |
-| PC | Users: list, detail, create worker, temporary password, status, reset | Not started |
+| PC | Users: list, detail, create worker, temporary password, status, reset | **Done** - section 5 |
 | PD | Assignments: add, end, suspend, reactivate, revoke | Not started |
 | PE | Docs, security review, live end-to-end run, PDF guide admin section | Not started |
 
@@ -72,8 +72,7 @@ The API must be running and list `http://localhost:5173` in `CORS_ORIGINS`. Ever
 | Signed in without `user.manage` / `assignment.manage` | "This portal is for administrators" + Sign out |
 | Administrator | Header (name, language, sign out), navigation (Home, Users, Change password), Home with role, areas and scope |
 
-The Users page is a placeholder until stage PC. The API checks every request again; the
-screen choices above are for usability only.
+The API checks every request again; the screen choices above are for usability only.
 
 ### Structure (`apps/admin-portal/src`)
 
@@ -112,3 +111,58 @@ Nothing is logged (`no-console` lint rule).
 
 Strings shared with the worker app reuse its wording; portal-only Hindi strings are engineering
 drafts and need review by a native speaker before release.
+
+## 5. Stage PC - user accounts
+
+### Screens
+
+| Address | What it does |
+|---|---|
+| `/users` | Accounts with a current assignment in the administrator's areas (never the administrator): name, login ID, role and area, status, "must change password", last sign-in. Search (2+ characters), status filter and page live in the address. Accounts without `user.manage` (supervisors) see an explanation, and **no request is made** (a refused request would be logged as a denied attempt) |
+| `/users/new` | Create a worker: login ID (normalised like the API: upper case, trimmed), full name, preferred language, role (only roles whose management permissions the administrator holds), area (picker), coverage (this area only / and all within it; default this area only), reason. Then the **one-time password**, shown once |
+| `/users/:id` | Account facts, assignments (read-only until stage PD) and actions, each with a required reason and an explicit confirmation: suspend / reactivate, reset password (new one-time password), sign out everywhere, deactivate permanently. Unknown and out-of-scope accounts show the same "not found or outside your areas" message |
+
+**Area picker:** starts at the administrator's own top areas (`GET /areas`), opens sub-areas
+with a breadcrumb trail, or searches by name or code; the chosen area is shown with its full
+path. Only areas the API offers can be chosen, and the API checks the choice again.
+
+**One-time passwords:** shown in a panel with a copy button and "I have noted it - continue".
+They exist only in that page's state: never in the query cache, mutations keep no result
+(`gcTime: 0`), and leaving the page loses them (by design - they can only be reset again).
+
+**Errors:** login ID taken -> on the field; outside your areas / role above your own -> a
+specific message; a concurrent change (409) -> "changed meanwhile" and the account is reloaded;
+everything else -> the generic translated messages.
+
+### API changes in this stage (additive, no database change)
+
+- `GET /users` rows now include `currentAssignments` (role code, area name, status) - only
+  current assignments **inside the caller's `user.manage` areas**; assignments elsewhere are not
+  revealed. New shared schemas: `userListResponseSchema`, `roleListResponseSchema`,
+  `UserDetailResponse`, `TemporaryPasswordResponse`.
+- `MANAGEMENT_PERMISSIONS` in the shared contracts; a unit test keeps it equal to the API's
+  delegation table.
+
+### Tests
+
+- Portal: **253 tests** (17 new screen tests for PC): list contents, search/filter/paging in the
+  address, supervisor makes no request, every validation message, the complete create flow
+  (browse state -> district -> village, exact request body, password panel, not cached, gone
+  after continue), area search, taken login ID, out-of-scope refusal, role filtering for a
+  district administrator, account page, suspend (reason required) -> reactivate, permanent
+  deactivation, password reset panel, sign out everywhere, 409 reload.
+- Mutation checks: keeping one-time passwords in the cache (1 failure), offering every role (2),
+  requesting the list without `user.manage` (1).
+- API: 2 new database tests (list rows show only current in-scope assignments; roles parse) and
+  1 unit test (management permissions in step).
+- **Live** (opt-in): a new test creates a synthetic worker through the real API, finds it, opens
+  it, lets the worker sign in with the one-time password (must change it), suspends,
+  reactivates, resets, signs out everywhere and finally deactivates it. Run 2026-11-23 against a
+  temporary API on the test database: **4/4 passed**.
+
+### Known gaps (for later stages)
+
+- Supervisors hold `assignment.manage` but not `user.manage`, so they cannot list accounts;
+  how they find a person to assign is part of stage PD.
+- The create form does not offer future start or end dates for the first assignment (the API
+  supports them; stage PD adds them for assignments).

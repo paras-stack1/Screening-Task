@@ -3,6 +3,7 @@ import {
   useId,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
+  type SelectHTMLAttributes,
   type ReactNode,
 } from 'react';
 import { useI18n, type TranslationKey } from '../i18n';
@@ -95,3 +96,52 @@ export const TextField = forwardRef<HTMLInputElement, FieldProps>(function TextF
     </div>
   );
 });
+
+type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
+  label: string;
+  hint?: string;
+  errorKey?: string;
+  children: ReactNode;
+};
+
+/** Labelled select with the same hint/error wiring as TextField. */
+export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(function SelectField(
+  { label, hint, errorKey, id, children, ...rest },
+  ref,
+) {
+  const { t } = useI18n();
+  const generated = useId();
+  const selectId = id ?? generated;
+  const hintId = hint ? `${selectId}-hint` : undefined;
+  const errorId = errorKey ? `${selectId}-error` : undefined;
+  return (
+    <div className="field">
+      <label htmlFor={selectId}>{label}</label>
+      {hint && (
+        <p className="field-hint" id={hintId}>
+          {hint}
+        </p>
+      )}
+      <select
+        ref={ref}
+        id={selectId}
+        aria-invalid={errorKey ? true : undefined}
+        aria-describedby={[hintId, errorId].filter(Boolean).join(' ') || undefined}
+        {...rest}
+      >
+        {children}
+      </select>
+      {errorKey && (
+        <p className="field-error" id={errorId}>
+          {t(errorKey as TranslationKey)}
+        </p>
+      )}
+    </div>
+  );
+});
+
+/** Coloured status label for accounts and assignments. */
+export function StatusBadge({ status }: { status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED' | 'REVOKED' }) {
+  const { t } = useI18n();
+  return <span className={`badge badge-${status.toLowerCase()}`}>{t(`status.${status}`)}</span>;
+}

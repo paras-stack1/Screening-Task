@@ -1,3 +1,12 @@
+import {
+  areaListResponseSchema,
+  roleListResponseSchema,
+  temporaryPasswordResponseSchema,
+  userDetailResponseSchema,
+  userListResponseSchema,
+  userViewSchema,
+} from '@balswasthya/shared-contracts';
+import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
 import { createPortalServices } from '../../src/app/services';
 import { canUsePortal } from '../../src/auth/sessionManager';
@@ -106,5 +115,81 @@ describe.skipIf(!API)('live: admin portal session against a running API', () => 
       status: 401,
       code: 'INVALID_CREDENTIALS',
     });
+  });
+
+  it('stage PC: create a worker, find, view, suspend, reactivate, reset, sign out everywhere', async () => {
+    const jar: Jar = { value: null, attributes: '' };
+    const tab = createPortalServices({ apiBaseUrl: API!, fetchFn: browserLikeFetch(jar) });
+    await tab.session.login(admin.login, admin.password);
+    const api = tab.api;
+
+    const roles = await api.get('/roles', roleListResponseSchema);
+    const asha = roles.roles.find((r) => r.code === 'ASHA')!;
+    const villages = await api.get(
+      `/areas?search=${encodeURIComponent(process.env.LIVE_AREA_SEARCH ?? 'Area V1')}`,
+      areaListResponseSchema,
+    );
+    const village = villages.items.find((a) => a.allowsChildRegistration)!;
+    expect(village).toBeDefined();
+
+    const loginId = `LIVE-PC-${Date.now().toString(36).toUpperCase()}`;
+    const created = await api.post(
+      '/users',
+      {
+        loginId,
+        displayName: 'Synthetic Live Portal Worker',
+        preferredLanguage: 'hi',
+        assignment: { areaId: village.id, roleId: asha.id, scope: 'AREA_ONLY', reason: 'Live portal test' },
+      },
+      temporaryPasswordResponseSchema,
+    );
+    expect(created.user).toMatchObject({ loginId, mustChangePassword: true, status: 'ACTIVE' });
+
+    const found = await api.get(`/users?search=${loginId}`, userListResponseSchema);
+    expect(found.items.map((u) => u.loginId)).toEqual([loginId]);
+    expect(found.items[0]!.currentAssignments[0]).toMatchObject({ roleCode: 'ASHA', status: 'ACTIVE' });
+
+    const detail = await api.get(`/users/${created.user.id}`, userDetailResponseSchema);
+    expect(detail.assignments).toHaveLength(1);
+
+    // The new worker can sign in with the one-time password and must change it.
+    const workerTab = createPortalServices({
+      apiBaseUrl: API!,
+      fetchFn: browserLikeFetch({ value: null, attributes: '' }),
+    });
+    await workerTab.session.login(loginId, created.temporaryPassword);
+    const workerState = workerTab.session.getState();
+    expect(workerState.status === 'authenticated' && workerState.user.mustChangePassword).toBe(true);
+
+    const status = z.object({ user: userViewSchema });
+    const suspended = await api.post(
+      `/users/${created.user.id}/status`,
+      { status: 'SUSPENDED', reason: 'Live test' },
+      status,
+    );
+    expect(suspended.user.status).toBe('SUSPENDED');
+    const active = await api.post(
+      `/users/${created.user.id}/status`,
+      { status: 'ACTIVE', reason: 'Live test' },
+      status,
+    );
+    expect(active.user.status).toBe('ACTIVE');
+
+    const reset = await api.post(
+      `/users/${created.user.id}/reset-password`,
+      { reason: 'Live test' },
+      temporaryPasswordResponseSchema,
+    );
+    expect(reset.temporaryPassword).not.toBe(created.temporaryPassword);
+    await api.post(`/users/${created.user.id}/revoke-sessions`, { reason: 'Live test' });
+
+    // Leave nothing usable behind.
+    const gone = await api.post(
+      `/users/${created.user.id}/status`,
+      { status: 'DEACTIVATED', reason: 'Live test clean-up' },
+      status,
+    );
+    expect(gone.user.status).toBe('DEACTIVATED');
+    await tab.session.logout();
   });
 });

@@ -1,5 +1,7 @@
 import {
   areaListResponseSchema,
+  roleListResponseSchema,
+  userListResponseSchema,
   webAuthResponseSchema,
   type AreaListResponse,
 } from '@balswasthya/shared-contracts';
@@ -282,5 +284,37 @@ describe('POST /auth/web/* - admin portal browser sessions', () => {
     });
     expect(audit).not.toBeNull();
     expect(JSON.stringify(audit?.details)).not.toMatch(/refresh|token|password/i);
+  });
+});
+
+// ------------------------------------------------------------------- stage PC: user list
+
+describe('GET /users and GET /roles - response contracts used by the portal (stage PC)', () => {
+  it('each user row shows only the CURRENT assignments inside the caller’s areas', async () => {
+    const res = await api(app, await tokenFor(app, 'dadmin1')).get('/users?pageSize=50');
+    expect(res.status).toBe(200);
+    const list = userListResponseSchema.parse(res.body);
+    const byLogin = new Map(list.items.map((item) => [item.loginId, item]));
+
+    // Works in V1 (district 1) and V5 (district 2): only V1 is shown to district admin 1.
+    expect(byLogin.get('ASHABOTH')!.currentAssignments).toEqual([
+      { roleCode: 'ASHA', areaName: 'Area V1', areaNameHi: null, status: 'ACTIVE' },
+    ]);
+    // Suspended assignments are current; revoked and ended ones are not.
+    expect(byLogin.get('ASHASUSP')!.currentAssignments).toEqual([
+      expect.objectContaining({ status: 'SUSPENDED' }),
+    ]);
+    expect(byLogin.has('ASHAREVE')).toBe(false);
+    expect(byLogin.has('ASHAENDED')).toBe(false);
+    // Another district's worker and the caller are not listed at all.
+    expect(byLogin.has('ASHA5')).toBe(false);
+    expect(byLogin.has('DADMIN1')).toBe(false);
+    expect(JSON.stringify(res.body)).not.toMatch(/passwordHash|failedLoginCount|lockedUntil/);
+  });
+
+  it('roles parse with the shared contract', async () => {
+    const res = await api(app, await tokenFor(app, 'stateadmin')).get('/roles');
+    const roles = roleListResponseSchema.parse(res.body).roles;
+    expect(roles.map((r) => r.code)).toContain('ASHA');
   });
 });

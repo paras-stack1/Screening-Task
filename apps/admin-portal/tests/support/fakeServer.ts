@@ -69,7 +69,19 @@ export interface RecordedCall {
   credentials: RequestCredentials | undefined;
   clientHeader: string | null;
   authorization: string | null;
+  /** Parsed JSON body (undefined for none) and query string, for assertions. */
+  body: unknown;
+  search: string;
 }
+
+/** Extra endpoints (tests/support/fakeAdmin.ts). Returns null when the path is not handled. */
+export type ExtraRoute = (request: {
+  method: string;
+  path: string;
+  url: URL;
+  body: unknown;
+  caller: FakeUser | undefined;
+}) => Response | null;
 
 type Failure = 'network' | number;
 
@@ -89,6 +101,7 @@ export class FakeServer {
   private counter = 0;
   /** Access token lifetime in seconds (inside the fake JWT). */
   accessLifetimeSec = 900;
+  extraRoutes: ExtraRoute | null = null;
 
   addUser(user: Omit<FakeUser, 'id'>): FakeUser {
     const full = { ...user, id: `user-${this.users.size + 1}` };
@@ -154,6 +167,8 @@ export class FakeServer {
       credentials: init.credentials,
       clientHeader: headers.get('x-balswasthya-client'),
       authorization: headers.get('authorization'),
+      body: typeof init.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      search: url.search,
     });
 
     const queued = this.failures.get(path);
@@ -170,6 +185,9 @@ export class FakeServer {
     if (path.startsWith('/auth/web/') && headers.get('x-balswasthya-client') !== 'admin-portal') {
       return json(403, error('WEB_CLIENT_REQUIRED'));
     }
+
+    const extra = this.extraRoutes?.({ method, path, url, body: this.calls.at(-1)!.body, caller });
+    if (extra) return extra;
 
     switch (`${method} ${path}`) {
       case 'POST /auth/web/login': {
@@ -225,13 +243,13 @@ export class FakeServer {
   };
 }
 
-function error(code: string, details?: unknown) {
+export function error(code: string, details?: unknown) {
   return {
     error: { code, message: 'synthetic', ...(details !== undefined && { details }), requestId: 'req-test-1' },
   };
 }
 
-function json(status: number, body: unknown): Response {
+export function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 

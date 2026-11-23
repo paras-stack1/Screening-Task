@@ -24,16 +24,6 @@ export function NotAdminPage({ name }: { name: string }) {
   );
 }
 
-export function UsersPlaceholderPage() {
-  const { t } = useI18n();
-  return (
-    <>
-      <h1>{t('users.title')}</h1>
-      <p className="muted">{t('common.comingSoon')}</p>
-    </>
-  );
-}
-
 export function NotFoundPage() {
   const { t } = useI18n();
   return (
