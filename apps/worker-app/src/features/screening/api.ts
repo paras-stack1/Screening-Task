@@ -1,10 +1,12 @@
 import {
+  amendmentQueueResponseSchema,
   screeningDashboardSummarySchema,
   screeningEligibilityResponseSchema,
   screeningListResponseSchema,
   screeningProtocolDetailResponseSchema,
   screeningSessionResponseSchema,
   type AddMeasurementRequest,
+  type CreateAmendmentRequest,
   type CorrectMeasurementRequest,
   type FourDCategoryCode,
   type SaveResponsesRequest,
@@ -69,6 +71,21 @@ export function createScreeningApi(api: ApiClient) {
         body,
         screeningSessionResponseSchema,
       ),
+    /**
+     * Amends a COMPLETED screening (Step 6G): a new version with a mandatory reason; the original
+     * is never changed. Idempotent through clientOperationId; a stale expectedSequence -> 409.
+     */
+    amend: (sessionId: string, body: CreateAmendmentRequest) =>
+      api.post(`${session(sessionId)}/amendments`, body, screeningSessionResponseSchema),
+    /** Medical officer acknowledges a clinically significant amendment (notes optional). */
+    reviewAmendment: (sessionId: string, amendmentId: string, notes?: string) =>
+      api.post(
+        `${session(sessionId)}/amendments/${id(amendmentId)}/review`,
+        notes ? { notes } : {},
+        screeningSessionResponseSchema,
+      ),
+    amendmentQueue: (page: number, options?: RequestOptions) =>
+      api.get(`/screening-amendments?page=${page}&pageSize=20`, amendmentQueueResponseSchema, options),
   };
 }
 

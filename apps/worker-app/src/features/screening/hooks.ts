@@ -24,7 +24,22 @@ export function useScreeningPermissions() {
     loaded: Boolean(me.data),
     canConduct: permissions.includes('screening.conduct'),
     canRead: permissions.includes('child.read'),
+    /** Medical officer: may review amendments of completed screenings (Step 6G). */
+    canReview: permissions.includes('screening.review'),
   };
+}
+
+/** Pending amendments in the medical officer's areas (GET /screening-amendments), 20 per page. */
+export function useAmendmentQueue(enabled = true) {
+  const screening = useScreeningApi();
+  const userId = useUserId();
+  return useInfiniteQuery({
+    queryKey: queryKeys.amendmentQueue(userId),
+    queryFn: ({ pageParam, signal }) => screening.amendmentQueue(pageParam, { signal }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page * last.pageSize < last.total ? last.page + 1 : undefined),
+    enabled: enabled && userId !== 'none',
+  });
 }
 
 /** The caller's own real counts (GET /screenings/summary). */

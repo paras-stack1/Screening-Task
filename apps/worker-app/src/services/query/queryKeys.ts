@@ -26,6 +26,8 @@ export const queryKeys = {
   screeningHistory: (userId: string, childId: string) => [userId, 'screening', 'history', childId] as const,
   screeningSession: (userId: string, sessionId: string) =>
     [userId, 'screening', 'session', sessionId] as const,
+  /** Medical officer's queue of amendments waiting for review (Step 6G-2). */
+  amendmentQueue: (userId: string) => [userId, 'screening', 'amendment-queue'] as const,
   /** Protocol versions are immutable once used, so they may be cached for the app session. */
   screeningProtocol: (userId: string, protocolId: string) =>
     [userId, 'screening-protocol', protocolId] as const,

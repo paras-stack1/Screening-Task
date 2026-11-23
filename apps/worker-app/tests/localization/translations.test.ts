@@ -21,6 +21,9 @@ const NO_DEVANAGARI_EXPECTED = new Set<TranslationKey>([
   'screening.measurement.valueConverted',
   'screening.measurement.meta',
   'screening.summary.measurementLine',
+  // Step 6G-2: "item: old → new" and a measurement value - placeholders and symbols only.
+  'screening.amendments.change',
+  'screening.amendments.measurementValue',
 ]);
 
 describe('translation files', () => {

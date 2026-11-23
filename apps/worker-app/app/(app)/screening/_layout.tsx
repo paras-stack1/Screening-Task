@@ -28,6 +28,8 @@ export default function ScreeningLayout() {
       <Stack.Screen name="[sessionId]/measurements" options={{ title: t('screening.measurement.title') }} />
       <Stack.Screen name="[sessionId]/review" options={{ title: t('screening.review.title') }} />
       <Stack.Screen name="[sessionId]/summary" options={{ title: t('screening.summary.title') }} />
+      <Stack.Screen name="[sessionId]/amend" options={{ title: t('screening.amend.title') }} />
+      <Stack.Screen name="review-queue" options={{ title: t('screening.reviewQueue.title') }} />
       <Stack.Screen name="history/[childId]" options={{ title: t('screening.history.title') }} />
     </Stack>
   );

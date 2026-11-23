@@ -191,4 +191,86 @@ function syntheticName() {
     const summary = await screening.summary();
     expect(summary.completedToday).toBeGreaterThanOrEqual(1);
   });
+
+  // ------------------------------------------------------------ Step 6G-2: amendments
+  it('amends the completed screening as the conducting worker: new version, old -> new, review pending', async () => {
+    const current = (await screening.get(session.id)).session;
+    expect(current).toMatchObject({
+      canAmend: true,
+      amendBasis: 'CONDUCTOR_WITHIN_WINDOW',
+      currentVersion: 1,
+    });
+    expect(current.amendableUntil).not.toBeNull();
+    const category = current.sessionCategories.find((c) => c.status === 'COMPLETED')!;
+    const protocol = (await screening.protocol(category.protocol.id)).protocol;
+    const yesNo = protocol.questions.find((q) => q.answerType === 'YES_NO')!;
+    const before = category.responses.find((r) => r.questionId === yesNo.id);
+
+    const operation = newSubmissionId();
+    const body = {
+      clientOperationId: operation,
+      expectedSequence: 0,
+      reason: 'Synthetic live correction',
+      changes: [
+        {
+          kind: 'RESPONSE' as const,
+          category: category.category,
+          questionId: yesNo.id,
+          status: 'UNKNOWN' as const,
+          source: 'GUARDIAN_REPORTED' as const,
+        },
+      ],
+    };
+    const amended = (await screening.amend(session.id, body)).session;
+    expect(amended.currentVersion).toBe(2);
+    const a = amended.amendments[0]!;
+    expect(a).toMatchObject({
+      sequence: 1,
+      version: 2,
+      basis: 'CONDUCTOR_WITHIN_WINDOW',
+      reason: 'Synthetic live correction',
+      clinicallySignificant: true,
+      reviewStatus: 'PENDING',
+    });
+    expect(a.changes[0]).toMatchObject({
+      kind: 'RESPONSE',
+      oldValue: before ? expect.objectContaining({ status: before.status }) : null,
+      newValue: expect.objectContaining({ status: 'UNKNOWN', source: 'GUARDIAN_REPORTED' }),
+    });
+    const shown = amended.sessionCategories
+      .find((c) => c.category === category.category)!
+      .responses.find((r) => r.questionId === yesNo.id)!;
+    expect(shown).toMatchObject({ status: 'UNKNOWN', amended: true });
+
+    // Retrying the same operation returns the first result; it does not add a version.
+    const replay = (await screening.amend(session.id, body)).session;
+    expect(replay.currentVersion).toBe(2);
+    // A stale sequence is refused instead of silently overwriting.
+    const stale = await screening
+      .amend(session.id, { ...body, clientOperationId: newSubmissionId() })
+      .catch((e: unknown) => e);
+    expect(stale).toMatchObject({ status: 409, code: 'AMENDMENT_CONFLICT' });
+  });
+
+  it('an observations-only amendment needs no medical review', async () => {
+    const current = (await screening.get(session.id)).session;
+    const category = current.sessionCategories[0]!;
+    const amended = (
+      await screening.amend(session.id, {
+        clientOperationId: newSubmissionId(),
+        expectedSequence: current.amendments.length,
+        reason: 'Synthetic note correction',
+        changes: [{ kind: 'CATEGORY_NOTES', category: category.category, notes: 'Synthetic corrected note' }],
+      })
+    ).session;
+    expect(amended.currentVersion).toBe(3);
+    expect(amended.amendments.find((x) => x.sequence === 2)).toMatchObject({
+      clinicallySignificant: false,
+      reviewStatus: 'NOT_REQUIRED',
+    });
+    expect(amended.sessionCategories[0]).toMatchObject({
+      notes: 'Synthetic corrected note',
+      notesAmended: true,
+    });
+  });
 });

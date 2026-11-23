@@ -2,6 +2,7 @@ import type { ScreeningSessionSummary } from '@balswasthya/shared-contracts';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
+  AppButton,
   AppCard,
   AppIcon,
   AppText,
@@ -90,6 +91,16 @@ export default function ScreeningHomeScreen() {
         onPress={() => router.push(screeningRoutes.selectChild)}
         testID="screening-start"
       />
+      {permissions.canReview ? (
+        <AppButton
+          variant="secondary"
+          icon="check-decagram-outline"
+          label={t('screening.home.reviewQueue')}
+          accessibilityHint={t('screening.home.reviewQueueHint')}
+          onPress={() => router.push(screeningRoutes.reviewQueue)}
+          testID="screening-review-queue"
+        />
+      ) : null}
 
       <SectionHeader title={t('screening.home.continueTitle')} />
       {listLoading ? (

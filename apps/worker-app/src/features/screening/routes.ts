@@ -18,4 +18,10 @@ export const screeningRoutes = {
   summary: (sessionId: string) => `/screening/${seg(sessionId)}/summary` as Href,
   history: (childId: string) => `/screening/history/${seg(childId)}` as Href,
   measurements: (sessionId: string) => `/screening/${seg(sessionId)}/measurements` as Href,
+  /** Amend a completed screening (Step 6G-2). */
+  amend: (sessionId: string) => `/screening/${seg(sessionId)}/amend` as Href,
+  /** Summary right after an amendment was saved (shows a confirmation). */
+  summaryAfterAmendment: (sessionId: string) => `/screening/${seg(sessionId)}/summary?amended=1` as Href,
+  /** Medical officer: amendments waiting for review. */
+  reviewQueue: '/screening/review-queue' as Href,
 };

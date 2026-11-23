@@ -44,17 +44,15 @@ import { useTranslation, type TranslationKey } from '../../../../src/localizatio
 import { apiErrorMessageKey } from '../../../../src/services/api/errorMessages';
 import { spacing } from '../../../../src/theme';
 import { measuredAtFor, type MeasurementDateError } from '../../../../src/features/screening/measurementDate';
+import {
+  checkMeasurementValue,
+  MEASUREMENT_MAX_DECIMALS,
+  MEASUREMENT_UNITS,
+} from '../../../../src/features/screening/measurementRules';
 
-/** Mirrors the API's data-entry rules so mistakes show before sending (the API decides). */
-const UNITS: Record<ScreeningMeasurementType, MeasurementUnit[]> = {
-  WEIGHT: ['kg', 'g'],
-  HEIGHT: ['cm', 'mm'],
-  LENGTH: ['cm', 'mm'],
-  MUAC: ['cm', 'mm'],
-  HEAD_CIRCUMFERENCE: ['cm', 'mm'],
-};
-const MAX_DECIMALS: Record<MeasurementUnit, number> = { kg: 2, g: 0, cm: 1, mm: 0 };
-const DECIMAL = /^(0|[1-9]\d{0,5})(\.\d{1,3})?$/;
+/** Data-entry rules shared with the amendment screen (src/features/screening/measurementRules.ts). */
+const UNITS = MEASUREMENT_UNITS;
+const MAX_DECIMALS = MEASUREMENT_MAX_DECIMALS;
 
 type Source = (typeof MEASUREMENT_SOURCES)[number];
 type Quality = (typeof MEASUREMENT_QUALITIES)[number];
@@ -102,11 +100,8 @@ const FORM_ERRORS: Record<FormError, TranslationKey> = {
 
 function validate(form: Form, correcting: boolean): FormError | null {
   if (!form.type) return 'type';
-  if (!form.unit || !UNITS[form.type].includes(form.unit)) return 'unit';
-  const value = form.value.trim();
-  if (!DECIMAL.test(value)) return 'value';
-  const decimals = value.includes('.') ? value.split('.')[1]!.length : 0;
-  if (decimals > MAX_DECIMALS[form.unit]) return 'decimals';
+  const valueError = checkMeasurementValue(form.type, form.unit, form.value);
+  if (valueError) return valueError;
   if (!form.source) return 'source';
   if (!form.quality) return 'quality';
   if (correcting && form.correctionReason.trim().length < 3) return 'reason';

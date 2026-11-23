@@ -1,13 +1,11 @@
 import type {
   ScreeningMeasurementType,
   ScreeningProtocolDetail,
-  ScreeningQuestion,
-  ScreeningResponse,
   ScreeningSessionDetail,
 } from '@balswasthya/shared-contracts';
 import { StyleSheet, View } from 'react-native';
 import { AppCard, AppText, InlineAlert, SectionHeader, StatusBadge } from '../../../components';
-import { useTranslation, type TranslateFn, type TranslationKey } from '../../../localization';
+import { useTranslation, type TranslationKey } from '../../../localization';
 import { spacing } from '../../../theme';
 import { formatIndiaDate } from '../../children/labels';
 import {
@@ -17,37 +15,11 @@ import {
   MEASUREMENT_SOURCE_KEYS,
   MEASUREMENT_TYPE_KEYS,
 } from '../labels';
+import { answerText } from '../answerText';
+import { AmendmentHistory } from './AmendmentHistory';
 import { DemoContentBanner, NotADiagnosisNote, screeningAgeText } from './ScreeningParts';
 
-/** The recorded answer in plain words. Unknown / not assessed are shown as such, never as "No". */
-export function answerText(
-  t: TranslateFn,
-  language: string,
-  question: ScreeningQuestion,
-  response: ScreeningResponse,
-): string {
-  if (response.status !== 'ANSWERED') {
-    const state = t(`screening.question.state.${response.status}` as TranslationKey);
-    return response.notAssessedReason ? `${state} – ${response.notAssessedReason}` : state;
-  }
-  const value = response.value;
-  const option = (code: string) => {
-    const found = question.options?.find((o) => o.code === code);
-    return found ? localized(found.label, language) : code;
-  };
-  switch (question.answerType) {
-    case 'YES_NO':
-      return t(value ? 'screening.question.yes' : 'screening.question.no');
-    case 'NUMBER':
-      return question.validation?.unit ? `${String(value)} ${question.validation.unit}` : String(value);
-    case 'SINGLE_CHOICE':
-      return option(String(value));
-    case 'MULTI_CHOICE':
-      return (Array.isArray(value) ? value : []).map(option).join(', ');
-    case 'TEXT':
-      return String(value);
-  }
-}
+export { answerText } from '../answerText';
 
 const SOURCE_KEYS: Record<string, TranslationKey> = {
   WORKER_OBSERVED: 'screening.question.sourceWorker',
@@ -142,6 +114,11 @@ export function SessionSummary({ session: s, protocols }: SessionSummaryProps) {
                     {t(SOURCE_KEYS[r.source] ?? 'screening.question.source')}
                     {r.notes ? ` · ${r.notes}` : ''}
                   </AppText>
+                  {r.amended ? (
+                    <View testID={`summary-amended-${c.category}-${r.questionCode}`}>
+                      <StatusBadge label={t('screening.amended')} tone="info" icon="pencil-outline" />
+                    </View>
+                  ) : null}
                 </View>
               );
             })}
@@ -149,6 +126,11 @@ export function SessionSummary({ session: s, protocols }: SessionSummaryProps) {
               <AppText variant="bodySmall" testID={`summary-notes-${c.category}`}>
                 {t('screening.summary.workerNotes', { notes: c.notes })}
               </AppText>
+            ) : null}
+            {c.notesAmended ? (
+              <View testID={`summary-notes-amended-${c.category}`}>
+                <StatusBadge label={t('screening.amended')} tone="info" icon="pencil-outline" />
+              </View>
             ) : null}
           </AppCard>
         );
@@ -169,17 +151,24 @@ export function SessionSummary({ session: s, protocols }: SessionSummaryProps) {
         <AppText color="textSecondary">{t('screening.measurement.none')}</AppText>
       ) : (
         current.map((m) => (
-          <AppText key={m.id} variant="body" testID={`summary-measurement-${m.id}`}>
-            {t('screening.summary.measurementLine', {
-              type: t(
-                MEASUREMENT_TYPE_KEYS[m.type as ScreeningMeasurementType] ?? 'screening.measurement.title',
-              ),
-              value: m.value,
-              unit: m.unit,
-              source: t(MEASUREMENT_SOURCE_KEYS[m.source as keyof typeof MEASUREMENT_SOURCE_KEYS]),
-              quality: t(MEASUREMENT_QUALITY_KEYS[m.quality as keyof typeof MEASUREMENT_QUALITY_KEYS]),
-            })}
-          </AppText>
+          <View key={m.id} style={styles.answer}>
+            <AppText variant="body" testID={`summary-measurement-${m.id}`}>
+              {t('screening.summary.measurementLine', {
+                type: t(
+                  MEASUREMENT_TYPE_KEYS[m.type as ScreeningMeasurementType] ?? 'screening.measurement.title',
+                ),
+                value: m.value,
+                unit: m.unit,
+                source: t(MEASUREMENT_SOURCE_KEYS[m.source as keyof typeof MEASUREMENT_SOURCE_KEYS]),
+                quality: t(MEASUREMENT_QUALITY_KEYS[m.quality as keyof typeof MEASUREMENT_QUALITY_KEYS]),
+              })}
+            </AppText>
+            {m.amended ? (
+              <View testID={`summary-measurement-amended-${m.id}`}>
+                <StatusBadge label={t('screening.amended')} tone="info" icon="pencil-outline" />
+              </View>
+            ) : null}
+          </View>
         ))
       )}
       {corrected > 0 ? (
@@ -187,6 +176,7 @@ export function SessionSummary({ session: s, protocols }: SessionSummaryProps) {
           {t('screening.summary.correctedCount', { count: corrected })}
         </AppText>
       ) : null}
+      <AmendmentHistory session={s} protocols={protocols} />
       <NotADiagnosisNote />
     </View>
   );

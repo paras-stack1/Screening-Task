@@ -1,12 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
+import type { ScreeningSessionDetail } from '@balswasthya/shared-contracts';
 import {
   AppButton,
+  AppText,
   ErrorState,
+  InlineAlert,
   LoadingIndicator,
   PrimaryButton,
   ScreenContainer,
 } from '../../../../src/components';
+import { formatIndiaDateTime } from '../../../../src/features/children/labels';
 import { SessionSummary } from '../../../../src/features/screening/components/SessionSummary';
 import { useSessionWithProtocols } from '../../../../src/features/screening/hooks';
 import { screeningRoutes } from '../../../../src/features/screening/routes';
@@ -20,7 +24,7 @@ import { spacing } from '../../../../src/theme';
  * incomplete and not assessed; measurements. Read-only. Never a diagnosis or a recommendation.
  */
 export default function ScreeningSummaryScreen() {
-  const { sessionId = '' } = useLocalSearchParams<{ sessionId: string }>();
+  const { sessionId = '', amended } = useLocalSearchParams<{ sessionId: string; amended?: string }>();
   const { t } = useTranslation();
   const router = useRouter();
   const { session, protocols, isError, error, retry } = useSessionWithProtocols(sessionId);
@@ -46,7 +50,15 @@ export default function ScreeningSummaryScreen() {
 
   return (
     <ScreenContainer edges={['left', 'right']} testID="screening-summary">
+      {amended === '1' && session.currentVersion > 1 ? (
+        <InlineAlert
+          tone="info"
+          message={t('screening.amend.saved', { version: session.currentVersion })}
+          testID="summary-amendment-saved"
+        />
+      ) : null}
       <SessionSummary session={session} protocols={protocols} />
+      <AmendmentEntry session={session} onAmend={() => router.push(screeningRoutes.amend(session.id))} />
       <View style={styles.actions}>
         {session.canEdit ? (
           <PrimaryButton
@@ -72,6 +84,37 @@ export default function ScreeningSummaryScreen() {
         />
       </View>
     </ScreenContainer>
+  );
+}
+
+/**
+ * Step 6G-2: who may amend this completed screening, and until when. The API decides (canAmend,
+ * amendBasis, amendableUntil); this only explains it. The worker who did the screening sees when
+ * their 7 days end, or that they have ended.
+ */
+function AmendmentEntry({ session, onAmend }: { session: ScreeningSessionDetail; onAmend: () => void }) {
+  const { t } = useTranslation();
+  if (session.status !== 'COMPLETED') return null;
+  if (!session.canAmend) {
+    return session.isMine ? (
+      <InlineAlert tone="info" message={t('screening.amend.windowClosed')} testID="summary-amend-closed" />
+    ) : null;
+  }
+  return (
+    <View style={styles.actions} testID="summary-amend">
+      <AppText variant="bodySmall" color="textSecondary" testID="summary-amend-window">
+        {session.amendBasis === 'CONDUCTOR_WITHIN_WINDOW' && session.amendableUntil
+          ? t('screening.amend.untilConductor', { date: formatIndiaDateTime(session.amendableUntil) })
+          : t('screening.amend.asMedicalOfficer')}
+      </AppText>
+      <AppButton
+        variant="secondary"
+        icon="pencil-outline"
+        label={t('screening.amend.open')}
+        onPress={onAmend}
+        testID="summary-amend-open"
+      />
+    </View>
   );
 }
 

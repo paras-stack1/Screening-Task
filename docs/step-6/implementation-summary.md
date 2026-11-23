@@ -228,7 +228,7 @@ npm run db:protocol-status -- --code <CODE> --version 1 --to IN_REVIEW --actor <
 | End to end against the real API | `npm run db:dev-live-worker` (dev only, synthetic ASHA worker, password from the environment, audited) and the opt-in `tests/live/liveScreening.test.ts`: sign in → register → consent → eligibility → start (idempotent) → answer with a note → finish → measurement and correction → stale version refused → complete twice → history and counts | **8/8 passed** against the running API and the dev database on 2026-11-23 |
 | Free-text encryption | Text answers, answer notes, not-assessed reasons, area notes, measurement notes and correction reasons, cancel reasons: AES-256-GCM (existing PII key), stored as `enc1:…`, bound to session and field; no key → 503 | 4 unit + 4 DB tests (stored rows hold only ciphertext; a moved value is refused; no key → 503); mutation (store plaintext) caught by all 4; the dev DB row from the live run is `enc1:` |
 | Measurement date | "When was it measured?" for values from a card or a guardian; real date, not future (India date), not before birth; stored as the start of that day (no invented time) | `tests/screening/measurementDate.test.ts` (9) + a screen test |
-| Amendments | **Not started**: waiting for the programme's answers (who may amend, time limit, approval) | - |
+| Amendments | Done later in stage 6G (section 25) | - |
 
 Bugs found and fixed in 6F: S6-006 (importer file paths), S6-007 (duplicate codes not reported
 alongside other errors). No database migration was needed (no free text existed in the dev
@@ -236,3 +236,18 @@ database: verified 0 rows before the change).
 
 **Stop condition:** Step 6 (including 6F) is finished. Step 7, AI integration and referrals have
 not been started. Waiting for explicit approval.
+
+## 25. Stage 6G - amending completed screenings (2026-11-23)
+
+Rules agreed with the programme: the conducting worker (7 x 24 hours) and medical officers
+(`screening.review`, any time); no separate approval but a mandatory reason; the original is never
+changed; every amendment is a new version with old and new values, who, when and why; clinically
+significant changes wait for medical officer review; referrals made from an earlier version are
+flagged for reassessment. Design: [amendment-design.md](amendment-design.md).
+
+| Stage | Content | Evidence |
+|---|---|---|
+| 6G-1 (commit `9324319`) | Additive migration (amendments, changes, referral flags; append-only triggers), API (amend, review, queue), overlay model | API/DB tests for permissions, the 7-day limit, versioning, concurrency, audit |
+| 6G-2 | Worker-app screens: amend entry and window on the summary, Amended badges, amendment history with old -> new, amend screen, medical officer review queue and review | 16 screen + 9 unit tests; mutation checks; live 10/10 against the real API (test database) |
+
+The admin web portal (docs/admin-portal) was built between 6G-1 and 6G-2 at the programme's request.

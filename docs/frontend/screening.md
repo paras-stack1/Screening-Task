@@ -16,6 +16,8 @@
 | `/screening/:sessionId/review` | Review and complete (6E) | Observations-only summary, incomplete-area warning, Complete disabled until one area is finished, confirmation dialog, one request on double tap; then the summary |
 | `/screening/:sessionId/summary` | Summary / details (6E) | Who, when, status (cancel reason), per-area answers with source and notes, incomplete and not-assessed areas, current measurements, number of corrections, and "no approved rules, so no result or recommendation" |
 | `/screening/history/:childId` | History (6E) | Newest first, 20 per page; completed and cancelled open the summary, the worker's own unfinished ones open the session |
+| `/screening/:sessionId/amend` | Amend a completed screening (6G-2) | Change answers (also answer a question left unanswered), measurements and area observations; a reason (3-500 characters) and a confirmation; everything is sent as ONE amendment = one new version. Leave warning while unsaved |
+| `/screening/review-queue` | Amendments to review (6G-2) | Medical officers (`screening.review`) only: pending amendments in their areas; each opens the summary |
 
 The hub also has **Review and complete**, **Cancel this screening** (a reason of 3+ characters and a
 confirmation; the record is kept as CANCELLED), and **View summary** once closed. The child profile
@@ -76,6 +78,32 @@ Screening is online-only. Requests pause while offline, and the offline banner e
 screening data is written to device storage (TanStack Query cache in memory only, cleared on
 sign-out). Server drafts let the worker resume later from the screening home.
 
+## Amendments of completed screenings (Step 6G-2)
+
+Design and rules: [../step-6/amendment-design.md](../step-6/amendment-design.md). The API decides who
+may amend (`canAmend`, `amendBasis`, `amendableUntil`); the app only explains it.
+
+- **Summary:** "Amend this screening" when allowed, with "you can correct it until DD/MM/YYYY HH:MM"
+  (India time) for the conducting worker or "as a medical officer you can correct it at any
+  time". The conducting worker whose 7 days have ended is told to ask a medical officer. After a
+  save, "saved as version N".
+- **Current values** carry an **Amended** badge (answers, area observations, measurements). The
+  **Amendment history** lists every version, newest first: who, when, basis, reason, each change
+  as "old -> new" ("not answered" / "none" stay visible), and the review status: "No medical
+  review needed (observations only)", "Waiting for medical officer review", or "Reviewed by ...
+  on ..." with notes and "self-reviewed".
+- **Amend screen:** every question of the areas that were started (an area that was never started
+  needs a new screening), the current measurements and the area observations, each with
+  "Change" / "Undo". An answer cannot be removed (use Unknown / Not assessed). A measurement keeps
+  its original time unless its source changes to a card or the guardian (then the date is
+  required, India day start). Edits stay in memory only.
+- **Saving:** one request with a `clientOperationId` (kept for identical content, so a retry after
+  a lost response is safe) and `expectedSequence`. If someone else amended meanwhile (409
+  `AMENDMENT_CONFLICT`), the screen explains it, reloads, keeps the edits, and the next save uses
+  the new sequence.
+- **Medical officer:** "Amendments to review" on the screening home, and "Mark as reviewed" (optional
+  notes, explicit confirm) on pending amendments in the summary.
+
 ## Tests
 
 - `tests/screening/answerDraft.test.ts`: answer logic. Unknown never carries a value; only changes
@@ -86,7 +114,18 @@ sign-out). Server drafts let the worker resume later from the screening home.
   source required, finishing rules, version conflict keeps answers, network failure, leave
   warning, accessible radios and checkboxes, measurement precision, plausibility message,
   correction history, expired token refresh.
-- Fake API: `tests/support/fakeScreening.ts`, validated with the real shared contracts.
+- `tests/screens/amendments.test.tsx` (16, Step 6G-2): who may amend (conductor window, closed
+  window, other worker, medical officer, direct URL refused), exact amendment request, version and
+  Amended badge, old -> new history, answering an unanswered question, notes-only = no review,
+  measurement change, card date required, no change / no reason refused, conflict reload and
+  resave with a new operation id, leave warning, medical officer queue and review, queue hidden
+  from workers, empty queue.
+- `tests/screening/amendDraft.test.ts` (9): change building, removing an answer refused,
+  measurement time and card date, precision, future / before-birth dates, notes removal, reason
+  length, India date-time.
+- Fake API: `tests/support/fakeScreening.ts`, validated with the real shared contracts (6G-2: its
+  ids are now valid RFC 4122 UUIDs - the old `c000` variant was rejected by the strict amendment
+  contract).
 - Mutation checks (2026-11-22): removing the source rule, the leave guard, the consent gate on
   Start, or sending a value with Unknown each made a test fail.
 

@@ -7,11 +7,15 @@ import {
   formatCalendarDate,
   parseCalendarDate,
   saveResponsesRequestSchema,
+  createAmendmentRequestSchema,
+  reviewAmendmentRequestSchema,
   startCategoryRequestSchema,
   startScreeningRequestSchema,
   todayInIndia,
   updateCategoryRequestSchema,
+  type AmendmentChange,
   type AnswerType,
+  type ScreeningAmendment,
   type FourDCategoryCode,
   type ScreeningProtocolDetail,
   type ScreeningResponse,
@@ -109,6 +113,7 @@ interface Category {
   category: FourDCategoryCode;
   status: 'IN_PROGRESS' | 'COMPLETED';
   notes: string | null;
+  notesAmended?: boolean;
   startedAt: string;
   completedAt: string | null;
   responses: ScreeningResponse[];
@@ -126,6 +131,11 @@ interface Measurement {
   recordedAt: string;
   supersedesId: string | null;
   correctionReason: string | null;
+  amended?: boolean;
+}
+interface FakeAmendment extends ScreeningAmendment {
+  clientOperationId: string;
+  amendedById: string;
 }
 interface Session {
   id: string;
@@ -144,6 +154,7 @@ interface Session {
   dobEstimated: boolean;
   categories: Category[];
   measurements: Measurement[];
+  amendments: FakeAmendment[];
 }
 
 const UNITS: Record<string, string[]> = {
@@ -165,7 +176,7 @@ export function createFakeScreening(children: FakeChildren) {
   let seq = 0;
   let clock = NOW;
   const tick = () => new Date((clock += 1000)).toISOString();
-  const uuid = () => `00000000-0000-4000-c000-${String((seq += 1)).padStart(12, '0')}`;
+  const uuid = () => `00000000-0000-4000-8c00-${String((seq += 1)).padStart(12, '0')}`;
   let approved = false;
   let protocols = FOUR_D_CATEGORIES.map((c, i) => protocolFor(c, i, approved));
   const sessions = new Map<string, Session>();
@@ -185,7 +196,18 @@ export function createFakeScreening(children: FakeChildren) {
     return { child, days: ageInDaysOn(birth, today), age: ageOn(birth, today) };
   }
 
-  function detail(s: Session, userId: string): ScreeningSessionDetail {
+  const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+  /** Who may amend (decision G4 / G3): the conductor within 7 x 24 h, or screening.review. */
+  function amendBasisFor(s: Session, userId: string, permissions: readonly string[]) {
+    if (s.status !== 'COMPLETED' || !s.completedAt) return null;
+    if (s.ownerId === userId && clock < Date.parse(s.completedAt) + WINDOW_MS)
+      return 'CONDUCTOR_WITHIN_WINDOW' as const;
+    if (permissions.includes('screening.review')) return 'MEDICAL_OFFICER' as const;
+    return null;
+  }
+
+  function detail(s: Session, userId: string, permissions: readonly string[] = []): ScreeningSessionDetail {
+    const basis = amendBasisFor(s, userId, permissions);
     const child = children.children.get(s.childId)!;
     const birth = parseCalendarDate(s.dob)!;
     const started = new Set(s.categories.map((c) => c.category));
@@ -225,7 +247,7 @@ export function createFakeScreening(children: FakeChildren) {
           protocolStatusAtStart: p.status,
           usedApprovedContent: approved,
           notes: c.notes,
-          notesAmended: false,
+          notesAmended: c.notesAmended ?? false,
           startedAt: c.startedAt,
           completedAt: c.completedAt,
           completeness: {
@@ -253,16 +275,19 @@ export function createFakeScreening(children: FakeChildren) {
           recordedByName: s.ownerName,
           converted: { value: String(Number((Number(m.value) * factor).toFixed(4))), unit },
           isCurrent: !s.measurements.some((x) => x.supersedesId === m.id),
-          amended: false,
+          amended: m.amended ?? false,
         };
       }),
       screeningRulesApplied: false,
-      currentVersion: 1,
-      amendments: [],
-      canAmend: false,
-      amendBasis: null,
-      amendableUntil: null,
-      canReviewAmendments: false,
+      currentVersion: 1 + s.amendments.length,
+      amendments: s.amendments.map(({ clientOperationId: _op, amendedById: _by, ...a }) => a),
+      canAmend: basis !== null,
+      amendBasis: basis,
+      amendableUntil:
+        basis === 'CONDUCTOR_WITHIN_WINDOW' && s.completedAt
+          ? new Date(Date.parse(s.completedAt) + WINDOW_MS).toISOString()
+          : null,
+      canReviewAmendments: permissions.includes('screening.review'),
     };
   }
 
@@ -377,6 +402,26 @@ export function createFakeScreening(children: FakeChildren) {
         .map((s) => listItem(s, user.id));
       return ok(200, { items: all.slice((page - 1) * 20, page * 20), page, pageSize: 20, total: all.length });
     }
+    if (method === 'GET' && path === '/screening-amendments') {
+      if (!user.permissions.includes('screening.review')) return err(403, 'FORBIDDEN');
+      const items = [...sessions.values()].flatMap((x) =>
+        x.amendments
+          .filter((a) => a.reviewStatus === 'PENDING')
+          .map((a) => ({
+            amendmentId: a.id,
+            sessionId: x.id,
+            childId: x.childId,
+            childName: children.children.get(x.childId)!.fullName,
+            sequence: a.sequence,
+            amendedAt: a.amendedAt,
+            amendedByName: a.amendedByName,
+            basis: a.basis,
+            changeCount: a.changes.length,
+          })),
+      );
+      return ok(200, { items, page: 1, pageSize: 20, total: items.length });
+    }
+
     if (!path!.startsWith('/screenings')) return null;
 
     if (method === 'GET' && path === '/screenings/summary') {
@@ -423,9 +468,10 @@ export function createFakeScreening(children: FakeChildren) {
         dobEstimated: child.dobIsEstimated,
         categories: [],
         measurements: [],
+        amendments: [],
       };
       sessions.set(s.id, s);
-      return ok(201, { session: detail(s, user.id) });
+      return ok(201, { session: detail(s, user.id, user.permissions) });
     }
 
     const sm = /^\/screenings\/([^/]+)(\/.*)?$/.exec(path!);
@@ -435,7 +481,155 @@ export function createFakeScreening(children: FakeChildren) {
     if (!read || (method !== 'GET' && !conduct)) return err(403, 'FORBIDDEN');
     if (!s) return err(404, 'NOT_FOUND');
 
-    if (method === 'GET' && rest === '') return ok(200, { session: detail(s, user.id) });
+    if (method === 'GET' && rest === '') return ok(200, { session: detail(s, user.id, user.permissions) });
+
+    if (method === 'POST' && rest === '/amendments') {
+      const parsed = createAmendmentRequestSchema.safeParse(rawBody);
+      if (!parsed.success) return err(400, 'VALIDATION_ERROR');
+      const body = parsed.data;
+      const replay = s.amendments.find((a) => a.clientOperationId === body.clientOperationId);
+      if (replay) return ok(200, { session: detail(s, user.id, user.permissions) });
+      if (s.status !== 'COMPLETED') return err(409, 'SESSION_NOT_COMPLETED');
+      const basis = amendBasisFor(s, user.id, user.permissions);
+      if (!basis) return err(403, 'AMENDMENT_NOT_ALLOWED');
+      if (body.expectedSequence !== s.amendments.length) return err(409, 'AMENDMENT_CONFLICT');
+      const changes: AmendmentChange[] = [];
+      const record = (r: ScreeningResponse | undefined) =>
+        r
+          ? {
+              status: r.status,
+              source: r.source,
+              value: r.value,
+              notAssessedReason: r.notAssessedReason,
+              notes: r.notes,
+            }
+          : null;
+      for (const c of body.changes) {
+        if (c.kind === 'RESPONSE') {
+          const cat = s.categories.find((x) => x.category === c.category);
+          if (!cat) return err(422, 'CATEGORY_NOT_IN_SCREENING');
+          const q = protocolOf(c.category).questions.find((x) => x.id === c.questionId);
+          if (!q) return err(422, 'QUESTION_NOT_IN_PROTOCOL');
+          const before = cat.responses.find((r) => r.questionId === q.id);
+          const next = {
+            status: c.status,
+            source: c.source,
+            value: c.value ?? null,
+            notAssessedReason: c.notAssessedReason ?? null,
+            notes: c.notes ?? null,
+          };
+          if (JSON.stringify(record(before)) === JSON.stringify(next)) continue;
+          changes.push({
+            kind: 'RESPONSE',
+            category: c.category,
+            questionId: q.id,
+            questionCode: q.code,
+            measurementId: null,
+            oldValue: record(before),
+            newValue: next,
+            clinicallySignificant: true,
+          });
+          const updated: ScreeningResponse = {
+            id: before?.id ?? uuid(),
+            questionId: q.id,
+            questionCode: q.code,
+            ...next,
+            recordedAt: before?.recordedAt ?? tick(),
+            updatedAt: tick(),
+            recordedByName: before?.recordedByName ?? user.name,
+            amended: true,
+          };
+          cat.responses = [...cat.responses.filter((r) => r.questionId !== q.id), updated];
+        } else if (c.kind === 'MEASUREMENT') {
+          const m = s.measurements.find((x) => x.id === c.measurementId);
+          if (!m) return err(422, 'MEASUREMENT_NOT_IN_SCREENING');
+          if (s.measurements.some((x) => x.supersedesId === m.id))
+            return err(409, 'MEASUREMENT_ALREADY_CORRECTED');
+          const old = {
+            value: m.value,
+            unit: m.unit,
+            source: m.source,
+            quality: m.quality,
+            measuredAt: m.measuredAt,
+            notes: m.notes,
+          };
+          const next = {
+            value: c.value,
+            unit: c.unit,
+            source: c.source,
+            quality: c.quality,
+            measuredAt: c.measuredAt,
+            notes: c.notes ?? null,
+          };
+          if (JSON.stringify(old) === JSON.stringify(next)) continue;
+          changes.push({
+            kind: 'MEASUREMENT',
+            category: null,
+            questionId: null,
+            questionCode: null,
+            measurementId: m.id,
+            oldValue: old,
+            newValue: next,
+            clinicallySignificant: true,
+          });
+          Object.assign(m, next, { amended: true });
+        } else {
+          const cat = s.categories.find((x) => x.category === c.category);
+          if (!cat) return err(422, 'CATEGORY_NOT_IN_SCREENING');
+          if ((cat.notes ?? null) === c.notes) continue;
+          changes.push({
+            kind: 'CATEGORY_NOTES',
+            category: c.category,
+            questionId: null,
+            questionCode: null,
+            measurementId: null,
+            oldValue: { notes: cat.notes },
+            newValue: { notes: c.notes },
+            clinicallySignificant: false,
+          });
+          cat.notes = c.notes;
+          cat.notesAmended = true;
+        }
+      }
+      if (changes.length === 0) return err(422, 'AMENDMENT_UNCHANGED');
+      const significant = changes.some((c) => c.clinicallySignificant);
+      s.amendments.push({
+        id: uuid(),
+        sequence: s.amendments.length + 1,
+        version: s.amendments.length + 2,
+        amendedAt: tick(),
+        amendedByName: user.name,
+        amendedById: user.id,
+        clientOperationId: body.clientOperationId,
+        basis,
+        reason: body.reason,
+        clinicallySignificant: significant,
+        reviewStatus: significant ? 'PENDING' : 'NOT_REQUIRED',
+        reviewedByName: null,
+        reviewedAt: null,
+        reviewNotes: null,
+        selfReviewed: false,
+        referralsFlagged: 0,
+        changes,
+      });
+      return ok(201, { session: detail(s, user.id, user.permissions) });
+    }
+
+    let am: RegExpExecArray | null;
+    if (method === 'POST' && (am = /^\/amendments\/([^/]+)\/review$/.exec(rest))) {
+      if (!user.permissions.includes('screening.review')) return err(403, 'FORBIDDEN');
+      const parsed = reviewAmendmentRequestSchema.safeParse(rawBody);
+      if (!parsed.success) return err(400, 'VALIDATION_ERROR');
+      const a = s.amendments.find((x) => x.id === am![1]);
+      if (!a) return err(404, 'NOT_FOUND');
+      if (a.reviewStatus !== 'PENDING') return err(409, 'AMENDMENT_NOT_PENDING');
+      a.reviewStatus = 'REVIEWED';
+      a.reviewedByName = user.name;
+      a.reviewedAt = tick();
+      a.reviewNotes = parsed.data.notes ?? null;
+      a.selfReviewed = a.amendedById === user.id;
+      return ok(200, { session: detail(s, user.id, user.permissions) });
+    }
 
     if (method === 'POST' && rest === '/categories') {
       const parsed = startCategoryRequestSchema.safeParse(rawBody);
@@ -455,7 +649,7 @@ export function createFakeScreening(children: FakeChildren) {
         responses: [],
       });
       touched(s);
-      return ok(201, { session: detail(s, user.id) });
+      return ok(201, { session: detail(s, user.id, user.permissions) });
     }
 
     const cm = /^\/categories\/([A-Z_]+)(\/responses)?$/.exec(rest);
@@ -503,7 +697,7 @@ export function createFakeScreening(children: FakeChildren) {
         }
         cat.responses = cat.responses.filter((x) => !parsed.data.cleared.includes(x.questionId));
         touched(s);
-        return ok(200, { session: detail(s, user.id) });
+        return ok(200, { session: detail(s, user.id, user.permissions) });
       }
       if (method === 'PATCH' && !cm[2]) {
         const parsed = updateCategoryRequestSchema.safeParse(rawBody);
@@ -525,21 +719,22 @@ export function createFakeScreening(children: FakeChildren) {
         }
         if (parsed.data.notes !== undefined) cat.notes = parsed.data.notes;
         touched(s);
-        return ok(200, { session: detail(s, user.id) });
+        return ok(200, { session: detail(s, user.id, user.permissions) });
       }
     }
 
     if (method === 'POST' && rest === '/complete') {
       const body = rawBody as { expectedVersion?: number };
       // Idempotent: completing again returns the original completion.
-      if (s.status === 'COMPLETED' && s.ownerId === user.id) return ok(200, { session: detail(s, user.id) });
+      if (s.status === 'COMPLETED' && s.ownerId === user.id)
+        return ok(200, { session: detail(s, user.id, user.permissions) });
       const blocked = guard(s, user.id, Number(body.expectedVersion));
       if (blocked) return blocked;
       if (!s.categories.some((c) => c.status === 'COMPLETED')) return err(422, 'NO_COMPLETED_CATEGORY');
       s.status = 'COMPLETED';
       s.completedAt = tick();
       s.version += 1;
-      return ok(200, { session: detail(s, user.id) });
+      return ok(200, { session: detail(s, user.id, user.permissions) });
     }
     if (method === 'POST' && rest === '/cancel') {
       const body = rawBody as { expectedVersion?: number; reason?: string };
@@ -550,7 +745,7 @@ export function createFakeScreening(children: FakeChildren) {
       s.cancelledAt = tick();
       s.cancelReason = body.reason.trim();
       s.version += 1;
-      return ok(200, { session: detail(s, user.id) });
+      return ok(200, { session: detail(s, user.id, user.permissions) });
     }
 
     const mm = /^\/measurements(?:\/([^/]+)\/corrections)?$/.exec(rest);
@@ -589,7 +784,7 @@ export function createFakeScreening(children: FakeChildren) {
         correctionReason: 'correctionReason' in body ? body.correctionReason : null,
       });
       touched(s);
-      return ok(201, { session: detail(s, user.id) });
+      return ok(201, { session: detail(s, user.id, user.permissions) });
     }
     return err(404, 'NOT_FOUND');
   }
@@ -644,6 +839,61 @@ export function createFakeScreening(children: FakeChildren) {
       s.status = 'IN_PROGRESS';
       s.version += 1;
     },
+    /** Marks a session COMPLETED now (after finishCategory); its 7-day amendment window starts. */
+    complete(sessionId: string) {
+      const s = sessions.get(sessionId)!;
+      s.status = 'COMPLETED';
+      s.completedAt = tick();
+      s.version += 1;
+    },
+    /** Moves the completion back in time (e.g. past the conductor's 7-day window). */
+    completedAgo(sessionId: string, ms: number) {
+      const s = sessions.get(sessionId)!;
+      s.completedAt = new Date(clock - ms).toISOString();
+    },
+    /** Adds a measured-now value to a session (synthetic). */
+    seedMeasurement(sessionId: string, type = 'WEIGHT', value = '12.5', unit = 'kg') {
+      const s = sessions.get(sessionId)!;
+      const m: Measurement = {
+        id: uuid(),
+        type,
+        value,
+        unit,
+        source: 'MEASURED',
+        quality: 'RELIABLE',
+        deviceMake: null,
+        notes: null,
+        measuredAt: tick(),
+        recordedAt: tick(),
+        supersedesId: null,
+        correctionReason: null,
+      };
+      s.measurements.push(m);
+      return m;
+    },
+    /** Simulates another user amending the session meanwhile (bumps the amendment sequence). */
+    amendedElsewhere(sessionId: string) {
+      const s = sessions.get(sessionId)!;
+      s.amendments.push({
+        id: uuid(),
+        sequence: s.amendments.length + 1,
+        version: s.amendments.length + 2,
+        amendedAt: tick(),
+        amendedByName: 'Other Medical Officer',
+        amendedById: 'other-mo',
+        clientOperationId: uuid(),
+        basis: 'MEDICAL_OFFICER',
+        reason: 'Synthetic correction elsewhere',
+        clinicallySignificant: false,
+        reviewStatus: 'NOT_REQUIRED',
+        reviewedByName: null,
+        reviewedAt: null,
+        reviewNotes: null,
+        selfReviewed: false,
+        referralsFlagged: 0,
+        changes: [],
+      });
+    },
     /** Starts a category without finishing it. */
     startCategory(sessionId: string, category: FourDCategoryCode) {
       const s = sessions.get(sessionId)!;
@@ -677,6 +927,7 @@ export function createFakeScreening(children: FakeChildren) {
         dobEstimated: child.dobIsEstimated,
         categories: [],
         measurements: [],
+        amendments: [],
       };
       sessions.set(s.id, s);
       return s;

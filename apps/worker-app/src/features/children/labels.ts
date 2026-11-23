@@ -25,6 +25,18 @@ export function formatIndiaDate(isoTimestamp: string): string {
   return `${pad(date.day)}/${pad(date.month)}/${date.year}`;
 }
 
+/**
+ * An ISO timestamp as date and time in India, "DD/MM/YYYY HH:MM" (24-hour). India has no daylight
+ * saving, so a fixed +05:30 offset is exact. Used where the time matters (e.g. the 7-day limit for
+ * correcting a screening).
+ */
+export function formatIndiaDateTime(isoTimestamp: string): string {
+  const shifted = new Date(new Date(isoTimestamp).getTime() + (5 * 60 + 30) * 60_000);
+  return `${pad(shifted.getUTCDate())}/${pad(shifted.getUTCMonth() + 1)}/${shifted.getUTCFullYear()} ${pad(
+    shifted.getUTCHours(),
+  )}:${pad(shifted.getUTCMinutes())}`;
+}
+
 /** Calendar age, e.g. "3 years 2 months" / "5 months" (never year subtraction). */
 export function ageText(t: TranslateFn, dateOfBirth: string, now: Date = new Date()): string {
   const birth = parseCalendarDate(dateOfBirth);

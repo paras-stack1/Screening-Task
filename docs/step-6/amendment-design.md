@@ -1,7 +1,7 @@
 # Amending Completed Screenings - Design and Schema Proposal (Stage 6G)
 
-> Status: **APPROVED 2026-11-23. 6G-1 (database, API, tests) implemented**; 6G-2 (app screens) not
-> started. Implementation notes: section 9.
+> Status: **APPROVED 2026-11-23. 6G-1 (database, API, tests) and 6G-2 (app screens, tests) implemented.**
+> Implementation notes: sections 9 and 10.
 > Based on the user's rules of 2026-11-23 (below).
 
 ## 1. Agreed rules (from the user)
@@ -207,3 +207,18 @@ audited); in the area but not allowed (e.g. after 7 days) = 403 `AMENDMENT_NOT_A
 - Amending a measurement that has an in-session correction is refused: amend the latest value.
 - The "current version" is computed by one function (`amendmentOverlay.ts`), used both to show
   values and to capture old values, so the two can never disagree.
+
+## 10. Implementation notes (6G-2, worker app)
+
+- Screens: summary (amend entry, Amended badges, amendment history, medical officer review),
+  `/screening/:id/amend`, `/screening/review-queue`. Details: docs/frontend/screening.md.
+- The app never decides who may amend: it shows `canAmend` / `amendBasis` / `amendableUntil` from
+  the API, and the API refuses everything else (403/409, audited).
+- One save = one amendment. `clientOperationId` is kept for identical content (safe retry); after
+  `AMENDMENT_CONFLICT` the session is reloaded, the edits stay, and the next save sends the new
+  `expectedSequence` with a new operation id.
+- An answer cannot be removed by an amendment (Unknown / Not assessed are the explicit ways); a
+  measurement keeps its time unless its source changes to a card or the guardian.
+- Tests: 16 screen + 9 unit tests; mutation checks (stale sequence, amend offered when not
+  allowed, review offered to workers) each caught. Live: the worker-app live test now also amends
+  the completed screening against the real API (2 new steps; 10/10 on 2026-11-23, test database).
