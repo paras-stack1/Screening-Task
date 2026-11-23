@@ -181,6 +181,12 @@ then, in one transaction: new hash, `passwordChangedAt`, `mustChangePassword = f
 session of the user revoked (all devices), a new session started for the calling device (same label),
 audit. Returns new tokens. Limited to 10 per user per 15 min.
 
+**Admin portal (browser):** `/auth/web/login`, `/auth/web/refresh`, `/auth/web/logout` and
+`/auth/web/change-password` use the same sessions, but the refresh token travels only in an
+httpOnly, SameSite=Strict cookie scoped to `/api/v1/auth/web`, and a listed Origin plus the
+header `x-balswasthya-client: admin-portal` are required. See
+[admin-portal/api.md](admin-portal/api.md).
+
 **Password reset:** no email/SMS service exists, so there is no self-service reset (decision approved
 in Stage 1). An administrator sets a temporary password with `mustChangePassword = true`, which also
 revokes all sessions (user-management API, Stage 3). No messages are sent or simulated.

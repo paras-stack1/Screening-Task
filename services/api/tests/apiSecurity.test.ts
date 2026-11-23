@@ -158,6 +158,9 @@ describe('protected routes without a valid access token', () => {
     ['post', `/api/v1/screenings/${ID}/amendments`],
     ['post', `/api/v1/screenings/${ID}/amendments/${ID}/review`],
     ['get', '/api/v1/screening-amendments'],
+    // Admin portal stage PA.
+    ['get', '/api/v1/areas'],
+    ['get', `/api/v1/areas?parentId=${ID}`],
   ] as const)('%s %s requires authentication', async (method, path) => {
     const res = await request(app())[method](path);
     expect(res.status).toBe(401);
@@ -197,5 +200,83 @@ describe('rate limiting', () => {
     }
     const other = await request(instance).post('/api/v1/auth/login').send({ loginId: 'EMP-0004' });
     expect(other.status).toBe(400);
+  });
+});
+
+describe('admin portal browser sign-in (/auth/web) - stage PA', () => {
+  const ORIGIN = 'http://localhost:8081';
+  const portal = (r: request.Test, origin: string | null = ORIGIN, header = true) => {
+    if (origin) r.set('Origin', origin);
+    if (header) r.set('x-balswasthya-client', 'admin-portal');
+    return r;
+  };
+
+  it.each(['/login', '/refresh', '/logout', '/change-password'])(
+    'POST /auth/web%s without an Origin header is refused (403 ORIGIN_NOT_ALLOWED)',
+    async (path) => {
+      const res = await portal(request(app()).post(`/api/v1/auth/web${path}`), null);
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('ORIGIN_NOT_ALLOWED');
+    },
+  );
+
+  it('refuses an unlisted origin even with the portal header', async () => {
+    const res = await portal(request(app()).post('/api/v1/auth/web/login'), 'https://evil.example').send({
+      loginId: 'EMP-0001',
+      password: 'whatever123',
+    });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('ORIGIN_NOT_ALLOWED');
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+    expect(res.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('refuses a listed origin without the portal header (403 WEB_CLIENT_REQUIRED)', async () => {
+    const res = await portal(request(app()).post('/api/v1/auth/web/refresh'), ORIGIN, false);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('WEB_CLIENT_REQUIRED');
+  });
+
+  it('refresh without the cookie answers 401 SESSION_EXPIRED', async () => {
+    const res = await portal(request(app()).post('/api/v1/auth/web/refresh'));
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('SESSION_EXPIRED');
+  });
+
+  it('logout without the cookie answers 204 and clears the cookie (no database needed)', async () => {
+    const res = await portal(request(app()).post('/api/v1/auth/web/logout'));
+    expect(res.status).toBe(204);
+    const cookie = String(res.headers['set-cookie']);
+    expect(cookie).toMatch(/^bs_admin_rt=;/);
+    expect(cookie).toContain('Path=/api/v1/auth/web');
+    expect(cookie).toMatch(/HttpOnly/);
+    expect(cookie).toMatch(/SameSite=Strict/);
+  });
+
+  it('change-password requires an access token', async () => {
+    const res = await portal(request(app()).post('/api/v1/auth/web/change-password')).send({
+      currentPassword: 'a',
+      newPassword: 'b',
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('allows credentialed CORS for a listed origin only, including the preflight', async () => {
+    const preflight = await request(app())
+      .options('/api/v1/auth/web/login')
+      .set('Origin', ORIGIN)
+      .set('Access-Control-Request-Method', 'POST')
+      .set('Access-Control-Request-Headers', 'content-type,x-balswasthya-client');
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers['access-control-allow-origin']).toBe(ORIGIN);
+    expect(preflight.headers['access-control-allow-credentials']).toBe('true');
+
+    const evil = await request(app())
+      .options('/api/v1/auth/web/login')
+      .set('Origin', 'https://evil.example')
+      .set('Access-Control-Request-Method', 'POST')
+      .set('Access-Control-Request-Headers', 'content-type,x-balswasthya-client');
+    expect(evil.headers['access-control-allow-origin']).toBeUndefined();
+    expect(evil.headers['access-control-allow-credentials']).toBeUndefined();
   });
 });

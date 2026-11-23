@@ -61,6 +61,21 @@ export const authTokensResponseSchema = z.object({
 });
 export type AuthTokensResponse = z.infer<typeof authTokensResponseSchema>;
 
+/**
+ * Browser sign-in for the admin portal (/auth/web/*). The refresh token is set in an httpOnly,
+ * SameSite=Strict cookie scoped to /api/v1/auth/web and is NEVER in the JSON body, so page
+ * scripts cannot read or leak it. The access token stays in memory only.
+ */
+export const webAuthResponseSchema = authTokensResponseSchema.omit({ refreshToken: true });
+export type WebAuthResponse = z.infer<typeof webAuthResponseSchema>;
+
+/**
+ * Every /auth/web/* request must carry this header with this value. A custom header forces a
+ * CORS preflight, so a page on an unlisted origin cannot even send the request.
+ */
+export const WEB_CLIENT_HEADER = 'x-balswasthya-client';
+export const WEB_CLIENT_VALUE = 'admin-portal';
+
 /** The app adapts its UI to `access`; the API never relies on it (every request is re-checked). */
 export const meResponseSchema = z.object({ user: authUserSchema, access: effectiveAccessSchema });
 export type MeResponse = z.infer<typeof meResponseSchema>;

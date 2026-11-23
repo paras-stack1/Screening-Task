@@ -9,3 +9,4 @@ export * from './guardians.js';
 export * from './consent.js';
 export * from './users.js';
 export * from './screening.js';
+export * from './areas.js';

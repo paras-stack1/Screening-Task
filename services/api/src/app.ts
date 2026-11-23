@@ -28,6 +28,8 @@ function defaultDependencies(): AppDependencies {
     consentPolicy: { allowDraftNotices: !isProduction },
     // Draft and demonstration screening protocols are never usable in production (Step 6 decision F).
     screeningPolicy: { allowDraftProtocols: !isProduction },
+    // Admin portal: refresh cookie is Secure (HTTPS-only) in production (decision P4).
+    webSession: { secureCookie: isProduction, allowedOrigins: env.CORS_ORIGINS },
   };
 }
 
@@ -51,6 +53,9 @@ export function createApp(overrides: Partial<AppDependencies> = {}): Express {
       origin: (origin, callback) => {
         callback(null, !origin || env.CORS_ORIGINS.includes(origin));
       },
+      // The admin portal's refresh cookie (/auth/web only) needs credentialed requests. Only
+      // listed origins are ever reflected, never "*".
+      credentials: true,
     }),
   );
   app.use(requestId);

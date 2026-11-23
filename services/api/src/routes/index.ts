@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { createDataRateLimiters } from '../middleware/rateLimit';
+import { createAreasRouter } from '../modules/areas/areas.routes';
 import { createAuthRouter, type AuthRouterDependencies } from '../modules/auth/auth.routes';
+import { createWebAuthRouter, type WebSessionSettings } from '../modules/auth/webAuth.routes';
 import { createChildrenRouter } from '../modules/children/children.routes';
 import { createChildConsentsRouter, createConsentNoticesRouter } from '../modules/consent/consent.routes';
 import type { ConsentPolicySettings } from '../modules/consent/consentPolicy';
@@ -29,13 +31,17 @@ export interface ApiRouterDependencies {
   consentPolicy: ConsentPolicySettings;
   /** Screening content rules that depend on the environment (draft protocols outside production only). */
   screeningPolicy: ScreeningPolicySettings;
+  /** Admin portal browser sessions (refresh token in an httpOnly cookie; secure in production). */
+  webSession: WebSessionSettings;
 }
 
 /**
  * Versioned API router mounted at /api/v1. Each feature module exports its own router factory
  * and is registered here.
  *
- * PUBLIC routes (no access token): /health/*, /auth/login, /auth/refresh, /auth/logout.
+ * PUBLIC routes (no access token): /health/*, /auth/login, /auth/refresh, /auth/logout, and the
+ * admin portal's /auth/web/login, /auth/web/refresh, /auth/web/logout (listed origin + portal
+ * header required; the refresh token is an httpOnly cookie).
  * Every other route authenticates first and then checks a permission. The route inventory in
  * tests/apiSecurity.test.ts is a MANUAL list: add every new protected route to it (bug S6-004).
  */
@@ -50,6 +56,7 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
     dataRateLimit: createDataRateLimiters(deps.auth.rateLimits),
   };
   router.use('/health', createHealthRouter(deps.health));
+  router.use('/auth/web', createWebAuthRouter(deps.auth, deps.webSession));
   router.use('/auth', createAuthRouter(deps.auth));
   router.use('/consent-notices', createConsentNoticesRouter(childData));
   // Before '/children' so the nested consent and screening routes are matched first.
@@ -64,5 +71,6 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/users', createUsersRouter(deps.auth));
   router.use('/assignments', createAssignmentsRouter(deps.auth));
   router.use('/roles', createRolesRouter(deps.auth));
+  router.use('/areas', createAreasRouter(deps.auth));
   return router;
 }
