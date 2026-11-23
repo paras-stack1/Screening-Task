@@ -168,6 +168,25 @@ Notes:
 - On web the sign-in session is kept in memory only: reloading the page signs you out (by design;
   there is no secure storage in a browser).
 
+### Run the admin web portal
+
+For state, district and block administrators and supervisors: accounts, roles and area
+assignments (never child data). Details: [docs/admin-portal/README.md](docs/admin-portal/README.md).
+
+```powershell
+Copy-Item apps\admin-portal\.env.example apps\admin-portal\.env   # once
+npm run dev:api      # Terminal 1 (database running)
+npm run dev:admin    # Terminal 2
+```
+
+Open **http://localhost:5173**. `services\api\.env` must list the portal in `CORS_ORIGINS`
+(`CORS_ORIGINS=http://localhost:8081,http://localhost:5173`); restart the API after changing it.
+Forgot a password on your local development database? `npm run db:dev-reset-password -- --login-id
+ADMIN-0001` prints a one-time password (development only; refused when `NODE_ENV=production`).
+
+Sign in with an administrator account (`npm run db:bootstrap-admin`); field-worker accounts are
+told the portal is for administrators.
+
 ### Stop everything
 
 `Ctrl+C` in each terminal, then:

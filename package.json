@@ -5,6 +5,7 @@
   "description": "BalSwasthya AI - child health screening support platform for the RBSK programme (Uttar Pradesh). Screening support only, not diagnosis.",
   "workspaces": [
     "apps/worker-app",
+    "apps/admin-portal",
     "services/api",
     "packages/shared-contracts"
   ],
@@ -35,7 +36,9 @@
     "db:bootstrap-admin": "npm run db:bootstrap-admin --workspace @balswasthya/api --",
     "db:protocol-status": "npm run db:protocol-status --workspace @balswasthya/api --",
     "db:protocol-import": "npm run db:protocol-import --workspace @balswasthya/api --",
-    "db:dev-live-worker": "npm run db:dev-live-worker --workspace @balswasthya/api --"
+    "db:dev-live-worker": "npm run db:dev-live-worker --workspace @balswasthya/api --",
+    "dev:admin": "npm run dev --workspace @balswasthya/admin-portal",
+    "db:dev-reset-password": "npm run db:dev-reset-password --workspace @balswasthya/api --"
   },
   "devDependencies": {
     "@eslint/js": "~9.39.5",
