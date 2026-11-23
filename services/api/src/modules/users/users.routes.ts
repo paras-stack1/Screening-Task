@@ -19,6 +19,7 @@ import { Router, type Response } from 'express';
 import { z } from 'zod';
 import { createAuthenticate, getAuth, type AuthenticateDependencies } from '../../middleware/authenticate';
 import { createRequirePermission } from '../../middleware/authorize';
+import { createDataRateLimiters, type RateLimitSettings } from '../../middleware/rateLimit';
 import { getRequestId } from '../../middleware/requestId';
 import { getValidated, validate } from '../../middleware/validate';
 import { createAssignmentsService, type AdminContext } from './assignments.service';
@@ -26,6 +27,7 @@ import { createUsersService } from './users.service';
 
 export interface AdminRouterDependencies extends AuthenticateDependencies {
   db: PrismaClient;
+  rateLimits?: RateLimitSettings;
 }
 
 const userParams = z.strictObject({ userId: z.uuid() });
@@ -40,7 +42,12 @@ export function createUsersRouter(deps: AdminRouterDependencies): Router {
   const router = Router();
   const now = deps.now ?? (() => new Date());
   const service = createUsersService(deps.db);
-  router.use(createAuthenticate(deps)(), createRequirePermission(deps)('user.manage'));
+  // Per-user budget after sign-in (security review PE-3): same limits as child-data routes.
+  router.use(
+    createAuthenticate(deps)(),
+    createDataRateLimiters(deps.rateLimits),
+    createRequirePermission(deps)('user.manage'),
+  );
 
   router.get('/', validate({ query: userListQuerySchema }), async (_req, res) => {
     res.json(await service.list(context(res, now), getValidated<UserListQuery>(res, 'query')));
@@ -96,7 +103,11 @@ export function createAssignmentsRouter(deps: AdminRouterDependencies): Router {
   const router = Router();
   const now = deps.now ?? (() => new Date());
   const service = createAssignmentsService(deps.db);
-  router.use(createAuthenticate(deps)(), createRequirePermission(deps)('assignment.manage'));
+  router.use(
+    createAuthenticate(deps)(),
+    createDataRateLimiters(deps.rateLimits),
+    createRequirePermission(deps)('assignment.manage'),
+  );
 
   router.get('/', validate({ query: assignmentListQuerySchema }), async (_req, res) => {
     res.json(await service.list(context(res, now), getValidated<AssignmentListQuery>(res, 'query')));
@@ -136,7 +147,11 @@ export function createAssignmentsRouter(deps: AdminRouterDependencies): Router {
 export function createRolesRouter(deps: AdminRouterDependencies): Router {
   const router = Router();
   const service = createUsersService(deps.db);
-  router.use(createAuthenticate(deps)(), createRequirePermission(deps)('assignment.manage'));
+  router.use(
+    createAuthenticate(deps)(),
+    createDataRateLimiters(deps.rateLimits),
+    createRequirePermission(deps)('assignment.manage'),
+  );
   router.get('/', async (_req, res) => {
     res.json(await service.listRoles());
   });

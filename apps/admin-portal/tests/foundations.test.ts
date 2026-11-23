@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHttp } from '../src/api/http';
+import { contentSecurityPolicy } from '../src/security/contentSecurityPolicy';
 import { accessTokenLifetimeMs, FALLBACK_ACCESS_LIFETIME_MS } from '../src/auth/tokenLifetime';
 import { parseApiBaseUrl } from '../src/config';
 import { en } from '../src/i18n/en';
@@ -96,5 +97,31 @@ describe('translations', () => {
     expect(errorMessageKey(new ApiError('http', { status: 403 }))).toBe('errors.forbidden');
     expect(errorMessageKey(new ApiError('http', { status: 503 }))).toBe('errors.server');
     expect(errorMessageKey(new Error('boom'))).toBe('errors.unexpected');
+  });
+});
+
+describe('Content-Security-Policy of the built page (security review PE-1)', () => {
+  it('allows only the page itself and the configured API; no inline script, no plugins, no base or form targets', () => {
+    const policy = contentSecurityPolicy('https://api.example.gov.in/api/v1');
+    const directives = Object.fromEntries(
+      policy.split('; ').map((d) => [d.split(' ')[0], d.split(' ').slice(1).join(' ')]),
+    );
+    expect(directives).toEqual({
+      'default-src': "'none'",
+      'script-src': "'self'",
+      'style-src': "'self'",
+      'img-src': "'self' data:",
+      'font-src': "'self'",
+      'connect-src': 'https://api.example.gov.in',
+      'manifest-src': "'self'",
+      'base-uri': "'none'",
+      'form-action': "'none'",
+      'object-src': "'none'",
+    });
+    expect(policy).not.toMatch(/unsafe-inline|unsafe-eval|\*/);
+  });
+
+  it('without a valid API address the page may connect nowhere', () => {
+    expect(contentSecurityPolicy(null)).toContain("connect-src 'none'");
   });
 });

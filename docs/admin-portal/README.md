@@ -1,7 +1,7 @@
 # Admin Web Portal
 
 > Status: decisions P1-P12 **approved 2026-11-23** (portal before Step 6G-2).
-> Stages **PA** (`790aac7`), **PB** (`934e4d7`), **PC** (`7523f96`) and **PD** done; PE not started. Branch
+> **All stages done**: PA (`790aac7`), PB (`934e4d7`), PC (`7523f96`), PD (`e220292`), PE. Branch
 > `feat/admin-portal` (based on `feat/step-6-screening` at 6G-1, commit `9324319`).
 
 A separate browser portal for office administrators: create worker accounts, give them a role
@@ -32,7 +32,7 @@ and an area, change or end assignments. It never shows child health data.
 | PB | Portal shell: sign in, change password, admin-only access, layout | **Done** - section 4 |
 | PC | Users: list, detail, create worker, temporary password, status, reset | **Done** - section 5 |
 | PD | Assignments: add, end, suspend, reactivate, revoke | **Done** - section 6 |
-| PE | Docs, security review, live end-to-end run, PDF guide admin section | Not started |
+| PE | Docs, security review, live end-to-end run, PDF guide admin section | **Done** - section 7 |
 
 ## 3. Notes from stage PA (all handled in PB)
 
@@ -228,3 +228,39 @@ change still goes through the existing endpoints and their full delegation check
 - **Live** (opt-in): a supervisor finds a worker through `GET /assignments`, adds an area with an
   end date, suspends, reactivates, shortens it, is refused when extending, and revokes it. Run
   2026-11-23 against a temporary API on the test database: **5/5 passed**.
+
+## 7. Stage PE - security review, final checks, guide
+
+- **Security review:** [security-review.md](security-review.md). Three findings fixed:
+  - **PE-1** a strict Content-Security-Policy is added to the built page;
+  - **PE-2** the development-only scripts (`db:dev-reset-password`, `db:dev-live-worker`) now
+    also refuse any database that is not on this computer;
+  - **PE-3** `/users`, `/assignments`, `/roles` and `/areas` now have a per-user rate limit
+    (600 reads / 150 changes per 15 minutes).
+
+  Accepted risks and hosting requirements are listed there (section 3).
+- **Guide:** the PDF "BalSwasthya AI - Setup, Usage and Data Guide" has a new section 8 for the
+  admin portal, section 4.C on forgotten passwords, new troubleshooting rows and updated test
+  results.
+- **Final checks (2026-11-23, run one after another):** formatting, typecheck and lint clean;
+  API unit **398 passed**; database **348 passed**; admin portal **308 passed** (5 opt-in live
+  tests skipped), production build clean; worker app **2073 passed**, 18 skipped; live portal
+  run against a temporary API on the test database **5/5 passed**. `npm audit`: 32 advisories,
+  all in pre-existing API tooling (none from the portal).
+- **Intermittent database stalls (environment, not code):** in one of four full database runs,
+  7 tests timed out or saw `503` (database unreachable). The PostgreSQL container stayed
+  healthy and never restarted, but its log shows a checkpoint taking 104 seconds (slow Docker
+  disk I/O on this Windows machine). The same tests pass on every rerun, and two complete full
+  runs passed 348/348. This is the same pattern as S6-005 and the occasional worker-app
+  timeouts; run heavy suites one at a time.
+
+### Summary of the admin portal
+
+| | |
+|---|---|
+| Where | `apps/admin-portal`, `npm run dev:admin`, http://localhost:5173 |
+| Who | Accounts holding `user.manage` (accounts + assignments) or `assignment.manage` (assignments) |
+| What | Sign in, change password, users (list, create with one-time password, suspend, reactivate, reset password, sign out everywhere, deactivate), assignments (list, add, end, suspend, reactivate, revoke) |
+| Never | Child, guardian or screening data |
+| API additions | `/auth/web/*` cookie sign-in, `GET /areas`, `GET /assignments`, `currentAssignments` in `GET /users`, per-user limits on admin routes. No database change |
+| Not built | Audit-log viewer, reports, area editing, facilities, protocol management (decision P8) |

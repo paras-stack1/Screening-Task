@@ -1,6 +1,7 @@
 /**
  * DEVELOPMENT ONLY: resets a forgotten password on a local development database.
- * Refuses to run when NODE_ENV=production.
+ * Refuses to run when NODE_ENV=production or when the database is not on this computer
+ * (prisma/devGuard.ts).
  *
  *   npm run db:dev-reset-password -- --login-id ADMIN-0001
  *
@@ -12,13 +13,14 @@
  */
 import { parseArgs } from 'node:util';
 import { PrismaClient } from '@prisma/client';
+import { assertDevelopmentDatabase } from './devGuard';
 import { normalizeLoginId } from '../src/modules/auth/loginId';
 import { REVOCATION_REASONS, revokeAllUserSessions } from '../src/modules/auth/session.service';
 import { recordAudit } from '../src/modules/audit/audit.service';
 import { generateTemporaryPassword, hashPassword } from '../src/utils/password';
 
 async function main() {
-  if (process.env.NODE_ENV === 'production') throw new Error('Refusing to run in production');
+  assertDevelopmentDatabase();
   const { values } = parseArgs({ options: { 'login-id': { type: 'string' } } });
   const raw = values['login-id'];
   if (!raw) throw new Error('Usage: npm run db:dev-reset-password -- --login-id <LOGIN-ID>');

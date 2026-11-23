@@ -394,3 +394,31 @@ describe('GET /assignments - assignments in the caller’s assignment.manage are
     expect(tooHigh.status).toBe(403);
   });
 });
+
+// ------------------------------------------------------------- stage PE: rate limit (PE-3)
+
+describe('administration routes have a per-user rate limit (security review PE-3)', () => {
+  it('the budget is counted per signed-in person, not per office network', async () => {
+    const limited = createApp({
+      auth: {
+        db: prisma,
+        config: testAuthConfig,
+        now: clock.now,
+        rateLimits: { ...DEFAULT_RATE_LIMITS, childDataReadPerUser: 3, childDataWritePerUser: 2 },
+      },
+    });
+    const admin = api(limited, await tokenFor(limited, 'stateadmin'));
+    const responses = [];
+    for (let i = 0; i < 4; i += 1) responses.push(await admin.get('/areas'));
+    // On failure, show what came back (status + error code) to diagnose intermittent runs.
+    const seen = responses.map(
+      (r) => `${r.status}:${(r.body as { error?: { code?: string } }).error?.code ?? ''}`,
+    );
+    expect(seen).toEqual(['200:', '200:', '200:', '429:TOO_MANY_REQUESTS']);
+
+    // Another administrator on the same network still has their own budget.
+    const other = api(limited, await tokenFor(limited, 'dadmin1'));
+    expect((await other.get('/areas')).status).toBe(200);
+    expect((await other.get('/users')).status).toBe(200);
+  });
+});

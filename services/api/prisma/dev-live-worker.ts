@@ -10,6 +10,7 @@
  * anywhere but as an Argon2 hash. The change is audited.
  */
 import { PrismaClient } from '@prisma/client';
+import { assertDevelopmentDatabase } from './devGuard';
 import { recordAudit } from '../src/modules/audit/audit.service';
 import { checkPasswordPolicy, hashPassword } from '../src/utils/password';
 
@@ -17,7 +18,7 @@ const LOGIN_ID = 'LIVE-ASHA-01';
 const AREA_CODE = 'DEMO-D1-B1-S1-V1';
 
 async function main() {
-  if (process.env.NODE_ENV === 'production') throw new Error('Refusing to run in production');
+  assertDevelopmentDatabase();
   const password = process.env.LIVE_WORKER_PASSWORD;
   if (!password) throw new Error('Set LIVE_WORKER_PASSWORD');
   const violation = checkPasswordPolicy(password, LOGIN_ID);
