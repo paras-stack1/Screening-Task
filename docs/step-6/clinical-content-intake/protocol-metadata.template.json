@@ -1,0 +1,12 @@
+{
+  "code": "<<CODE e.g. RBSK_D4_0_6M>>",
+  "version": 1,
+  "category": "<<DEFECTS_AT_BIRTH | DEFICIENCIES | DISEASES | DEVELOPMENTAL_DELAYS_DISABILITIES>>",
+  "name_hi": "<<हिन्दी नाम>>",
+  "name_en": "<<English name>>",
+  "description_hi": "<<हिन्दी विवरण (optional - delete both description lines if not used)>>",
+  "description_en": "<<English description (optional)>>",
+  "age_min_days": 0,
+  "age_max_days": 0,
+  "source_reference": "<<Guideline document, edition, page / section>>"
+}

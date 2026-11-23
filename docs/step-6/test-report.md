@@ -8,10 +8,11 @@
 
 | Test Category | Total | Passed | Failed | Status |
 |---|---|---|---|---|
-| Backend (API unit, no database) | 362 | 362 | 0 | Pass |
-| Frontend (Jest, worker app) | 2060 | 2050 | 0 (10 skipped) | Pass |
+| Backend (API unit, no database) | 374 | 374 | 0 | Pass |
+| Frontend (Jest, worker app) | 2091 | 2073 | 0 (18 skipped: opt-in live tests) | Pass |
 | Security (subset: `apiSecurity` 71 + `authorization` 76 + `accessScope` 20) | 167 | 167 | 0 | Pass |
-| Database (real PostgreSQL + real HTTP API) | 299 | 299 | 0 | Pass (see S6-005) |
+| Database (real PostgreSQL + real HTTP API) | 304 | 304 | 0 | Pass (see S6-005) |
+| Live end to end (6F: app modules → running API → dev DB) | 8 | 8 | 0 | Pass (opt-in) |
 | Regression (Steps 1-5: API unit 254, DB 235, the 20 pre-existing frontend suites) | 489 + 20 suites | all | 0 | Pass |
 
 Security is a subset of the backend and database rows, not extra tests. The 10 skipped frontend
@@ -24,9 +25,9 @@ Other checks: TypeScript, all workspaces: 0 errors. ESLint: 0 problems. Prettier
 
 | Suite | Before Step 6 | After 6B | After 6C | After 6D | Final (6E) |
 |---|---|---|---|---|---|
-| API unit | 254 | 295 | 346 | 346 | **362** |
-| Database | 235 | 268 | 299 | 299 | **299** |
-| Frontend | 1433 + 10 skipped | 1433 | 1433 | 1920 | **2050** + 10 skipped |
+| API unit | 254 | 295 | 346 | 346 | 362 → **374** (6F) |
+| Database | 235 | 268 | 299 | 299 | 299 → **304** (6F) |
+| Frontend | 1433 + 10 skipped | 1433 | 1433 | 1920 | 2050 → **2073** + 18 skipped (6F) |
 
 ## 3. Step 6 test files
 

@@ -21,7 +21,9 @@
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
     "db:bootstrap-admin": "tsx --env-file=.env prisma/bootstrap-admin.ts",
-    "db:protocol-status": "tsx --env-file=.env prisma/protocol-status.ts"
+    "db:protocol-status": "tsx --env-file=.env prisma/protocol-status.ts",
+    "db:protocol-import": "tsx --env-file=.env prisma/protocol-import.ts",
+    "db:dev-live-worker": "tsx --env-file=.env prisma/dev-live-worker.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

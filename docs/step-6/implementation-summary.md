@@ -1,6 +1,6 @@
 # Step 6 - Final Implementation Report: Four-D Child Health Screening
 
-> Date: 2026-11-23. Branch `feat/step-6-screening`. Commits: `7d9cecf` (audit), `2080c05` (6B),
+> Date: 2026-11-23 (updated after stage 6F). Branch `feat/step-6-screening`. Commits: `7d9cecf` (audit), `2080c05` (6B),
 > `08aff86` (6C), `dc2a2b7` (6D); stage 6E is **not yet committed**. Screening support only: the
 > system never diagnoses, classifies, scores or recommends treatment.
 
@@ -110,14 +110,15 @@ runtime-account grants, audit without health values, rate limits, safe errors, n
 API unit (Vitest), API database (Vitest, real PostgreSQL + HTTP), worker app (Jest, real routes
 against a contract-validated fake API), 14 mutation checks. See [test-report.md](test-report.md).
 
-## 15. Test results
+## 15. Test results (final, after stage 6F)
 
 | Test Category | Total | Passed | Failed | Status |
 |---|---|---|---|---|
-| Backend | 362 | 362 | 0 | Pass |
-| Frontend | 2060 | 2050 | 0 (10 skipped) | Pass |
+| Backend | 374 | 374 | 0 | Pass |
+| Frontend | 2091 | 2073 | 0 (18 skipped: opt-in live tests) | Pass |
 | Security | 167 | 167 | 0 | Pass (subset of Backend + Database) |
-| Database | 299 | 299 | 0 | Pass (1 unexplained timeout in an earlier run, S6-005) |
+| Database | 304 | 304 | 0 | Pass (1 unexplained timeout in an earlier 6E run, S6-005) |
+| Live end to end (app modules → running API → dev DB) | 8 | 8 | 0 | Pass (opt-in, 6F) |
 | Regression | 489 + 20 suites | all | 0 | Pass |
 
 ## 16. Critical bugs discovered
@@ -148,11 +149,12 @@ S6-005 (Low): one DB test timed out once in five full runs; not reproducible, ca
 
 ## 20. Known limitations
 
-No approved content, so nothing is operational in production. Online only. No amendments.
-Measurement time = time of entry. No application-level encryption of health data (W8). Rate
-limits are per process. Supervisors can read answers (decision M). Free-text notes may contain
-personal data (warned, not detectable). Not done: device testing, load testing, an end-to-end run
-of the app against the real API, external penetration testing.
+No approved content, so nothing is operational in production. Online only. No amendments
+(waiting for the programme's policy). Structured answers and measurements rely on disk/database
+encryption (free text is encrypted at application level since 6F). Rate limits are per process.
+Supervisors can read answers (decision M). Not done: testing on a phone, load testing, external
+penetration testing. (6F added an automated end-to-end run of the app's modules against the real
+API; see section 24.)
 
 ## 21. Manual testing instructions
 
@@ -208,8 +210,8 @@ npm run db:protocol-status -- --code <CODE> --version 1 --to IN_REVIEW --actor <
 | Completion transactional and idempotent | ✅ |
 | Completed history preserved | ✅ (final, never deleted) |
 | Audit logging works | ✅ |
-| Sensitive information protected | ⚠️ Partially: no field-level encryption at rest (W8) |
-| Frontend connected to actual backend APIs | ⚠️ Contract-identical, tested against a contract-validated fake; no device run against the live API yet |
+| Sensitive information protected | ⚠️ Mostly: free text encrypted at rest (6F); structured answers rely on disk/database encryption (W8, infrastructure) |
+| Frontend connected to actual backend APIs | ✅ App modules run end to end against the real API (6F live test, 8/8); ⚠️ not yet on a phone |
 | Loading, error, empty, offline states | ✅ (offline = paused with banner; online-only by design) |
 | Critical security tests pass | ✅ |
 | High-priority regression tests pass | ✅ |
@@ -218,5 +220,19 @@ npm run db:protocol-status -- --code <CODE> --version 1 --to IN_REVIEW --actor <
 | Documentation complete | ✅ |
 | Clinical limitations and approvals documented | ✅ |
 
-**Stop condition:** Step 6 implementation is finished. Step 7, AI integration and referrals have
+## 24. Stage 6F - hardening after the Step 6 review (2026-11-23)
+
+| Item | What was done | Evidence |
+|---|---|---|
+| Clinical content intake | Template (`clinical-content-intake/`: metadata JSON + questions CSV + README) and `npm run db:protocol-import` (`--check` validates and lists every problem with its CSV line; `--actor` loads a new, audited DRAFT; never overwrites a version; refuses unfilled template text) | `tests/protocolImport.test.ts` (8), DB import test; the real command refuses the shipped template |
+| End to end against the real API | `npm run db:dev-live-worker` (dev only, synthetic ASHA worker, password from the environment, audited) and the opt-in `tests/live/liveScreening.test.ts`: sign in → register → consent → eligibility → start (idempotent) → answer with a note → finish → measurement and correction → stale version refused → complete twice → history and counts | **8/8 passed** against the running API and the dev database on 2026-11-23 |
+| Free-text encryption | Text answers, answer notes, not-assessed reasons, area notes, measurement notes and correction reasons, cancel reasons: AES-256-GCM (existing PII key), stored as `enc1:…`, bound to session and field; no key → 503 | 4 unit + 4 DB tests (stored rows hold only ciphertext; a moved value is refused; no key → 503); mutation (store plaintext) caught by all 4; the dev DB row from the live run is `enc1:` |
+| Measurement date | "When was it measured?" for values from a card or a guardian; real date, not future (India date), not before birth; stored as the start of that day (no invented time) | `tests/screening/measurementDate.test.ts` (9) + a screen test |
+| Amendments | **Not started**: waiting for the programme's answers (who may amend, time limit, approval) | - |
+
+Bugs found and fixed in 6F: S6-006 (importer file paths), S6-007 (duplicate codes not reported
+alongside other errors). No database migration was needed (no free text existed in the dev
+database: verified 0 rows before the change).
+
+**Stop condition:** Step 6 (including 6F) is finished. Step 7, AI integration and referrals have
 not been started. Waiting for explicit approval.

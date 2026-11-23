@@ -38,7 +38,7 @@
 | W5 | Wording outside versioning | **Fixed** (wording + hash in DB; hash re-checked before use) |
 | W6 | No concurrency / duplicate-session guard | **Fixed** (version, row lock, partial unique index) |
 | W7 | Supervisors can read answers | **Accepted** per decision M (`child.read`); revisit with the programme |
-| W8 | Health data not encrypted at application level | **Open** - relies on database/disk encryption (infrastructure decision) |
+| W8 | Health data not encrypted at application level | **Partly fixed (6F):** all free text (text answers, answer notes, not-assessed reasons, area notes, measurement notes and correction reasons, cancel reasons) is AES-256-GCM encrypted, bound to its session and field. Structured answers and measurements stay readable for reporting and rely on disk/database encryption (infrastructure decision, open) |
 | W9 | In-memory rate limits per process | **Open** (known since Step 5) |
 | W10 | Audit details must contain no health values | **Controlled** by code review + test |
 
@@ -48,10 +48,14 @@
    usable until the programme approves content (by design).
 2. **Approver role is an assumption** (`screening.review` holder). The script records the
    approver; it cannot verify their clinical authority.
-3. **Free-text notes** (answers, category notes, cancel reasons) could contain personal data; the
-   UI warns, the API cannot detect it. They are never logged or audited.
-4. **Measurement time** is the time of entry (no date picker for older recorded values).
-5. **W8/W9** above; no load or state-scale performance test.
+3. **Free-text notes** could contain personal data; the UI warns, the API cannot detect it. Since
+   6F they are encrypted at rest (tests: stored rows hold only `enc1:` ciphertext; a value moved to
+   another field is refused; no key → 503, never plaintext) and are never logged or audited. Losing
+   `PII_ENCRYPTION_KEY` makes them unreadable, as for guardian phones. Key rotation is not built yet
+   (the format is versioned for it).
+4. ~~Measurement time is the time of entry~~ - fixed in 6F (date entry for values from a card or
+   a guardian).
+5. **W8 (structured data) / W9** above; no load or state-scale performance test.
 6. **Hindi text** is an engineering draft.
 7. **Amendments** of completed screenings are not possible (no approved workflow).
 8. Dependencies: `npm audit --omit=dev` = 24 advisories (4 high), all pre-existing (Prisma CLI

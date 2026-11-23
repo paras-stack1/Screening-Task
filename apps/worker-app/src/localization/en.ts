@@ -669,6 +669,10 @@ export const en = {
   'screening.cancel.keep': 'Keep the screening',
   'screening.cancel.dialogTitle': 'Cancel this screening?',
   'screening.cancel.dialogMessage': 'Saved answers are kept but nothing more can be added.',
+  'screening.measurement.dateLabel': 'When was it measured?',
+  'screening.measurement.dateHint': 'Date from the card or as told. The time of day is not recorded.',
+  'screening.measurement.errors.date': 'Enter a real date (day, month, year).',
+  'screening.measurement.errors.dateFuture': 'The date cannot be in the future.',
 } as const;
 
 export type TranslationKey = keyof typeof en;

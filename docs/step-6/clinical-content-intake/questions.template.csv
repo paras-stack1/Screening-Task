@@ -1,0 +1,6 @@
+code,section,order,answer_type,required,prompt_hi,prompt_en,help_hi,help_en,options,min,max,max_decimals,unit,max_length
+Q1,PART_A,10,YES_NO,yes,<<हिन्दी प्रश्न>>,<<English question>>,,,,,,,,
+Q2,PART_A,20,SINGLE_CHOICE,yes,<<हिन्दी प्रश्न>>,<<English question>>,<<हिन्दी सहायता>>,<<English help>>,<<OPT_A=हिन्दी|English;OPT_B=हिन्दी|English>>,,,,,
+Q3,PART_B,30,MULTI_CHOICE,no,<<हिन्दी प्रश्न>>,<<English question>>,,,<<OPT_A=हिन्दी|English;OPT_B=हिन्दी|English>>,,,,,
+Q4,PART_B,40,NUMBER,no,<<हिन्दी प्रश्न>>,<<English question>>,,,,0,365,0,days,
+Q5,PART_B,50,TEXT,no,<<हिन्दी प्रश्न>>,<<English question>>,,,,,,,,300

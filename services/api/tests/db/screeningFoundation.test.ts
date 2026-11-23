@@ -15,6 +15,7 @@ import { DEFAULT_RATE_LIMITS } from '../../src/middleware/rateLimit';
 import { ensureConsentTemplates } from '../../src/modules/consent/consentNotices';
 import { DEMO_PROTOCOLS, ensureDemoProtocols } from '../../src/modules/screening/demoProtocols';
 import { definitionToCreateInput, protocolContentHash } from '../../src/modules/screening/protocolContent';
+import { buildDefinition, importProtocol } from '../../src/modules/screening/protocolImport';
 import { changeProtocolStatus } from '../../src/modules/screening/protocolLifecycle';
 import { testAuthConfig } from './authFixture';
 import {
@@ -351,6 +352,63 @@ describe('protocol content governance (database)', () => {
         data: { status: 'IN_REVIEW', contentSha256: 'x' },
       }),
     ).rejects.toThrow(/without questions/);
+  });
+});
+
+describe('clinical content import (Step 6F)', () => {
+  const META = {
+    code: 'SYNTHETIC_INTAKE',
+    version: 1,
+    category: 'DEFICIENCIES',
+    name_hi: 'कृत्रिम आयात',
+    name_en: 'Synthetic import',
+    age_min_days: 4000,
+    age_max_days: 4100,
+    source_reference: 'Synthetic test data, not a guideline',
+  };
+  const CSV = [
+    'code,section,order,answer_type,required,prompt_hi,prompt_en,help_hi,help_en,options,min,max,max_decimals,unit,max_length',
+    'Q1,PART_A,10,YES_NO,yes,कृत्रिम प्रश्न,Synthetic question,,,,,,,,',
+  ].join('\n');
+
+  it('imports as an audited DRAFT, refuses to overwrite a version, then follows the lifecycle', async () => {
+    const built = buildDefinition(META, CSV);
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const created = await importProtocol(prisma, built.definition, 'asha1');
+    const row = await prisma.screeningProtocol.findUniqueOrThrow({
+      where: { id: created.id },
+      include: { questions: true },
+    });
+    expect(row).toMatchObject({ status: 'DRAFT', isDemonstration: false, contentSha256: null });
+    expect(row.questions).toHaveLength(1);
+    expect(created.contentSha256).toBe(protocolContentHash(built.definition));
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'screening_protocol.imported', entityId: created.id },
+    });
+    expect(audit.details).toMatchObject({
+      code: 'SYNTHETIC_INTAKE',
+      version: 1,
+      contentSha256: created.contentSha256,
+    });
+
+    await expect(importProtocol(prisma, built.definition, 'asha1')).rejects.toMatchObject({
+      code: 'VERSION_EXISTS',
+    });
+    await expect(importProtocol(prisma, { ...built.definition, version: 2 }, 'nobody')).rejects.toMatchObject(
+      {
+        code: 'ACTOR_NOT_ACTIVE',
+      },
+    );
+
+    // The reviewed hash equals the import fingerprint: reviewers approve exactly what was imported.
+    const review = await changeProtocolStatus(prisma, {
+      code: 'SYNTHETIC_INTAKE',
+      version: 1,
+      to: 'IN_REVIEW',
+      actorLoginId: 'asha1',
+    });
+    expect(review.contentSha256).toBe(created.contentSha256);
   });
 });
 

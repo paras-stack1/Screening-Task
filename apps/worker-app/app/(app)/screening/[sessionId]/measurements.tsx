@@ -43,6 +43,7 @@ import {
 import { useTranslation, type TranslationKey } from '../../../../src/localization';
 import { apiErrorMessageKey } from '../../../../src/services/api/errorMessages';
 import { spacing } from '../../../../src/theme';
+import { measuredAtFor, type MeasurementDateError } from '../../../../src/features/screening/measurementDate';
 
 /** Mirrors the API's data-entry rules so mistakes show before sending (the API decides). */
 const UNITS: Record<ScreeningMeasurementType, MeasurementUnit[]> = {
@@ -66,6 +67,10 @@ interface Form {
   deviceMake: string;
   notes: string;
   correctionReason: string;
+  /** Date from a card or the guardian (not for values measured now). */
+  day: string;
+  month: string;
+  year: string;
 }
 const EMPTY: Form = {
   type: '',
@@ -76,8 +81,12 @@ const EMPTY: Form = {
   deviceMake: '',
   notes: '',
   correctionReason: '',
+  day: '',
+  month: '',
+  year: '',
 };
-type FormError = 'type' | 'unit' | 'value' | 'decimals' | 'source' | 'quality' | 'reason';
+type FormError =
+  'type' | 'unit' | 'value' | 'decimals' | 'source' | 'quality' | 'reason' | MeasurementDateError;
 const FORM_ERRORS: Record<FormError, TranslationKey> = {
   type: 'screening.measurement.errors.type',
   unit: 'screening.measurement.errors.unit',
@@ -86,6 +95,9 @@ const FORM_ERRORS: Record<FormError, TranslationKey> = {
   source: 'screening.measurement.errors.source',
   quality: 'screening.measurement.errors.quality',
   reason: 'screening.measurement.errors.reason',
+  date: 'screening.measurement.errors.date',
+  dateFuture: 'screening.measurement.errors.dateFuture',
+  dateBeforeBirth: 'screening.measurement.errors.beforeBirth',
 };
 
 function validate(form: Form, correcting: boolean): FormError | null {
@@ -154,6 +166,11 @@ export default function ScreeningMeasurementsScreen() {
       setError(problem);
       return;
     }
+    const when = measuredAtFor(form.source as Source, form, s.dateOfBirthAtStart, new Date());
+    if (!when.ok) {
+      setError(when.error);
+      return;
+    }
     inFlight.current = true;
     setSaving(true);
     setMessage(null);
@@ -163,8 +180,8 @@ export default function ScreeningMeasurementsScreen() {
       unit: form.unit as MeasurementUnit,
       source: form.source as Source,
       quality: form.quality as Quality,
-      // The time of entry (the measurement is taken during this visit).
-      measuredAt: new Date().toISOString(),
+      // Measured now: time of entry. From a card / guardian: start of the entered day (India).
+      measuredAt: when.measuredAt,
       ...(form.deviceMake.trim() ? { deviceMake: form.deviceMake.trim() } : {}),
       ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
     };
@@ -297,6 +314,29 @@ export default function ScreeningMeasurementsScreen() {
             onChange={(source) => set({ source })}
             testID="measurement-source"
           />
+          {form.source && form.source !== 'MEASURED' ? (
+            <View style={styles.dateBlock} testID="measurement-date">
+              <AppText variant="label">{t('screening.measurement.dateLabel')}</AppText>
+              <AppText variant="caption" color="textSecondary">
+                {t('screening.measurement.dateHint')}
+              </AppText>
+              <View style={styles.dateRow}>
+                {(['day', 'month', 'year'] as const).map((part) => (
+                  <View key={part} style={part === 'year' ? styles.dateWide : styles.dateNarrow}>
+                    <AppInput
+                      label={t(`children.form.${part}`)}
+                      value={form[part]}
+                      onChangeText={(text) => set({ [part]: text.replace(/\D/g, '') })}
+                      keyboardType="number-pad"
+                      maxLength={part === 'year' ? 4 : 2}
+                      placeholder={t(`children.form.${part}Placeholder`)}
+                      testID={`measurement-date-${part}`}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
           <ChoiceGroup
             label={t('screening.measurement.qualityLabel')}
             options={MEASUREMENT_QUALITIES.map((value) => ({
@@ -359,4 +399,8 @@ export default function ScreeningMeasurementsScreen() {
 const styles = StyleSheet.create({
   list: { gap: spacing.sm },
   card: { gap: spacing.xs },
+  dateBlock: { gap: spacing.xs },
+  dateRow: { flexDirection: 'row', gap: spacing.sm },
+  dateNarrow: { flex: 1 },
+  dateWide: { flex: 1.6 },
 });

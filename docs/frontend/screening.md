@@ -64,8 +64,11 @@ no tab button (`tabBarButton: () => null`; see bug S6-003 for why not `href: nul
   plausibility is decided only by the API and shown in plain language.
 - A saved value shows exactly as entered, plus the server's explicit conversion: "3250 g (= 3.25 kg)".
 - A correction keeps the original visible as *Corrected* and requires a reason.
-- **Limitation:** `measuredAt` is the time of entry. There is no picker yet for values copied from a
-  card or told by a guardian about an earlier date.
+- **Measurement date (6F):** a value *measured now* uses the time of entry. A value *copied from a
+  card* or *told by a guardian* asks "When was it measured?" (day / month / year boxes, as in
+  registration). It must be a real date, not in the future (India date) and not before the date of
+  birth, and is sent as the start of that day in India, because the time of day is not known and is
+  not invented. Logic: `src/features/screening/measurementDate.ts`.
 
 ## Offline (decision Q)
 

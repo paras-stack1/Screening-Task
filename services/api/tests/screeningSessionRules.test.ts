@@ -6,6 +6,7 @@ import {
 } from '@balswasthya/shared-contracts';
 import type { ScreeningObservation, ScreeningQuestion } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   convertDecimal,
@@ -14,7 +15,9 @@ import {
   validateMeasurement,
 } from '../src/modules/screening/measurementRules';
 import { responseColumns, responseValue } from '../src/modules/screening/responseRules';
+import { sessionTextSealer } from '../src/modules/screening/sensitiveText';
 import { completeness } from '../src/modules/screening/sessionDto';
+import { createPiiCrypto } from '../src/utils/piiCrypto';
 
 /** Step 6, stage 6C: pure rules for answers, measurements, completeness and request schemas. */
 
@@ -221,6 +224,45 @@ describe('completeness counts (decision N)', () => {
       notAssessed: 0,
       notAnswered: 2,
     });
+  });
+});
+
+describe('free-text encryption (Step 6F)', () => {
+  const pii = createPiiCrypto({ encryptionKey: randomBytes(32), lookupKey: randomBytes(32) });
+  const text = sessionTextSealer(pii, 'session-1');
+  const notes = { kind: 'obs', questionId: 'q-1', field: 'notes' } as const;
+
+  it('round-trips text, never stores the plaintext and uses a fresh IV each time', () => {
+    const a = text.seal(notes, 'Rash on the left arm (synthetic)')!;
+    const b = text.seal(notes, 'Rash on the left arm (synthetic)')!;
+    expect(a).toMatch(/^enc1:/);
+    expect(a).not.toContain('Rash');
+    expect(a).not.toBe(b);
+    expect(text.open(notes, a)).toBe('Rash on the left arm (synthetic)');
+    expect(text.seal(notes, null)).toBeNull();
+    expect(text.open(notes, null)).toBeNull();
+  });
+
+  it('refuses a value moved to another question, field or session', () => {
+    const sealed = text.seal(notes, 'synthetic')!;
+    expect(() => text.open({ ...notes, questionId: 'q-2' }, sealed)).toThrow();
+    expect(() => text.open({ ...notes, field: 'valueText' }, sealed)).toThrow();
+    expect(() => sessionTextSealer(pii, 'session-2').open(notes, sealed)).toThrow();
+  });
+
+  it('refuses tampered ciphertext and unencrypted values', () => {
+    const sealed = text.seal(notes, 'synthetic')!;
+    const tampered = sealed.slice(0, -4) + (sealed.endsWith('AAAA') ? 'BBBB' : 'AAAA');
+    expect(() => text.open(notes, tampered)).toThrow();
+    expect(() => text.open(notes, 'plain text written outside the API')).toThrow(/Unencrypted/);
+  });
+
+  it('answers 503 (never stores plaintext) when the key is not configured', () => {
+    const noKey = sessionTextSealer(createPiiCrypto({}), 'session-1');
+    expect(() => noKey.seal(notes, 'synthetic')).toThrow(
+      expect.objectContaining({ code: 'SENSITIVE_TEXT_UNAVAILABLE' }),
+    );
+    expect(noKey.seal(notes, null)).toBeNull();
   });
 });
 

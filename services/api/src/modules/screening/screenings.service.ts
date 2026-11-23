@@ -17,8 +17,10 @@ import {
   type StartScreeningRequest,
   type UpdateCategoryRequest,
 } from '@balswasthya/shared-contracts';
+import { randomUUID } from 'node:crypto';
 import { Prisma, type PrismaClient, type ScreeningSession } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
+import type { PiiCrypto } from '../../utils/piiCrypto';
 import { runIdempotent } from '../../utils/idempotency';
 import { logger } from '../../utils/logger';
 import {
@@ -35,12 +37,15 @@ import { protocolContentHash, protocolRowToDefinition } from './protocolContent'
 import { selectProtocol, type ScreeningPolicySettings } from './protocolSelection';
 import { responseChanged, responseColumns } from './responseRules';
 import { screeningAge } from './screeningAge';
+import { sessionTextSealer } from './sensitiveText';
 import { detailInclude, summaryInclude, toSessionDetail, toSessionSummary } from './sessionDto';
 
 export interface ScreeningsServiceDependencies {
   db: PrismaClient;
   consentPolicy: ConsentPolicySettings;
   screeningPolicy: ScreeningPolicySettings;
+  /** Encrypts free text (notes, text answers, reasons) - Step 6F. */
+  pii: PiiCrypto;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -80,12 +85,13 @@ export function createScreeningsService({
   db,
   consentPolicy,
   screeningPolicy,
+  pii,
 }: ScreeningsServiceDependencies) {
   const at = (ctx: AccessContext) => ctx.at ?? new Date();
 
   async function loadDetail(id: string, ctx: AccessContext): Promise<ScreeningSessionResponse> {
     const row = await db.screeningSession.findUniqueOrThrow({ where: { id }, include: detailInclude });
-    return { session: toSessionDetail(row, ctx.userId) };
+    return { session: toSessionDetail(row, ctx.userId, sessionTextSealer(pii, id)) };
   }
 
   async function auditDenied(ctx: AccessContext, session: ScreeningSession, reason: string) {
@@ -199,6 +205,8 @@ export function createScreeningsService({
     input: Omit<AddMeasurementRequest, 'expectedVersion' | 'type'>,
     type: AddMeasurementRequest['type'],
     now: Date,
+    /** Generated here so the encrypted notes can be bound to the row. */
+    measurementId: string,
   ) {
     const measuredAt = new Date(input.measuredAt);
     validateMeasurement({
@@ -210,6 +218,7 @@ export function createScreeningsService({
       notBefore: istStartOf(fromDbDate(session.dateOfBirthAtStart)),
     });
     return {
+      id: measurementId,
       childId: session.childId,
       sessionId: session.id,
       type,
@@ -222,7 +231,10 @@ export function createScreeningsService({
       deviceMake: input.deviceMake ?? null,
       deviceModel: input.deviceModel ?? null,
       deviceSerial: input.deviceSerial ?? null,
-      notes: input.notes ?? null,
+      notes: sessionTextSealer(pii, session.id).seal(
+        { kind: 'measurement', measurementId, field: 'notes' },
+        input.notes,
+      ),
     };
   }
 
@@ -520,16 +532,26 @@ export function createScreeningsService({
           ]),
         );
         const now = at(ctx);
+        const text = sessionTextSealer(pii, id);
         let created = 0;
         let changed = 0;
         for (const input of body.responses) {
           const question = questionOf(input.questionId);
-          const data = {
+          const plain = {
             status: input.status,
             source: input.source,
             notes: input.notes ?? null,
             notAssessedReason: input.notAssessedReason ?? null,
             ...responseColumns(question, input),
+          };
+          // Free text is encrypted at rest, bound to this session and question (Step 6F).
+          const field = (f: 'valueText' | 'notes' | 'notAssessedReason') =>
+            ({ kind: 'obs', questionId: question.id, field: f }) as const;
+          const data = {
+            ...plain,
+            notes: text.seal(field('notes'), plain.notes),
+            notAssessedReason: text.seal(field('notAssessedReason'), plain.notAssessedReason),
+            valueText: text.seal(field('valueText'), plain.valueText),
           };
           const before = existing.get(question.id);
           if (!before) {
@@ -544,12 +566,20 @@ export function createScreeningsService({
               },
             });
             created += 1;
-          } else if (responseChanged(before, data)) {
-            await tx.screeningObservation.update({
-              where: { id: before.id },
-              data: { ...data, recordedById: ctx.userId, recordedAt: now },
-            });
-            changed += 1;
+          } else {
+            const beforePlain = {
+              ...before,
+              notes: text.open(field('notes'), before.notes),
+              notAssessedReason: text.open(field('notAssessedReason'), before.notAssessedReason),
+              valueText: text.open(field('valueText'), before.valueText),
+            };
+            if (responseChanged(beforePlain, plain)) {
+              await tx.screeningObservation.update({
+                where: { id: before.id },
+                data: { ...data, recordedById: ctx.userId, recordedAt: now },
+              });
+              changed += 1;
+            }
           }
         }
         let cleared = 0;
@@ -575,8 +605,10 @@ export function createScreeningsService({
         const cat = await categoryOf(tx, id, category);
         const data: Prisma.ScreeningSessionCategoryUpdateInput = {};
         const audit: SessionChange['audit'] = [];
-        if (body.notes !== undefined && body.notes !== cat.notes) {
-          data.notes = body.notes;
+        const notesField = { kind: 'cat', category, field: 'notes' } as const;
+        const text = sessionTextSealer(pii, id);
+        if (body.notes !== undefined && body.notes !== text.open(notesField, cat.notes)) {
+          data.notes = text.seal(notesField, body.notes);
           audit.push({ action: 'screening.category_notes_updated', details: { category } });
         }
         if (body.status === 'COMPLETED' && cat.status !== 'COMPLETED') {
@@ -616,7 +648,10 @@ export function createScreeningsService({
     addMeasurement(ctx: AccessContext, id: string, body: AddMeasurementRequest) {
       return write(ctx, id, { expectedVersion: body.expectedVersion }, async (tx, session) => {
         const created = await tx.measurement.create({
-          data: { ...measurementData(session, body, body.type, at(ctx)), recordedById: ctx.userId },
+          data: {
+            ...measurementData(session, body, body.type, at(ctx), randomUUID()),
+            recordedById: ctx.userId,
+          },
         });
         return {
           patch: startedPatch(session),
@@ -655,12 +690,16 @@ export function createScreeningsService({
           );
         }
         const type = original.type as AddMeasurementRequest['type'];
+        const newId = randomUUID();
         const created = await tx.measurement.create({
           data: {
-            ...measurementData(session, body, type, at(ctx)),
+            ...measurementData(session, body, type, at(ctx), newId),
             recordedById: ctx.userId,
             supersedesId: original.id,
-            correctionReason: body.correctionReason,
+            correctionReason: sessionTextSealer(pii, id).seal(
+              { kind: 'measurement', measurementId: newId, field: 'correctionReason' },
+              body.correctionReason,
+            ),
           },
         });
         return {
@@ -736,7 +775,10 @@ export function createScreeningsService({
             status: 'CANCELLED',
             cancelledAt: at(ctx),
             cancelledById: ctx.userId,
-            cancelReason: body.reason,
+            cancelReason: sessionTextSealer(pii, id).seal(
+              { kind: 'session', field: 'cancelReason' },
+              body.reason,
+            ),
           },
           audit: [{ action: 'screening.cancelled', details: {} }],
         }),

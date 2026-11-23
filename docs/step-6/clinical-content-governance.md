@@ -59,8 +59,12 @@ npm run db:protocol-status -- --code <CODE> --version 1 --to ACTIVE --actor <LOG
 npm run db:protocol-status -- --code <CODE> --version 1 --to RETIRED --actor <LOGIN-ID>
 ```
 
-How approved content gets loaded as a DRAFT (format, file, review checklist) is **not yet
-defined**. It is listed below as an open programme decision.
+**Loading approved content (6F):** the content team fills a metadata JSON and a questions CSV;
+`npm run db:protocol-import -- … --check` validates them and lists every problem with its CSV line,
+then `--actor <LOGIN-ID>` loads them as a new, audited DRAFT version (an existing version is never
+overwritten, and unfilled template text is refused). Step-by-step guide:
+[clinical-content-intake/README.md](clinical-content-intake/README.md). The review checklist itself
+is still a programme decision.
 
 ## 5. Where content is usable
 
@@ -91,7 +95,7 @@ registration age range (0-6954 days, not a clinical band), `sourceReference` "NO
 1. The actual Four-D questions, Hindi/English wording, answer options, age bands and source
    guideline references.
 2. The approver role and approval evidence (assumed: `screening.review` holder + reference).
-3. The intake format and review checklist for loading approved content as DRAFT.
+3. The review checklist for imported content (the intake format and importer exist since 6F).
 4. Data-quality ranges for measurements (stage 6C uses only "physically impossible" limits,
    marked as assumptions).
 5. Scoring and referral rules, if any. None are implemented.

@@ -14,6 +14,7 @@ import { fromDbDate } from '../children/birthDate';
 import { toDisplayUnit } from './measurementRules';
 import { toSummary } from './protocols.service';
 import { responseValue } from './responseRules';
+import type { SessionTextSealer } from './sensitiveText';
 
 /** Fields for list rows: no answers, notes or measurements. */
 export const summaryInclude = {
@@ -94,7 +95,12 @@ export function completeness(
   };
 }
 
-export function toSessionDetail(row: DetailRow, userId: string): ScreeningSessionDetail {
+/** Free text is decrypted here, for the authorised caller only (sealer bound to this session). */
+export function toSessionDetail(
+  row: DetailRow,
+  userId: string,
+  text: SessionTextSealer,
+): ScreeningSessionDetail {
   const dob = fromDbDate(row.dateOfBirthAtStart);
   const started = new Set(row.categories.map((c) => c.category));
   return {
@@ -102,7 +108,7 @@ export function toSessionDetail(row: DetailRow, userId: string): ScreeningSessio
     dateOfBirthAtStart: formatCalendarDate(dob),
     ageAtStart: ageOn(dob, todayInIndia(row.startedAt)),
     screeningConsentId: row.screeningConsentId,
-    cancelReason: row.cancelReason,
+    cancelReason: text.open({ kind: 'session', field: 'cancelReason' }, row.cancelReason),
     cancelledByName: row.cancelledBy?.displayName ?? null,
     canEdit: row.conductedById === userId && (row.status === 'DRAFT' || row.status === 'IN_PROGRESS'),
     sessionCategories: row.categories.map((c) => {
@@ -114,13 +120,21 @@ export function toSessionDetail(row: DetailRow, userId: string): ScreeningSessio
         protocol: toSummary(c.protocol, c.protocol.questions.length),
         protocolStatusAtStart: c.protocolStatusAtStart,
         usedApprovedContent: isApproved(c),
-        notes: c.notes,
+        notes: text.open({ kind: 'cat', category: c.category, field: 'notes' }, c.notes),
         startedAt: c.startedAt.toISOString(),
         completedAt: c.completedAt?.toISOString() ?? null,
         completeness: completeness(c.protocol.questions, c.observations),
         responses: c.observations
           .map((o) => {
             const q = questions.get(o.questionId)!;
+            const field = (f: 'valueText' | 'notes' | 'notAssessedReason') =>
+              ({ kind: 'obs', questionId: o.questionId, field: f }) as const;
+            const plain = {
+              ...o,
+              valueText: text.open(field('valueText'), o.valueText),
+              notes: text.open(field('notes'), o.notes),
+              notAssessedReason: text.open(field('notAssessedReason'), o.notAssessedReason),
+            };
             return {
               sort: q.sortOrder,
               response: {
@@ -129,9 +143,9 @@ export function toSessionDetail(row: DetailRow, userId: string): ScreeningSessio
                 questionCode: q.code,
                 status: o.status,
                 source: o.source,
-                value: responseValue(q, o),
-                notAssessedReason: o.notAssessedReason,
-                notes: o.notes,
+                value: responseValue(q, plain),
+                notAssessedReason: plain.notAssessedReason,
+                notes: plain.notes,
                 recordedAt: o.recordedAt.toISOString(),
                 updatedAt: o.updatedAt.toISOString(),
                 recordedByName: o.recordedBy.displayName,
@@ -157,12 +171,15 @@ export function toSessionDetail(row: DetailRow, userId: string): ScreeningSessio
         deviceMake: m.deviceMake,
         deviceModel: m.deviceModel,
         deviceSerial: m.deviceSerial,
-        notes: m.notes,
+        notes: text.open({ kind: 'measurement', measurementId: m.id, field: 'notes' }, m.notes),
         measuredAt: m.measuredAt.toISOString(),
         recordedAt: m.createdAt.toISOString(),
         recordedByName: m.recordedBy.displayName,
         supersedesId: m.supersedesId,
-        correctionReason: m.correctionReason,
+        correctionReason: text.open(
+          { kind: 'measurement', measurementId: m.id, field: 'correctionReason' },
+          m.correctionReason,
+        ),
         isCurrent: m.supersededBy === null,
       };
     }),

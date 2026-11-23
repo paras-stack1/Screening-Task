@@ -9,7 +9,9 @@
 | S6-002 | 6C | Medium | A database integrity-rule violation that the service did not pre-check reached the client as 500 `INTERNAL_ERROR` | Fixed |
 | S6-003 | 6D | Medium | Hiding the screening section from the tab bar with `href: null` made every `/screening` URL unreachable (silently redirected to the dashboard) | Fixed |
 | S6-004 | 6E | Medium | The 16 screening routes were missing from the API's route inventory test (the list that proves every protected route rejects a missing token) | Fixed |
-| S6-005 | 6E | Low | One DB test timed out (20 s) once in five full runs; normally ~0.5 s | Open - not reproducible |
+| S6-005 | 6E | Low | One DB test timed out (20 s) once in five full runs; normally ~0.5 s | Open - not reproducible (not seen again in 6F runs) |
+| S6-006 | 6F | Low | The content importer looked for files relative to `services/api` (where npm runs workspace scripts), so paths typed from the repository root were "not found" | Fixed: paths resolve from the folder npm was started in (`INIT_CWD`); verified by running the real command from the root |
+| S6-007 | 6F | Low | The importer did not report duplicate question codes when the sheet also had other errors (the schema's whole-object checks only run once every field is valid) | Fixed: cross-row checks run in the importer; regression test "lists every problem with its CSV line, in one pass" |
 
 ## S6-004 - Screening routes missing from the authentication inventory
 

@@ -668,4 +668,8 @@ export const hi: Record<TranslationKey, string> = {
   'screening.cancel.keep': 'जाँच रखें',
   'screening.cancel.dialogTitle': 'यह जाँच रद्द करें?',
   'screening.cancel.dialogMessage': 'सहेजे गए उत्तर रखे जाते हैं, पर आगे कुछ जोड़ा नहीं जा सकता।',
+  'screening.measurement.dateLabel': 'यह कब मापा गया?',
+  'screening.measurement.dateHint': 'कार्ड से या बताई गई तारीख। दिन का समय दर्ज नहीं होता।',
+  'screening.measurement.errors.date': 'सही तारीख लिखें (दिन, महीना, वर्ष)।',
+  'screening.measurement.errors.dateFuture': 'तारीख भविष्य की नहीं हो सकती।',
 };

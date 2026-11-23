@@ -358,6 +358,31 @@ describe('measurements', () => {
     expect((posts(/\/measurements$/)[0]!.body as { value: unknown }).value).toBe('3250');
   });
 
+  it('asks for the date of a value copied from a card and sends the start of that day', async () => {
+    await openMeasurements();
+    expect(screen.queryByTestId('measurement-date')).toBeNull();
+    await fireEvent.press(screen.getByTestId('measurement-type-WEIGHT'));
+    await fireEvent.press(screen.getByTestId('measurement-unit-kg'));
+    await fireEvent.changeText(screen.getByTestId('measurement-value'), '9.8');
+    await fireEvent.press(screen.getByTestId('measurement-source-FROM_RECORD'));
+    await fireEvent.press(screen.getByTestId('measurement-quality-QUESTIONABLE'));
+    expect(screen.getByTestId('measurement-date')).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByTestId('measurement-save'));
+    expect(await screen.findByTestId('measurement-error')).toHaveTextContent(
+      'Enter a real date (day, month, year).',
+    );
+    expect(posts(/\/measurements$/)).toHaveLength(0);
+
+    await fireEvent.changeText(screen.getByTestId('measurement-date-day'), '15');
+    await fireEvent.changeText(screen.getByTestId('measurement-date-month'), '10');
+    await fireEvent.changeText(screen.getByTestId('measurement-date-year'), '2026');
+    await fireEvent.press(screen.getByTestId('measurement-save'));
+    expect(await screen.findByText('Measurement saved.')).toBeOnTheScreen();
+    const body = posts(/\/measurements$/)[0]!.body as { measuredAt: string; source: string };
+    expect(body).toMatchObject({ source: 'FROM_RECORD', measuredAt: '2026-10-14T18:30:00.000Z' });
+  });
+
   it("shows the server's plausibility refusal in plain language", async () => {
     await openMeasurements();
     await fill('400');

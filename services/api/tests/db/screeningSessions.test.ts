@@ -17,6 +17,7 @@ import { ensureConsentTemplates } from '../../src/modules/consent/consentNotices
 import { ensureDemoProtocols } from '../../src/modules/screening/demoProtocols';
 import { testAuthConfig } from './authFixture';
 import { api, buildAuthzFixture, TestClock, tokenFor, type AuthzFixture } from './authzFixture';
+import { createPiiCrypto, type PiiCrypto } from '../../src/utils/piiCrypto';
 import { createTestPrisma, resetData } from './testDatabase';
 
 /**
@@ -31,8 +32,9 @@ let app: ReturnType<typeof createApp>;
 const tokens = new Map<string, string>();
 const questions = new Map<string, Record<string, string>>(); // category -> code -> questionId
 
-function makeApp(writeLimit = 10_000) {
+function makeApp(writeLimit = 10_000, pii?: PiiCrypto) {
   return createApp({
+    ...(pii ? { pii } : {}),
     auth: {
       db: prisma,
       config: testAuthConfig,
@@ -838,6 +840,126 @@ describe('lists, history and the dashboard summary', () => {
     );
     expect(other).toMatchObject({ completedToday: 0, inProgress: 0, drafts: 0 });
     expect((await (await as('sup1')).get('/screenings/summary')).status).toBe(403);
+  });
+});
+
+describe('free text encrypted at rest (Step 6F)', () => {
+  const SECRET = 'SYNTHETIC-SECRET';
+  const plaintextIn = (values: Array<string | null>) => values.some((v) => v !== null && v.includes(SECRET));
+
+  it('stores notes, text answers and reasons encrypted, and shows them decrypted to the caller', async () => {
+    let { s } = await sessionWithDiseases();
+    s = session(
+      await save(s, 'DISEASES', [
+        { ...yes(q('DISEASES', 'DEMO_Q3'), `${SECRET} answer`), notes: `${SECRET} note` },
+        {
+          questionId: q('DISEASES', 'DEMO_Q1'),
+          status: 'NOT_ASSESSED',
+          source: 'WORKER_OBSERVED',
+          notAssessedReason: `${SECRET} reason`,
+        },
+      ]),
+    );
+    s = session(
+      await (
+        await as('asha1')
+      ).patch(`/screenings/${s.id}/categories/DISEASES`, {
+        expectedVersion: s.version,
+        notes: `${SECRET} area`,
+      }),
+    );
+    s = session(
+      await (
+        await as('asha1')
+      ).post(`/screenings/${s.id}/measurements`, measurement(s, { notes: `${SECRET} m` })),
+    );
+    s = session(
+      await (
+        await as('asha1')
+      ).post(`/screenings/${s.id}/measurements/${s.measurements[0]!.id}/corrections`, {
+        ...correction(s, { value: '24.4' }),
+        correctionReason: `${SECRET} fix`,
+      }),
+    );
+    // The caller sees plaintext.
+    const responses = s.sessionCategories[0]!.responses;
+    expect(responses.find((r) => r.questionCode === 'DEMO_Q3')).toMatchObject({
+      value: `${SECRET} answer`,
+      notes: `${SECRET} note`,
+    });
+    expect(responses.find((r) => r.questionCode === 'DEMO_Q1')!.notAssessedReason).toBe(`${SECRET} reason`);
+    expect(s.sessionCategories[0]!.notes).toBe(`${SECRET} area`);
+    expect(s.measurements.map((m) => [m.notes, m.correctionReason])).toEqual([
+      [`${SECRET} m`, null],
+      [null, `${SECRET} fix`],
+    ]);
+
+    // The database holds only ciphertext.
+    const obs = await prisma.screeningObservation.findMany({ where: { sessionId: s.id } });
+    const cat = await prisma.screeningSessionCategory.findMany({ where: { sessionId: s.id } });
+    const ms = await prisma.measurement.findMany({ where: { sessionId: s.id } });
+    const stored = [
+      ...obs.flatMap((o) => [o.valueText, o.notes, o.notAssessedReason]),
+      ...cat.map((c) => c.notes),
+      ...ms.flatMap((m) => [m.notes, m.correctionReason]),
+    ];
+    expect(plaintextIn(stored)).toBe(false);
+    const present = stored.filter((v): v is string => v !== null);
+    expect(present.every((v) => v.startsWith('enc1:'))).toBe(true);
+    expect(present).toHaveLength(6);
+  });
+
+  it('encrypts the cancel reason', async () => {
+    const { s } = await sessionWithDiseases();
+    const res = await (
+      await as('asha1')
+    ).post(`/screenings/${s.id}/cancel`, {
+      expectedVersion: s.version,
+      reason: `${SECRET} cancel`,
+    });
+    expect(session(res).cancelReason).toBe(`${SECRET} cancel`);
+    const row = await prisma.screeningSession.findUniqueOrThrow({ where: { id: s.id } });
+    expect(row.cancelReason).toMatch(/^enc1:/);
+    expect(plaintextIn([row.cancelReason])).toBe(false);
+  });
+
+  it('refuses to serve a ciphertext moved to another question (no data, no ciphertext leaked)', async () => {
+    let { s } = await sessionWithDiseases();
+    s = session(
+      await save(s, 'DISEASES', [
+        { ...yes(q('DISEASES', 'DEMO_Q1')), notes: `${SECRET} moved` },
+        yes(q('DISEASES', 'DEMO_Q2'), 3),
+      ]),
+    );
+    const [a, b] = await Promise.all(
+      ['DEMO_Q1', 'DEMO_Q2'].map((code) =>
+        prisma.screeningObservation.findFirstOrThrow({
+          where: { sessionId: s.id, questionId: q('DISEASES', code) },
+        }),
+      ),
+    );
+    await prisma.screeningObservation.update({ where: { id: b!.id }, data: { notes: a!.notes } });
+    const res = await (await as('asha1')).get(`/screenings/${s.id}`);
+    expect(res.status).toBe(500);
+    expect(res.text).not.toContain('enc1:');
+    expect(res.text).not.toContain(SECRET);
+  });
+
+  it('without an encryption key: text is refused with 503, structured answers still save', async () => {
+    const keyless = makeApp(10_000, createPiiCrypto({}));
+    const { s } = await sessionWithDiseases();
+    const token = await tokenFor(keyless, 'asha1');
+    const client = api(keyless, token);
+    const refused = await client.post(`/screenings/${s.id}/categories/DISEASES/responses`, {
+      expectedVersion: s.version,
+      responses: [{ ...yes(q('DISEASES', 'DEMO_Q1')), notes: 'synthetic' }],
+    });
+    expect([refused.status, refused.body.error.code]).toEqual([503, 'SENSITIVE_TEXT_UNAVAILABLE']);
+    const ok = await client.post(`/screenings/${s.id}/categories/DISEASES/responses`, {
+      expectedVersion: s.version,
+      responses: [yes(q('DISEASES', 'DEMO_Q1'))],
+    });
+    expect(ok.status).toBe(200);
   });
 });
 
