@@ -35,13 +35,6 @@ export function HomePage({ user, access }: { user: AuthUser; access: EffectiveAc
         )}
       </section>
 
-      <section className="card" aria-labelledby="next-heading">
-        <h2 id="next-heading">{t('home.next.title')}</h2>
-        <ul>
-          <li>{t('home.next.assignments')}</li>
-        </ul>
-      </section>
-
       <Alert tone="info">{t('home.privacy')}</Alert>
     </>
   );

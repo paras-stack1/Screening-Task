@@ -131,6 +131,7 @@ describe('protected routes without a valid access token', () => {
     ['post', `/api/v1/users/${ID}/status`],
     ['post', `/api/v1/users/${ID}/reset-password`],
     ['post', `/api/v1/users/${ID}/revoke-sessions`],
+    ['get', '/api/v1/assignments'],
     ['post', '/api/v1/assignments'],
     ['post', `/api/v1/assignments/${ID}/end`],
     ['post', `/api/v1/assignments/${ID}/suspend`],

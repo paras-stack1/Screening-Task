@@ -73,6 +73,43 @@ export const assignmentViewSchema = z.object({
 });
 export type AssignmentView = z.infer<typeof assignmentViewSchema>;
 
+/**
+ * GET /assignments (admin portal stage PD): assignments located in the caller's
+ * assignment.manage areas, with the holder's name and login ID - so supervisors, who manage
+ * assignments but not accounts, can find the people they assign. Never the caller's own.
+ * `current` (default) = not revoked and not ended; `all` includes history.
+ */
+export const assignmentListQuerySchema = z.strictObject({
+  search: z.string().trim().min(2).max(64).optional(),
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'REVOKED']).optional(),
+  include: z.enum(['current', 'all']).default('current'),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type AssignmentListQuery = z.infer<typeof assignmentListQuerySchema>;
+
+export const assignmentListItemSchema = assignmentViewSchema.extend({
+  user: z.object({
+    id: z.string(),
+    loginId: z.string(),
+    displayName: z.string(),
+    status: z.enum(['ACTIVE', 'SUSPENDED', 'DEACTIVATED']),
+  }),
+  areaNameHi: z.string().nullable(),
+});
+export type AssignmentListItem = z.infer<typeof assignmentListItemSchema>;
+
+export const assignmentListResponseSchema = z.object({
+  items: z.array(assignmentListItemSchema),
+  page: z.number().int(),
+  pageSize: z.number().int(),
+  total: z.number().int(),
+});
+export type AssignmentListResponse = z.infer<typeof assignmentListResponseSchema>;
+
+/** Response of POST /assignments and the assignment actions. */
+export const assignmentResponseSchema = z.object({ assignment: assignmentViewSchema });
+
 export const userViewSchema = z.object({
   id: z.string(),
   loginId: z.string(),

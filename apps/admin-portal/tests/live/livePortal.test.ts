@@ -1,5 +1,7 @@
 import {
   areaListResponseSchema,
+  assignmentListResponseSchema,
+  assignmentResponseSchema,
   roleListResponseSchema,
   temporaryPasswordResponseSchema,
   userDetailResponseSchema,
@@ -190,6 +192,64 @@ describe.skipIf(!API)('live: admin portal session against a running API', () => 
       status,
     );
     expect(gone.user.status).toBe('DEACTIVATED');
+    await tab.session.logout();
+  });
+
+  it('stage PD: a supervisor finds a worker, adds an area, suspends, reactivates, ends and revokes', async () => {
+    const supervisor = {
+      login: process.env.LIVE_SUPERVISOR_LOGIN ?? '',
+      password: process.env.LIVE_SUPERVISOR_PASSWORD ?? '',
+    };
+    const workerLogin = process.env.LIVE_ASSIGNEE_LOGIN ?? '';
+    const tab = createPortalServices({
+      apiBaseUrl: API!,
+      fetchFn: browserLikeFetch({ value: null, attributes: '' }),
+    });
+    await tab.session.login(supervisor.login, supervisor.password);
+    const api = tab.api;
+
+    const listed = await api.get(`/assignments?search=${workerLogin}`, assignmentListResponseSchema);
+    const person = listed.items[0]!.user;
+    expect(person.loginId).toBe(workerLogin);
+
+    const roles = await api.get('/roles', roleListResponseSchema);
+    const asha = roles.roles.find((r) => r.code === 'ASHA')!;
+    const areas = await api.get(
+      `/areas?search=${encodeURIComponent(process.env.LIVE_ASSIGN_AREA_SEARCH ?? 'Area V1')}`,
+      areaListResponseSchema,
+    );
+    const area = areas.items[0]!;
+
+    const nextYear = new Date().getUTCFullYear() + 1;
+    const created = await api.post(
+      '/assignments',
+      {
+        userId: person.id,
+        roleId: asha.id,
+        areaId: area.id,
+        scope: 'AREA_ONLY',
+        effectiveTo: `${nextYear}-03-31T00:00:00.000+05:30`,
+        reason: 'Live PD test',
+      },
+      assignmentResponseSchema,
+    );
+    const id = created.assignment.id;
+    expect(created.assignment.status).toBe('ACTIVE');
+
+    const act = (action: string, body: object) =>
+      api.post(`/assignments/${id}/${action}`, body, assignmentResponseSchema);
+    expect((await act('suspend', { reason: 'Live test' })).assignment.status).toBe('SUSPENDED');
+    expect((await act('reactivate', { reason: 'Live test' })).assignment.status).toBe('ACTIVE');
+    const ended = await act('end', {
+      reason: 'Live test',
+      effectiveTo: `${nextYear}-01-31T00:00:00.000+05:30`,
+    });
+    expect(ended.assignment.effectiveTo).toBe(new Date(`${nextYear}-01-31T00:00:00.000+05:30`).toISOString());
+    // An assignment can only be shortened: extending is refused.
+    await expect(
+      act('end', { reason: 'Live test', effectiveTo: `${nextYear}-02-28T00:00:00.000+05:30` }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect((await act('revoke', { reason: 'Live test clean-up' })).assignment.status).toBe('REVOKED');
     await tab.session.logout();
   });
 });

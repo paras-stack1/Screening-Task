@@ -570,3 +570,9 @@ th {
   color: var(--error-text);
   margin: 0;
 }
+
+.badge-ended {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}

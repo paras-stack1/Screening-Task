@@ -34,6 +34,7 @@ export function Layout({ user }: { user: AuthUser }) {
           {t('nav.home')}
         </NavLink>
         <NavLink to="/users">{t('nav.users')}</NavLink>
+        <NavLink to="/assignments">{t('nav.assignments')}</NavLink>
         <NavLink to="/account/password">{t('nav.password')}</NavLink>
       </nav>
       <main className="content" id="main" tabIndex={-1}>

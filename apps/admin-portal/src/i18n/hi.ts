@@ -82,8 +82,6 @@ export const hi: Record<TranslationKey, string> = {
   'home.noAssignments': 'आपका कोई वर्तमान असाइनमेंट नहीं है।',
   'home.canManageUsers': 'आप इन क्षेत्रों में उपयोगकर्ता खाते बना और प्रबंधित कर सकते हैं।',
   'home.canManageAssignments': 'आप इन क्षेत्रों में क्षेत्र असाइनमेंट दे और बदल सकते हैं।',
-  'home.next.title': 'अगले अपडेट में आ रहा है',
-  'home.next.assignments': 'क्षेत्र असाइनमेंट जोड़ना, समाप्त करना और निलंबित करना',
   'home.privacy': 'यह पोर्टल कभी भी बच्चों या अभिभावकों का विवरण या जाँच के परिणाम नहीं दिखाता।',
 
   'users.title': 'उपयोगकर्ता',
@@ -177,7 +175,6 @@ export const hi: Record<TranslationKey, string> = {
   'detail.col.period': 'अवधि',
   'detail.period': '{{from}} – {{to}}',
   'detail.openEnded': 'कोई अंतिम तिथि नहीं',
-  'detail.assignmentsNext': 'असाइनमेंट जोड़ना और बदलना अगले अपडेट में आएगा।',
   'detail.actions': 'खाते की कार्रवाइयाँ',
   'detail.deactivatedNote': 'यह खाता स्थायी रूप से निष्क्रिय है और बदला नहीं जा सकता।',
 
@@ -206,6 +203,59 @@ export const hi: Record<TranslationKey, string> = {
   'action.errors.reasonTooLong': 'कारण बहुत लंबा है (अधिकतम 500 अक्षर)',
   'action.errors.conflict':
     'इस बीच खाता बदल गया। पेज फिर से लोड किया गया है; कृपया जाँचें और फिर से कोशिश करें।',
+
+  'nav.assignments': 'असाइनमेंट',
+
+  'assignments.title': 'क्षेत्र असाइनमेंट',
+  'assignments.intro':
+    'आपके क्षेत्रों में कौन कहाँ काम करता है। हर बदलाव के लिए कारण ज़रूरी है और वह ऑडिट लॉग में दर्ज होता है।',
+  'assignments.include': 'दिखाएँ',
+  'assignments.include.current': 'केवल वर्तमान',
+  'assignments.include.all': 'समाप्त और रद्द सहित',
+  'assignments.col.person': 'व्यक्ति',
+  'assignments.col.actions': 'कार्रवाइयाँ',
+  'assignments.empty': 'कोई असाइनमेंट मेल नहीं खाता।',
+  'assignments.addForPerson': '{{name}} के लिए क्षेत्र जोड़ें',
+  'assignments.page': 'पेज {{page}} / {{pages}} ({{total}} असाइनमेंट)',
+
+  'assignment.ended': 'समाप्त',
+  'assignment.startsOn': '{{date}} से शुरू',
+  'assignment.add': 'असाइनमेंट जोड़ें',
+  'assignment.addTitle': '{{name}} के लिए क्षेत्र असाइनमेंट जोड़ें',
+  'assignment.startLabel': 'पहला दिन (वैकल्पिक)',
+  'assignment.startHint': 'अभी शुरू करने के लिए खाली छोड़ें। अतीत की तिथि नहीं हो सकती।',
+  'assignment.lastDayLabel': 'अंतिम दिन (वैकल्पिक)',
+  'assignment.lastDayHint':
+    'कोई अंतिम तिथि न हो तो खाली छोड़ें। असाइनमेंट इस दिन के बाद आधी रात को समाप्त होगा (भारतीय समय)।',
+  'assignment.submit': 'असाइनमेंट जोड़ें',
+  'assignment.submitting': 'जोड़ा जा रहा है…',
+  'assignment.added': 'असाइनमेंट जोड़ दिया गया है।',
+  'assignment.missingPerson': 'पहले असाइनमेंट सूची से कोई व्यक्ति चुनें।',
+
+  'assignment.action.end': 'असाइनमेंट समाप्त करें',
+  'assignment.action.end.help':
+    'व्यक्ति इस क्षेत्र में काम करना बंद कर देगा। अभी समाप्त करने के लिए अंतिम दिन खाली छोड़ें। असाइनमेंट केवल छोटा किया जा सकता है, बढ़ाया नहीं जा सकता।',
+  'assignment.action.suspend': 'निलंबित करें',
+  'assignment.action.suspend.help': 'इस असाइनमेंट को अस्थायी रूप से रोकता है (जैसे छुट्टी के दौरान)।',
+  'assignment.action.reactivate': 'फिर से सक्रिय करें',
+  'assignment.action.reactivate.help': 'निलंबित असाइनमेंट फिर से लागू होगा।',
+  'assignment.action.revoke': 'रद्द करें',
+  'assignment.action.revoke.help':
+    'स्थायी: केवल गलती से दिए गए असाइनमेंट के लिए उपयोग करें। किसी क्षेत्र में सामान्य काम रोकने के लिए इसे समाप्त करें।',
+  'assignment.endLastDayLabel': 'अंतिम दिन (वैकल्पिक)',
+  'assignment.done.end': 'असाइनमेंट समाप्त कर दिया गया है।',
+  'assignment.done.suspend': 'असाइनमेंट निलंबित है।',
+  'assignment.done.reactivate': 'असाइनमेंट फिर से लागू है।',
+  'assignment.done.revoke': 'असाइनमेंट रद्द कर दिया गया है।',
+  'assignment.actionsFor': '{{area}} में {{role}} के लिए कार्रवाइयाँ',
+
+  'assignment.errors.overlap': 'इस व्यक्ति के पास इसी अवधि में इस क्षेत्र में यह भूमिका पहले से है।',
+  'assignment.errors.self': 'आप अपने स्वयं के असाइनमेंट नहीं बदल सकते।',
+  'assignment.errors.dates':
+    'तिथियाँ जाँचें: वे अतीत में नहीं हो सकतीं, अंतिम दिन पहले दिन से पहले नहीं हो सकता, और असाइनमेंट केवल छोटा किया जा सकता है।',
+  'assignment.errors.lastBeforeStart': 'अंतिम दिन पहले दिन से पहले नहीं हो सकता',
+  'assignment.errors.past': 'तिथि अतीत में नहीं हो सकती',
+  'assignment.errors.notFound': 'यह असाइनमेंट नहीं मिला, या यह आपके क्षेत्रों से बाहर है।',
 
   'notFound.title': 'पेज नहीं मिला',
   'notFound.back': 'होम पेज पर जाएँ',

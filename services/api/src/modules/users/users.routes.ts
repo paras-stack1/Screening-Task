@@ -1,10 +1,12 @@
 import {
+  assignmentListQuerySchema,
   changeUserStatusRequestSchema,
   createAssignmentRequestSchema,
   createUserRequestSchema,
   endAssignmentRequestSchema,
   reasonRequestSchema,
   userListQuerySchema,
+  type AssignmentListQuery,
   type ChangeUserStatusRequest,
   type CreateAssignmentRequest,
   type CreateUserRequest,
@@ -95,6 +97,10 @@ export function createAssignmentsRouter(deps: AdminRouterDependencies): Router {
   const now = deps.now ?? (() => new Date());
   const service = createAssignmentsService(deps.db);
   router.use(createAuthenticate(deps)(), createRequirePermission(deps)('assignment.manage'));
+
+  router.get('/', validate({ query: assignmentListQuerySchema }), async (_req, res) => {
+    res.json(await service.list(context(res, now), getValidated<AssignmentListQuery>(res, 'query')));
+  });
 
   router.post('/', validate({ body: createAssignmentRequestSchema }), async (_req, res) => {
     const body = getValidated<CreateAssignmentRequest>(res, 'body');

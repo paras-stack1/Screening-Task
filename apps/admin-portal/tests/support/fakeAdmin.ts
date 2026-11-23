@@ -111,7 +111,106 @@ export class FakeAdmin {
   refuseNextCreate: { status: number; code: string } | null = null;
   /** Makes the next status change answer 409 CONCURRENT_CHANGE. */
   conflictNextStatus = false;
+  /** Makes the next POST /assignments fail with this error. */
+  refuseNextAssignment: { status: number; code: string } | null = null;
   private seq = 0;
+
+  private assignmentRoute(method: string, path: string, url: URL, body: unknown): Response | null {
+    const now = new Date();
+    const isCurrent = (a: AssignmentView) =>
+      a.status !== 'REVOKED' && (a.effectiveTo === null || new Date(a.effectiveTo) > now);
+
+    if (method === 'GET' && path === '/assignments') {
+      const include = url.searchParams.get('include') ?? 'current';
+      const status = url.searchParams.get('status');
+      const search = url.searchParams.get('search')?.toLowerCase();
+      const all = this.managed.flatMap((m) =>
+        m.assignments
+          .filter((a) => include === 'all' || isCurrent(a))
+          .filter((a) => !status || a.status === status)
+          .filter(
+            () =>
+              !search ||
+              m.user.displayName.toLowerCase().includes(search) ||
+              m.user.loginId.toLowerCase().includes(search),
+          )
+          .map((a) => ({
+            ...a,
+            areaNameHi: null,
+            user: {
+              id: m.user.id,
+              loginId: m.user.loginId,
+              displayName: m.user.displayName,
+              status: m.user.status,
+            },
+          })),
+      );
+      return json(200, { items: all, page: 1, pageSize: 20, total: all.length });
+    }
+
+    if (method === 'POST' && path === '/assignments') {
+      if (this.refuseNextAssignment) {
+        const refusal = this.refuseNextAssignment;
+        this.refuseNextAssignment = null;
+        return json(refusal.status, error(refusal.code));
+      }
+      const input = body as {
+        userId: string;
+        areaId: string;
+        roleId: string;
+        scope: 'AREA_ONLY' | 'AREA_AND_DESCENDANTS';
+        effectiveFrom?: string;
+        effectiveTo?: string;
+      };
+      const owner = this.managed.find((m) => m.user.id === input.userId);
+      if (!owner) return json(404, error('NOT_FOUND'));
+      if (
+        owner.assignments.some((a) => isCurrent(a) && a.areaId === input.areaId && a.roleId === input.roleId)
+      ) {
+        return json(409, error('ASSIGNMENT_OVERLAP'));
+      }
+      const area = AREAS.find((a) => a.id === input.areaId)!;
+      const role = ROLES.find((r) => r.id === input.roleId)!;
+      this.seq += 1;
+      const assignment: AssignmentView = {
+        id: `asg-new-${this.seq}`,
+        userId: owner.user.id,
+        areaId: area.id,
+        areaName: area.nameEn,
+        roleId: role.id,
+        roleCode: role.code,
+        scope: input.scope,
+        status: 'ACTIVE',
+        effectiveFrom: input.effectiveFrom ?? now.toISOString(),
+        effectiveTo: input.effectiveTo ?? null,
+      };
+      owner.assignments.push(assignment);
+      return json(201, { assignment });
+    }
+
+    const match = /^\/assignments\/([^/]+)\/(end|suspend|reactivate|revoke)$/.exec(path);
+    if (!match || method !== 'POST') return null;
+    const owner = this.managed.find((m) => m.assignments.some((a) => a.id === match[1]));
+    const index = owner?.assignments.findIndex((a) => a.id === match[1]) ?? -1;
+    if (!owner || index < 0) return json(404, error('NOT_FOUND'));
+    const current = owner.assignments[index]!;
+    const input = body as { effectiveTo?: string };
+    const transitions: Record<string, [string[], AssignmentView['status']]> = {
+      suspend: [['ACTIVE'], 'SUSPENDED'],
+      reactivate: [['SUSPENDED'], 'ACTIVE'],
+      revoke: [['ACTIVE', 'SUSPENDED'], 'REVOKED'],
+      end: [['ACTIVE', 'SUSPENDED'], current.status],
+    };
+    const [from, to] = transitions[match[2]!]!;
+    if (!from.includes(current.status)) return json(409, error('INVALID_TRANSITION'));
+    const updated: AssignmentView = {
+      ...current,
+      status: to,
+      effectiveTo: match[2] === 'end' ? (input.effectiveTo ?? now.toISOString()) : current.effectiveTo,
+    };
+    owner.assignments[index] = updated;
+    return json(200, { assignment: updated });
+  }
 
   constructor(private readonly server: FakeServer) {
     server.extraRoutes = (request) => this.route(request);
@@ -162,7 +261,12 @@ export class FakeAdmin {
     caller: FakeUser | undefined;
   }): Response | null {
     const isAdminPath =
-      path === '/roles' || path === '/areas' || path === '/users' || path.startsWith('/users/');
+      path === '/roles' ||
+      path === '/areas' ||
+      path === '/users' ||
+      path.startsWith('/users/') ||
+      path === '/assignments' ||
+      path.startsWith('/assignments/');
     if (!isAdminPath) return null;
     if (!caller) return json(401, error('UNAUTHENTICATED'));
     const perms = caller.access.permissions;
@@ -184,6 +288,11 @@ export class FakeAdmin {
         items = AREAS.filter((a) => PARENT[a.id] === parentId);
       } else items = AREAS.filter((a) => PARENT[a.id] === null);
       return json(200, { items, truncated: false });
+    }
+
+    if (path === '/assignments' || path.startsWith('/assignments/')) {
+      if (!hasAssignmentManage) return json(403, error('FORBIDDEN'));
+      return this.assignmentRoute(method, path, url, body);
     }
 
     if (!hasUserManage) return json(403, error('FORBIDDEN'));

@@ -88,3 +88,12 @@ to `/api/v1/auth/web`, so no other endpoint ever receives it; all other endpoint
   password change replaces the cookie, `Secure` with production settings, audit.
 - Mutation checks: removing the scope filter (6 failures), `httpOnly: false` (1), returning the
   refresh token in the body (3).
+
+## 5. Later additions (stages PC and PD)
+
+- **`GET /api/v1/users`** (stage PC): each row also has `currentAssignments` (role code, area
+  name, status) - only current assignments inside the caller's `user.manage` areas.
+- **`GET /api/v1/assignments`** (stage PD): gate `assignment.manage`; assignments located in the
+  caller's `assignment.manage` areas with the holder's id, login ID, name and account status,
+  never the caller's own. Query `search`, `status`, `include=current|all`, `page`, `pageSize`
+  (max 50). See [README.md](README.md) section 6.

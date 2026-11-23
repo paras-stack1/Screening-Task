@@ -1,7 +1,7 @@
 # Admin Web Portal
 
 > Status: decisions P1-P12 **approved 2026-11-23** (portal before Step 6G-2).
-> Stages **PA** (`790aac7`), **PB** (`934e4d7`) and **PC** done; PD-PE not started. Branch
+> Stages **PA** (`790aac7`), **PB** (`934e4d7`), **PC** (`7523f96`) and **PD** done; PE not started. Branch
 > `feat/admin-portal` (based on `feat/step-6-screening` at 6G-1, commit `9324319`).
 
 A separate browser portal for office administrators: create worker accounts, give them a role
@@ -31,7 +31,7 @@ and an area, change or end assignments. It never shows child health data.
 | PA | API: area tree, browser sign-in with cookie, CORS, tests | **Done** - see [api.md](api.md) |
 | PB | Portal shell: sign in, change password, admin-only access, layout | **Done** - section 4 |
 | PC | Users: list, detail, create worker, temporary password, status, reset | **Done** - section 5 |
-| PD | Assignments: add, end, suspend, reactivate, revoke | Not started |
+| PD | Assignments: add, end, suspend, reactivate, revoke | **Done** - section 6 |
 | PE | Docs, security review, live end-to-end run, PDF guide admin section | Not started |
 
 ## 3. Notes from stage PA (all handled in PB)
@@ -166,3 +166,65 @@ everything else -> the generic translated messages.
   how they find a person to assign is part of stage PD.
 - The create form does not offer future start or end dates for the first assignment (the API
   supports them; stage PD adds them for assignments).
+
+## 6. Stage PD - area assignments
+
+### Screens
+
+| Where | What it does |
+|---|---|
+| `/assignments` (menu "Assignments") | Every assignment in the administrator's areas with the person's name and login ID, role, area, coverage, status (Active / Suspended / Ended / Revoked / "Starts …"), period and actions. Search, status and "current only / including ended and revoked" filters live in the address. **The main page for supervisors**; administrators with `user.manage` also get links to the account pages |
+| `/assignments/new?userId=…` | "Add an area for <name>", opened from the list |
+| `/users/:id` | The assignment table gains an Actions column and an "Add assignment" button |
+
+**Actions** (each with a required reason and an explicit Confirm; only offered for *current*
+assignments, and only those that fit the status):
+
+| Status | Actions |
+|---|---|
+| Active | Suspend, End, Revoke |
+| Suspended | Reactivate, End, Revoke |
+| Ended or revoked | none (history) |
+
+- **End**: optional last day; empty = now. An assignment can only be shortened (the API refuses
+  extending).
+- **Revoke** is shown as permanent and "for an assignment given by mistake"; normal departures
+  use End.
+- **Add**: role (same filtering as account creation), area picker, coverage, optional first
+  and last days, reason.
+
+**Dates are India calendar days.** "Today" is computed in India time whatever the computer's
+time zone. A first day starts at 00:00 India time (today or empty = now); a last day means "until
+the end of that day", sent as 00:00 India time of the following day. Past dates and a last day
+before the first day are refused in the form; the API checks again.
+
+**Errors:** overlapping assignment, own assignment, outside your areas, role above your own,
+changed meanwhile (409, the list reloads), not found, invalid dates (400) - each with its own
+message.
+
+### API change in this stage (additive, no database change)
+
+`GET /api/v1/assignments` - gate `assignment.manage`. Assignments **located in** the caller's
+`assignment.manage` areas, with the holder's id, login ID, display name and account status;
+never the caller's own. Query: `search`, `status`, `include=current|all` (default current =
+not revoked and not ended), `page`, `pageSize` (max 50). This is how supervisors - who manage
+assignments but not accounts (`/users` needs `user.manage`) - find the people they assign. It
+returns names and assignments only: no child data, no account details beyond status. Every
+change still goes through the existing endpoints and their full delegation check.
+
+### Tests
+
+- Portal: **306 tests** (13 new for PD): India-time "today" across midnight, last-day and
+  first-day conversion (month/year/leap rollover), actions per status, supervisor list without
+  account links, suspend (reason required) -> reactivate, end with and without a last day (exact
+  request bodies), past date refused, revoke warning and history filter, adding from the list as
+  a supervisor (roles offered, exact body, "Starts …"), last-before-first and overlap messages,
+  inline add on the account page.
+- API: 5 new database tests - what a block supervisor, an `AREA_ONLY` supervisor and the other
+  district's administrator see; history and filters; field workers refused; a supervisor can add
+  a field-worker assignment but not grant a management role.
+- Mutation checks: end date one day early (3 failures), actions on ended assignments (2), API
+  list without the area limit (3).
+- **Live** (opt-in): a supervisor finds a worker through `GET /assignments`, adds an area with an
+  end date, suspends, reactivates, shortens it, is refused when extending, and revokes it. Run
+  2026-11-23 against a temporary API on the test database: **5/5 passed**.

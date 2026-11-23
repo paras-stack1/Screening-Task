@@ -5,6 +5,8 @@ import { useI18n } from '../i18n';
 import { ChangePasswordPage } from '../pages/ChangePasswordPage';
 import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
+import { AddAssignmentPage } from '../features/assignments/AddAssignmentPage';
+import { AssignmentsPage } from '../features/assignments/AssignmentsPage';
 import { CreateUserPage } from '../features/users/CreateUserPage';
 import { UserDetailPage } from '../features/users/UserDetailPage';
 import { UsersPage } from '../features/users/UsersPage';
@@ -72,7 +74,9 @@ export function App() {
             canManageUsers ? <CreateUserPage access={state.access} /> : <UsersPage canManageUsers={false} />
           }
         />
-        <Route path="users/:userId" element={<UserDetailPage />} />
+        <Route path="users/:userId" element={<UserDetailPage access={state.access} />} />
+        <Route path="assignments" element={<AssignmentsPage canManageUsers={canManageUsers} />} />
+        <Route path="assignments/new" element={<AddAssignmentPage access={state.access} />} />
         <Route path="account/password" element={<ChangePasswordPage forced={false} />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

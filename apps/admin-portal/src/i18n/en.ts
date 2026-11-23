@@ -75,8 +75,6 @@ export const en = {
   'home.noAssignments': 'You have no current assignments.',
   'home.canManageUsers': 'You can create and manage user accounts in these areas.',
   'home.canManageAssignments': 'You can give and change area assignments in these areas.',
-  'home.next.title': 'Coming in the next updates',
-  'home.next.assignments': 'Adding, ending and suspending area assignments',
   'home.privacy': 'This portal never shows children’s or guardians’ details or screening results.',
 
   'users.title': 'Users',
@@ -170,7 +168,6 @@ export const en = {
   'detail.col.period': 'Period',
   'detail.period': '{{from}} – {{to}}',
   'detail.openEnded': 'no end date',
-  'detail.assignmentsNext': 'Adding and changing assignments comes in the next update.',
   'detail.actions': 'Account actions',
   'detail.deactivatedNote': 'This account is deactivated permanently and cannot be changed.',
 
@@ -199,6 +196,59 @@ export const en = {
   'action.errors.reasonTooLong': 'The reason is too long (500 characters at most)',
   'action.errors.conflict':
     'The account was changed meanwhile. The page has been reloaded; please check and try again.',
+
+  'nav.assignments': 'Assignments',
+
+  'assignments.title': 'Area assignments',
+  'assignments.intro':
+    'Who works where in your areas. Every change needs a reason and is recorded in the audit log.',
+  'assignments.include': 'Show',
+  'assignments.include.current': 'Current only',
+  'assignments.include.all': 'Including ended and revoked',
+  'assignments.col.person': 'Person',
+  'assignments.col.actions': 'Actions',
+  'assignments.empty': 'No assignments match.',
+  'assignments.addForPerson': 'Add an area for {{name}}',
+  'assignments.page': 'Page {{page}} of {{pages}} ({{total}} assignments)',
+
+  'assignment.ended': 'Ended',
+  'assignment.startsOn': 'Starts {{date}}',
+  'assignment.add': 'Add assignment',
+  'assignment.addTitle': 'Add an area assignment for {{name}}',
+  'assignment.startLabel': 'First day (optional)',
+  'assignment.startHint': 'Leave empty to start now. Cannot be in the past.',
+  'assignment.lastDayLabel': 'Last day (optional)',
+  'assignment.lastDayHint':
+    'Leave empty for no end date. The assignment ends at midnight after this day (India time).',
+  'assignment.submit': 'Add assignment',
+  'assignment.submitting': 'Adding…',
+  'assignment.added': 'The assignment has been added.',
+  'assignment.missingPerson': 'Choose a person from the assignments list first.',
+
+  'assignment.action.end': 'End assignment',
+  'assignment.action.end.help':
+    'The person stops working in this area. Leave the last day empty to end it now. An assignment can only be shortened, never extended.',
+  'assignment.action.suspend': 'Suspend',
+  'assignment.action.suspend.help': 'Temporarily stops this assignment (for example during leave).',
+  'assignment.action.reactivate': 'Reactivate',
+  'assignment.action.reactivate.help': 'The suspended assignment applies again.',
+  'assignment.action.revoke': 'Revoke',
+  'assignment.action.revoke.help':
+    'Permanent: use only for an assignment given by mistake. To stop normal work in an area, end it instead.',
+  'assignment.endLastDayLabel': 'Last day (optional)',
+  'assignment.done.end': 'The assignment has been ended.',
+  'assignment.done.suspend': 'The assignment is suspended.',
+  'assignment.done.reactivate': 'The assignment applies again.',
+  'assignment.done.revoke': 'The assignment has been revoked.',
+  'assignment.actionsFor': 'Actions for {{role}} in {{area}}',
+
+  'assignment.errors.overlap': 'This person already has this role in this area for an overlapping period.',
+  'assignment.errors.self': 'You cannot change your own assignments.',
+  'assignment.errors.dates':
+    'Check the dates: they cannot be in the past, the last day must not be before the first day, and an assignment can only be shortened.',
+  'assignment.errors.lastBeforeStart': 'The last day cannot be before the first day',
+  'assignment.errors.past': 'The date cannot be in the past',
+  'assignment.errors.notFound': 'This assignment was not found, or it is outside your areas.',
 
   'notFound.title': 'Page not found',
   'notFound.back': 'Go to the home page',

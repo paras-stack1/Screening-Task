@@ -7,7 +7,11 @@ import { hasStatus, isApiError } from '../../api/errors';
 import { Alert, Button, Loading, StatusBadge, TextField } from '../../components/ui';
 import { errorMessageKey, useI18n, type TranslationKey } from '../../i18n';
 import { useChangeUserStatus, useResetPassword, useRevokeSessions, useUserDetail } from './api';
-import { formatDate, formatDateTime, roleLabel } from './format';
+import type { EffectiveAccess } from '../../auth/sessionManager';
+import { AddAssignmentForm } from '../assignments/AddAssignmentForm';
+import { AssignmentActions } from '../assignments/AssignmentActions';
+import { AssignmentPeriod, AssignmentStatus } from '../assignments/AssignmentStatus';
+import { formatDateTime, roleLabel } from './format';
 import { TemporaryPasswordPanel } from './TemporaryPasswordPanel';
 import { reasonFormSchema, type ReasonFormValues } from './validation';
 
@@ -18,13 +22,15 @@ function actionsFor(status: UserView['status']): Action[] {
   return [status === 'ACTIVE' ? 'suspend' : 'reactivate', 'resetPassword', 'revokeSessions', 'deactivate'];
 }
 
-export function UserDetailPage() {
+export function UserDetailPage({ access }: { access: EffectiveAccess }) {
   const { userId = '' } = useParams();
   const { t, language } = useI18n();
   const detail = useUserDetail(userId);
   const [open, setOpen] = useState<Action | null>(null);
   const [done, setDone] = useState<TranslationKey | null>(null);
   const [tempPassword, setTempPassword] = useState<TemporaryPasswordResponse | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [assignmentDone, setAssignmentDone] = useState<TranslationKey | null>(null);
 
   if (detail.isPending) return <Loading />;
   if (detail.isError) {
@@ -78,7 +84,33 @@ export function UserDetailPage() {
       </section>
 
       <section className="card" aria-labelledby="assignments-title">
-        <h2 id="assignments-title">{t('detail.assignments')}</h2>
+        <div className="page-head">
+          <h2 id="assignments-title">{t('detail.assignments')}</h2>
+          {user.status !== 'DEACTIVATED' && !adding && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAssignmentDone(null);
+                setAdding(true);
+              }}
+            >
+              {t('assignment.add')}
+            </Button>
+          )}
+        </div>
+        {assignmentDone && <Alert tone="success">{t(assignmentDone)}</Alert>}
+        {adding && (
+          <AddAssignmentForm
+            userId={user.id}
+            userName={user.displayName}
+            access={access}
+            onCancel={() => setAdding(false)}
+            onDone={() => {
+              setAdding(false);
+              setAssignmentDone('assignment.added');
+            }}
+          />
+        )}
         {assignments.length === 0 ? (
           <p className="muted">{t('detail.noAssignments')}</p>
         ) : (
@@ -91,6 +123,7 @@ export function UserDetailPage() {
                   <th scope="col">{t('detail.col.scope')}</th>
                   <th scope="col">{t('detail.col.status')}</th>
                   <th scope="col">{t('detail.col.period')}</th>
+                  <th scope="col">{t('assignments.col.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -100,13 +133,20 @@ export function UserDetailPage() {
                     <td>{a.areaName}</td>
                     <td>{t(`scope.${a.scope}`)}</td>
                     <td>
-                      <StatusBadge status={a.status} />
+                      <AssignmentStatus assignment={a} />
                     </td>
                     <td>
-                      {t('detail.period', {
-                        from: formatDate(a.effectiveFrom, language),
-                        to: a.effectiveTo ? formatDate(a.effectiveTo, language) : t('detail.openEnded'),
-                      })}
+                      <AssignmentPeriod assignment={a} />
+                    </td>
+                    <td>
+                      <AssignmentActions
+                        assignment={a}
+                        label={t('assignment.actionsFor', {
+                          role: roleLabel(t, a.roleCode),
+                          area: a.areaName,
+                        })}
+                        onDone={setAssignmentDone}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -114,7 +154,6 @@ export function UserDetailPage() {
             </table>
           </div>
         )}
-        <p className="muted small">{t('detail.assignmentsNext')}</p>
       </section>
 
       <section className="card" aria-labelledby="actions-title">

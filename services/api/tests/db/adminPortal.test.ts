@@ -1,5 +1,7 @@
 import {
   areaListResponseSchema,
+  assignmentListResponseSchema,
+  assignmentResponseSchema,
   roleListResponseSchema,
   userListResponseSchema,
   webAuthResponseSchema,
@@ -316,5 +318,79 @@ describe('GET /users and GET /roles - response contracts used by the portal (sta
     const res = await api(app, await tokenFor(app, 'stateadmin')).get('/roles');
     const roles = roleListResponseSchema.parse(res.body).roles;
     expect(roles.map((r) => r.code)).toContain('ASHA');
+  });
+});
+
+// ------------------------------------------------------------- stage PD: assignment list
+
+describe('GET /assignments - assignments in the caller’s assignment.manage areas (stage PD)', () => {
+  async function list(login: string, query = '') {
+    const res = await api(app, await tokenFor(app, login)).get(`/assignments${query}`);
+    return res;
+  }
+  const keys = (body: unknown) =>
+    assignmentListResponseSchema
+      .parse(body)
+      .items.map((a) => `${a.user.loginId}@${a.areaName.replace('Area ', '')}`)
+      .sort();
+
+  it('a supervisor of block B1 sees the current assignments inside B1 - with names, never their own', async () => {
+    const res = await list('sup1', '?pageSize=50');
+    expect(res.status).toBe(200);
+    expect(keys(res.body)).toEqual(
+      [
+        'ASHA1@V1',
+        'ASHA1@V2',
+        'ASHA2@V2',
+        'ASHABOTH@V1',
+        'ASHAFUTURE@V1',
+        'ASHASUSP@V1',
+        'AWW1@AWC1',
+        'FORMERADMIN@B1',
+        'SUP2@B1',
+      ].sort(),
+    );
+    const text = JSON.stringify(res.body);
+    expect(text).not.toMatch(/passwordHash|fullName|childId|guardian/i);
+  });
+
+  it('include=all adds ended and revoked assignments; status and search filter', async () => {
+    expect(keys((await list('sup1', '?include=all&pageSize=50')).body)).toEqual(
+      expect.arrayContaining(['ASHAENDED@V1', 'ASHAREVE@V1']),
+    );
+    expect(keys((await list('sup1', '?status=SUSPENDED')).body)).toEqual(['ASHASUSP@V1']);
+    expect(keys((await list('sup1', '?search=asha1')).body)).toEqual(['ASHA1@V1', 'ASHA1@V2']);
+  });
+
+  it('AREA_ONLY scope: only assignments located at that exact area', async () => {
+    expect(keys((await list('sup2', '?pageSize=50')).body)).toEqual(['FORMERADMIN@B1', 'SUP1@B1']);
+  });
+
+  it('another district is never shown; field workers are refused', async () => {
+    const d2 = keys((await list('dadmin2', '?pageSize=50')).body);
+    expect(d2).toEqual(['ASHA5@V5', 'ASHABOTH@V5']);
+    expect((await list('asha1')).status).toBe(403);
+    expect((await list('sup1', '?include=sometimes')).status).toBe(400);
+  });
+
+  it('a supervisor can add a field-worker assignment in their block, but not grant a management role', async () => {
+    const sup = api(app, await tokenFor(app, 'sup1'));
+    const ok = await sup.post('/assignments', {
+      userId: fx.user.asha2,
+      areaId: fx.area.V3,
+      roleId: fx.role.ASHA,
+      scope: 'AREA_ONLY',
+      reason: 'Covering V3 (synthetic)',
+    });
+    expect(ok.status).toBe(201);
+    assignmentResponseSchema.parse(ok.body);
+    const tooHigh = await sup.post('/assignments', {
+      userId: fx.user.asha2,
+      areaId: fx.area.V3,
+      roleId: fx.role.DISTRICT_ADMIN,
+      scope: 'AREA_ONLY',
+      reason: 'Escalation attempt (synthetic)',
+    });
+    expect(tooHigh.status).toBe(403);
   });
 });

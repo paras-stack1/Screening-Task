@@ -1,7 +1,14 @@
-import type { AssignmentView, CreateAssignmentRequest, NewAssignment } from '@balswasthya/shared-contracts';
+import type {
+  AssignmentListQuery,
+  AssignmentListResponse,
+  AssignmentView,
+  CreateAssignmentRequest,
+  NewAssignment,
+} from '@balswasthya/shared-contracts';
 import { Prisma, type PrismaClient, type WorkerAreaAssignment } from '@prisma/client';
 import type { Db } from '../../config/database';
 import { AppError } from '../../utils/AppError';
+import { areaScopeWhere } from '../access-control/accessScope';
 import { checkDelegation, type DelegationDenial } from '../access-control/authorization.service';
 import type { PermissionCode } from '../access-control/permissions';
 import { recordAudit } from '../audit/audit.service';
@@ -198,6 +205,58 @@ export function createAssignmentsService(db: PrismaClient) {
   }
 
   return {
+    /**
+     * Assignments located in the actor's assignment.manage areas (admin portal stage PD), with
+     * the holder's name and login ID. Never the actor's own. Read-only: every change still runs
+     * the full delegation check.
+     */
+    async list(ctx: AdminContext, query: AssignmentListQuery): Promise<AssignmentListResponse> {
+      const where: Prisma.WorkerAreaAssignmentWhereInput = {
+        AND: [
+          { userId: { not: ctx.actorId } },
+          { area: areaScopeWhere(ctx.actorId, 'assignment.manage', ctx.at) },
+          query.include === 'current'
+            ? { status: { not: 'REVOKED' }, OR: [{ effectiveTo: null }, { effectiveTo: { gt: ctx.at } }] }
+            : {},
+          query.status ? { status: query.status } : {},
+          query.search
+            ? {
+                user: {
+                  OR: [
+                    { loginId: { contains: query.search.normalize('NFKC').trim().toUpperCase() } },
+                    { displayName: { contains: query.search, mode: 'insensitive' } },
+                  ],
+                },
+              }
+            : {},
+        ],
+      };
+      const [rows, total] = await Promise.all([
+        db.workerAreaAssignment.findMany({
+          where,
+          select: {
+            ...viewSelect,
+            area: { select: { nameEn: true, nameHi: true } },
+            user: { select: { id: true, loginId: true, displayName: true, status: true } },
+          },
+          orderBy: [{ user: { displayName: 'asc' } }, { effectiveFrom: 'desc' }, { id: 'asc' }],
+          skip: (query.page - 1) * query.pageSize,
+          take: query.pageSize,
+        }),
+        db.workerAreaAssignment.count({ where }),
+      ]);
+      return {
+        items: rows.map((row) => ({
+          ...toAssignmentView(row),
+          areaNameHi: row.area.nameHi,
+          user: row.user,
+        })),
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+      };
+    },
+
     async create(ctx: AdminContext, input: CreateAssignmentRequest): Promise<AssignmentView> {
       const target = await db.user.findUnique({ where: { id: input.userId }, select: { status: true } });
       if (!target) throw AppError.notFound('User not found');
