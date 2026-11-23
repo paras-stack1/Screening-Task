@@ -225,6 +225,7 @@ export function createFakeScreening(children: FakeChildren) {
           protocolStatusAtStart: p.status,
           usedApprovedContent: approved,
           notes: c.notes,
+          notesAmended: false,
           startedAt: c.startedAt,
           completedAt: c.completedAt,
           completeness: {
@@ -252,9 +253,16 @@ export function createFakeScreening(children: FakeChildren) {
           recordedByName: s.ownerName,
           converted: { value: String(Number((Number(m.value) * factor).toFixed(4))), unit },
           isCurrent: !s.measurements.some((x) => x.supersedesId === m.id),
+          amended: false,
         };
       }),
       screeningRulesApplied: false,
+      currentVersion: 1,
+      amendments: [],
+      canAmend: false,
+      amendBasis: null,
+      amendableUntil: null,
+      canReviewAmendments: false,
     };
   }
 
@@ -490,6 +498,7 @@ export function createFakeScreening(children: FakeChildren) {
             recordedAt: tick(),
             updatedAt: new Date(clock).toISOString(),
             recordedByName: user.name,
+            amended: false,
           });
         }
         cat.responses = cat.responses.filter((x) => !parsed.data.cleared.includes(x.questionId));
@@ -629,6 +638,7 @@ export function createFakeScreening(children: FakeChildren) {
             recordedAt: tick(),
             updatedAt: new Date(clock).toISOString(),
             recordedByName: s.ownerName,
+            amended: false,
           })),
       });
       s.status = 'IN_PROGRESS';

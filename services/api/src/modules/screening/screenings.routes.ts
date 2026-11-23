@@ -19,6 +19,12 @@ import {
   type StartCategoryRequest,
   type StartScreeningRequest,
   type UpdateCategoryRequest,
+  amendmentQueueQuerySchema,
+  createAmendmentRequestSchema,
+  reviewAmendmentRequestSchema,
+  type AmendmentQueueQuery,
+  type CreateAmendmentRequest,
+  type ReviewAmendmentRequest,
 } from '@balswasthya/shared-contracts';
 import { Router, type Response } from 'express';
 import { z } from 'zod';
@@ -28,11 +34,13 @@ import { getRequestId } from '../../middleware/requestId';
 import { getValidated, validate } from '../../middleware/validate';
 import type { AccessContext } from '../access-control/accessScope';
 import type { ScreeningRouterDependencies } from './protocols.routes';
+import { createAmendmentsService } from './amendments.service';
 import { createScreeningsService } from './screenings.service';
 
 const idParams = z.strictObject({ id: z.uuid() });
 const categoryParams = z.strictObject({ id: z.uuid(), category: fourDCategorySchema });
 const measurementParams = z.strictObject({ id: z.uuid(), measurementId: z.uuid() });
+const amendmentParams = z.strictObject({ id: z.uuid(), amendmentId: z.uuid() });
 const childParams = z.strictObject({ childId: z.uuid() });
 
 function contextOf(res: Response, now: () => Date): AccessContext {
@@ -167,6 +175,37 @@ export function createScreeningsRouter(deps: ScreeningRouterDependencies): Route
     },
   );
 
+  // --------------------------------------------- amendments of completed screenings (Step 6G)
+  const amendments = createAmendmentsService(deps);
+
+  router.post(
+    '/:id/amendments',
+    requirePermission(['screening.conduct', 'screening.review']),
+    validate({ params: idParams, body: createAmendmentRequestSchema }),
+    async (_req, res) => {
+      const { id } = getValidated<z.infer<typeof idParams>>(res, 'params');
+      const { result, replayed } = await amendments.create(
+        ctx(res),
+        id,
+        getValidated<CreateAmendmentRequest>(res, 'body'),
+      );
+      if (replayed) res.setHeader('Idempotent-Replay', 'true');
+      res.status(replayed ? 200 : 201).json(result);
+    },
+  );
+
+  router.post(
+    '/:id/amendments/:amendmentId/review',
+    requirePermission('screening.review'),
+    validate({ params: amendmentParams, body: reviewAmendmentRequestSchema }),
+    async (_req, res) => {
+      const { id, amendmentId } = getValidated<z.infer<typeof amendmentParams>>(res, 'params');
+      res.json(
+        await amendments.review(ctx(res), id, amendmentId, getValidated<ReviewAmendmentRequest>(res, 'body')),
+      );
+    },
+  );
+
   return router;
 }
 
@@ -189,6 +228,23 @@ export function createChildScreeningsRouter(deps: ScreeningRouterDependencies): 
           getValidated<ScreeningHistoryQuery>(res, 'query'),
         ),
       );
+    },
+  );
+  return router;
+}
+
+/** /api/v1/screening-amendments - medical officer's queue of amendments waiting for review. */
+export function createAmendmentQueueRouter(deps: ScreeningRouterDependencies): Router {
+  const router = Router();
+  const amendments = createAmendmentsService(deps);
+  const now = deps.now ?? (() => new Date());
+  router.use(createAuthenticate(deps)(), deps.dataRateLimit);
+  router.get(
+    '/',
+    createRequirePermission(deps)('screening.review'),
+    validate({ query: amendmentQueueQuerySchema }),
+    async (_req, res) => {
+      res.json(await amendments.queue(contextOf(res, now), getValidated<AmendmentQueueQuery>(res, 'query')));
     },
   );
   return router;

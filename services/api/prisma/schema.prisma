@@ -145,6 +145,31 @@ enum MeasurementSource {
   FROM_RECORD
 }
 
+/// Why the amender was allowed to amend (Step 6G, decision G4).
+enum AmendmentBasis {
+  /// The worker who conducted the screening, within 7 x 24 h of completion.
+  CONDUCTOR_WITHIN_WINDOW
+  /// A screening.review holder whose area scope covers the child's current area.
+  MEDICAL_OFFICER
+}
+
+enum AmendmentReviewStatus {
+  NOT_REQUIRED
+  PENDING
+  REVIEWED
+}
+
+enum AmendmentChangeKind {
+  RESPONSE
+  MEASUREMENT
+  CATEGORY_NOTES
+}
+
+enum ReassessmentStatus {
+  PENDING
+  REASSESSED
+}
+
 /// Illustrative - final list follows approved protocols.
 enum MeasurementType {
   WEIGHT
@@ -294,25 +319,28 @@ model User {
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
-  assignmentsHeld         WorkerAreaAssignment[] @relation("AssignmentHolder")
-  assignmentsCreated      WorkerAreaAssignment[] @relation("AssignmentCreatedBy")
-  assignmentStatusChanges WorkerAreaAssignment[] @relation("AssignmentStatusChangedBy")
+  assignmentsHeld         WorkerAreaAssignment[]             @relation("AssignmentHolder")
+  assignmentsCreated      WorkerAreaAssignment[]             @relation("AssignmentCreatedBy")
+  assignmentStatusChanges WorkerAreaAssignment[]             @relation("AssignmentStatusChangedBy")
   childrenRegistered      Child[]
   childTransfers          ChildAreaTransfer[]
-  guardianLinksCreated    ChildGuardian[]        @relation("GuardianLinkCreatedBy")
-  guardianLinksEnded      ChildGuardian[]        @relation("GuardianLinkEndedBy")
-  consentsRecorded        Consent[]              @relation("ConsentRecordedBy")
-  consentsWithdrawn       Consent[]              @relation("ConsentWithdrawnBy")
+  guardianLinksCreated    ChildGuardian[]                    @relation("GuardianLinkCreatedBy")
+  guardianLinksEnded      ChildGuardian[]                    @relation("GuardianLinkEndedBy")
+  consentsRecorded        Consent[]                          @relation("ConsentRecordedBy")
+  consentsWithdrawn       Consent[]                          @relation("ConsentWithdrawnBy")
   protocolsApproved       ScreeningProtocol[]
-  sessionsConducted       ScreeningSession[]     @relation("SessionConductedBy")
-  sessionsCancelled       ScreeningSession[]     @relation("SessionCancelledBy")
+  sessionsConducted       ScreeningSession[]                 @relation("SessionConductedBy")
+  sessionsCancelled       ScreeningSession[]                 @relation("SessionCancelledBy")
+  amendmentsMade          ScreeningAmendment[]               @relation("AmendmentAuthor")
+  amendmentsReviewed      ScreeningAmendment[]               @relation("AmendmentReviewer")
+  reassessmentsDone       ScreeningAmendmentReferralImpact[]
   observationsRecorded    ScreeningObservation[]
   measurementsRecorded    Measurement[]
   resultsReviewed         ScreeningResult[]
   referralsCreated        Referral[]
   referralStatusEvents    ReferralStatusEvent[]
-  followUpsAssigned       FollowUp[]             @relation("FollowUpAssignee")
-  followUpsCompleted      FollowUp[]             @relation("FollowUpCompletedBy")
+  followUpsAssigned       FollowUp[]                         @relation("FollowUpAssignee")
+  followUpsCompleted      FollowUp[]                         @relation("FollowUpCompletedBy")
   mediaCaptured           MediaMetadata[]
   notifications           Notification[]
   refreshSessions         RefreshSession[]
@@ -677,8 +705,9 @@ model ScreeningQuestion {
   validation  Json?
   isRequired  Boolean       @default(true)
 
-  protocol     ScreeningProtocol      @relation(fields: [protocolId], references: [id], onDelete: Restrict)
-  observations ScreeningObservation[]
+  protocol         ScreeningProtocol          @relation(fields: [protocolId], references: [id], onDelete: Restrict)
+  observations     ScreeningObservation[]
+  amendmentChanges ScreeningAmendmentChange[]
 
   @@unique([protocolId, code])
   @@index([protocolId, sortOrder])
@@ -724,6 +753,7 @@ model ScreeningSession {
   screeningConsent Consent            @relation(fields: [screeningConsentId], references: [id], onDelete: Restrict)
 
   categories   ScreeningSessionCategory[]
+  amendments   ScreeningAmendment[]
   observations ScreeningObservation[]
   measurements Measurement[]
   results      ScreeningResult[]
@@ -754,9 +784,10 @@ model ScreeningSessionCategory {
   createdAt             DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime         @updatedAt @db.Timestamptz(3)
 
-  session      ScreeningSession       @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  protocol     ScreeningProtocol      @relation(fields: [protocolId], references: [id], onDelete: Restrict)
-  observations ScreeningObservation[]
+  session          ScreeningSession           @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  protocol         ScreeningProtocol          @relation(fields: [protocolId], references: [id], onDelete: Restrict)
+  observations     ScreeningObservation[]
+  amendmentChanges ScreeningAmendmentChange[]
 
   @@unique([sessionId, category])
   @@index([protocolId])
@@ -818,11 +849,12 @@ model Measurement {
   notes            String?
   createdAt        DateTime           @default(now()) @db.Timestamptz(3)
 
-  child        Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
-  session      ScreeningSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  recordedBy   User              @relation(fields: [recordedById], references: [id], onDelete: Restrict)
-  supersedes   Measurement?      @relation("MeasurementCorrection", fields: [supersedesId], references: [id], onDelete: Restrict)
-  supersededBy Measurement?      @relation("MeasurementCorrection")
+  child            Child                      @relation(fields: [childId], references: [id], onDelete: Restrict)
+  session          ScreeningSession?          @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  recordedBy       User                       @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  supersedes       Measurement?               @relation("MeasurementCorrection", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersededBy     Measurement?               @relation("MeasurementCorrection")
+  amendmentChanges ScreeningAmendmentChange[]
 
   @@index([childId, type, measuredAt])
   @@index([sessionId])
@@ -882,6 +914,81 @@ model AiAnalysis {
   @@index([consentId])
 }
 
+/// One amendment = one new VERSION of a COMPLETED screening (Step 6G; docs/step-6/amendment-design.md).
+/// Append-only: the completed screening rows are never changed. SQL additions (migration
+/// 20261123100000_step6g_screening_amendments): only for COMPLETED sessions; sequence = last + 1;
+/// no DELETE; the only UPDATE is a one-time PENDING -> REVIEWED review.
+model ScreeningAmendment {
+  id                    String                @id @default(uuid()) @db.Uuid
+  sessionId             String                @db.Uuid
+  /// 1 for the first amendment (version 2 of the screening), 2 for the next, ...
+  sequence              Int
+  amendedById           String                @db.Uuid
+  amendedAt             DateTime              @db.Timestamptz(3)
+  basis                 AmendmentBasis
+  /// Mandatory. Encrypted (enc1:), bound to the session and amendment.
+  reason                String
+  clinicallySignificant Boolean
+  reviewStatus          AmendmentReviewStatus
+  reviewedById          String?               @db.Uuid
+  reviewedAt            DateTime?             @db.Timestamptz(3)
+  /// Encrypted (enc1:).
+  reviewNotes           String?
+  /// Device-generated id: a retried submission returns the first amendment.
+  clientOperationId     String?               @unique @db.Uuid
+  createdAt             DateTime              @default(now()) @db.Timestamptz(3)
+
+  session    ScreeningSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  amendedBy  User             @relation("AmendmentAuthor", fields: [amendedById], references: [id], onDelete: Restrict)
+  reviewedBy User?            @relation("AmendmentReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  changes         ScreeningAmendmentChange[]
+  referralImpacts ScreeningAmendmentReferralImpact[]
+
+  @@unique([sessionId, sequence])
+  @@index([reviewStatus, amendedAt])
+}
+
+/// One changed item inside an amendment: exact old and new values. Append-only.
+model ScreeningAmendmentChange {
+  id                    String              @id @default(uuid()) @db.Uuid
+  amendmentId           String              @db.Uuid
+  kind                  AmendmentChangeKind
+  sessionCategoryId     String?             @db.Uuid
+  questionId            String?             @db.Uuid
+  measurementId         String?             @db.Uuid
+  /// Previous / new value; free-text parts encrypted. null = "not answered" / "no notes".
+  oldValue              Json?
+  newValue              Json?
+  clinicallySignificant Boolean
+
+  amendment       ScreeningAmendment        @relation(fields: [amendmentId], references: [id], onDelete: Restrict)
+  sessionCategory ScreeningSessionCategory? @relation(fields: [sessionCategoryId], references: [id], onDelete: Restrict)
+  question        ScreeningQuestion?        @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  measurement     Measurement?              @relation(fields: [measurementId], references: [id], onDelete: Restrict)
+
+  @@index([amendmentId])
+}
+
+/// A referral made from an earlier version that must be reassessed (decision G9). The referral
+/// itself is never changed, so its historical context is kept. Shown by the Step 7 referral module.
+model ScreeningAmendmentReferralImpact {
+  id                        String             @id @default(uuid()) @db.Uuid
+  amendmentId               String             @db.Uuid
+  referralId                String             @db.Uuid
+  referralStatusAtAmendment ReferralStatus
+  reassessmentStatus        ReassessmentStatus @default(PENDING)
+  reassessedById            String?            @db.Uuid
+  reassessedAt              DateTime?          @db.Timestamptz(3)
+
+  amendment    ScreeningAmendment @relation(fields: [amendmentId], references: [id], onDelete: Restrict)
+  referral     Referral           @relation(fields: [referralId], references: [id], onDelete: Restrict)
+  reassessedBy User?              @relation(fields: [reassessedById], references: [id], onDelete: Restrict)
+
+  @@unique([amendmentId, referralId])
+  @@index([referralId, reassessmentStatus])
+}
+
 // ===================================================== Facilities, referrals, follow-up
 
 model Facility {
@@ -928,8 +1035,9 @@ model Referral {
   area      Area              @relation(fields: [areaId], references: [id], onDelete: Restrict)
   createdBy User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
-  statusEvents ReferralStatusEvent[]
-  followUps    FollowUp[]
+  statusEvents     ReferralStatusEvent[]
+  amendmentImpacts ScreeningAmendmentReferralImpact[]
+  followUps        FollowUp[]
 
   @@index([childId])
   @@index([areaId, status])

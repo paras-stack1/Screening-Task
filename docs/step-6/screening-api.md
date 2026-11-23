@@ -206,3 +206,72 @@ access path to secure.
 - `screeningRulesApplied` is always `false`: there are no approved rules, so no outcome or
   referral recommendation exists.
 - Two simultaneous completions both get 200 with one completion time and one audit row.
+
+---
+
+# Amendments of completed screenings (stage 6G-1)
+
+Design and decisions: [amendment-design.md](amendment-design.md). The completed screening is
+never changed; every amendment is a new version with old and new values.
+
+## POST /api/v1/screenings/:id/amendments
+
+Permission `screening.conduct` or `screening.review`; then, in one transaction:
+
+| Check | Response when it fails |
+|---|---|
+| Session in the caller's area (with either permission) | 404, as if it did not exist (audited) |
+| Session is COMPLETED | 409 `SESSION_NOT_COMPLETED` (in progress: edit normally; cancelled: never) |
+| Caller is a `screening.review` holder in scope (any time), or the conducting worker within **7 × 24 h** of completion | 403 `AMENDMENT_NOT_ALLOWED` (audited `screening.amendment_denied`, reason `WINDOW_EXPIRED` / `NOT_PERMITTED`) |
+| `expectedSequence` = the latest amendment sequence (0 = never amended) | 409 `AMENDMENT_CONFLICT`, `details.currentSequence` |
+| Each change valid (same rules as normal answers and measurements) | 422 `INVALID_RESPONSE`, `QUESTION_NOT_IN_PROTOCOL`, `CATEGORY_NOT_IN_SCREENING`, `MEASUREMENT_NOT_IN_SCREENING`, `AMENDMENT_UNCHANGED`, `DUPLICATE_CHANGE`, measurement codes; 409 `MEASUREMENT_ALREADY_CORRECTED` |
+
+Body (strict; `reason` is mandatory, 3-500 characters):
+
+```json
+{
+  "clientOperationId": "…uuid…",
+  "expectedSequence": 0,
+  "reason": "Answer ticked by mistake",
+  "changes": [
+    { "kind": "RESPONSE", "category": "DISEASES", "questionId": "…", "status": "ANSWERED", "source": "WORKER_OBSERVED", "value": false },
+    { "kind": "MEASUREMENT", "measurementId": "…", "value": "24.53", "unit": "kg", "source": "MEASURED", "quality": "RELIABLE", "measuredAt": "…" },
+    { "kind": "CATEGORY_NOTES", "category": "DISEASES", "notes": "Added observation" }
+  ]
+}
+```
+
+- 201 with the full session; a retry with the same `clientOperationId` returns 200 +
+  `Idempotent-Replay: true`.
+- A question left unanswered may be answered (old value `null`). An area that was not screened
+  cannot be added.
+- Clinically significant (an answer's state or value; a measurement's value, unit, source,
+  reliability or date) → `reviewStatus: PENDING`. Notes only → `NOT_REQUIRED`.
+- Every referral made from the screening gets a PENDING reassessment flag (the referral row is
+  not changed).
+- Consent is not re-checked (decision G8). Audited `screening.amended` (identifiers and counts
+  only).
+
+## POST /api/v1/screenings/:id/amendments/:amendmentId/review
+
+Permission `screening.review`, session in scope (else 404). Body `{ notes? }`. Marks a PENDING
+amendment REVIEWED, once; otherwise 409 `AMENDMENT_NOT_PENDING`. An amendment id from another
+screening gives 404. The author may confirm their own amendment (`selfReviewed: true`). Audited
+`screening.amendment_reviewed`.
+
+## GET /api/v1/screening-amendments?page&pageSize
+
+Permission `screening.review`: PENDING amendments in the caller's areas, oldest first:
+`{ items: [{ amendmentId, sessionId, childId, childName, sequence, amendedAt, amendedByName, basis, changeCount }], page, pageSize, total }`.
+
+## Session detail additions (`GET /screenings/:id` and every write response)
+
+`currentVersion` (original = 1), `amendments[]`, `canAmend`, `amendBasis`, `amendableUntil`
+(conductor's window end) and `canReviewAmendments`.
+
+- Each amendment has: `id`, `sequence`, `version`, `amendedAt`, `amendedByName`, `basis`,
+  `reason`, `clinicallySignificant`, `reviewStatus`, `reviewedByName`, `reviewedAt`,
+  `reviewNotes`, `selfReviewed`, `referralsFlagged`, and `changes[]` with
+  `kind, category, questionId, questionCode, measurementId, oldValue, newValue, clinicallySignificant`.
+- Answers, measurements and area notes show the **current** values, with `amended` /
+  `notesAmended` flags.

@@ -154,6 +154,10 @@ describe('protected routes without a valid access token', () => {
     ['post', `/api/v1/screenings/${ID}/measurements/${ID}/corrections`],
     ['post', `/api/v1/screenings/${ID}/complete`],
     ['post', `/api/v1/screenings/${ID}/cancel`],
+    // Step 6G amendments.
+    ['post', `/api/v1/screenings/${ID}/amendments`],
+    ['post', `/api/v1/screenings/${ID}/amendments/${ID}/review`],
+    ['get', '/api/v1/screening-amendments'],
   ] as const)('%s %s requires authentication', async (method, path) => {
     const res = await request(app())[method](path);
     expect(res.status).toBe(401);

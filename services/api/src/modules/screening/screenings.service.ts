@@ -37,8 +37,9 @@ import { protocolContentHash, protocolRowToDefinition } from './protocolContent'
 import { selectProtocol, type ScreeningPolicySettings } from './protocolSelection';
 import { responseChanged, responseColumns } from './responseRules';
 import { screeningAge } from './screeningAge';
+import { loadSessionDetail } from './sessionDetail';
 import { sessionTextSealer } from './sensitiveText';
-import { detailInclude, summaryInclude, toSessionDetail, toSessionSummary } from './sessionDto';
+import { summaryInclude, toSessionSummary } from './sessionDto';
 
 export interface ScreeningsServiceDependencies {
   db: PrismaClient;
@@ -90,8 +91,8 @@ export function createScreeningsService({
   const at = (ctx: AccessContext) => ctx.at ?? new Date();
 
   async function loadDetail(id: string, ctx: AccessContext): Promise<ScreeningSessionResponse> {
-    const row = await db.screeningSession.findUniqueOrThrow({ where: { id }, include: detailInclude });
-    return { session: toSessionDetail(row, ctx.userId, sessionTextSealer(pii, id)) };
+    // Current version + amendment history + what the caller may amend (Step 6G).
+    return loadSessionDetail(db, pii, ctx, id);
   }
 
   async function auditDenied(ctx: AccessContext, session: ScreeningSession, reason: string) {

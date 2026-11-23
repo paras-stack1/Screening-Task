@@ -1,7 +1,7 @@
 # Amending Completed Screenings - Design and Schema Proposal (Stage 6G)
 
-> Status: **PROPOSAL - nothing implemented, no migration created or run.** Waiting for approval of
-> the schema changes (section 4) and decisions G1-G12 (section 7).
+> Status: **APPROVED 2026-11-23. 6G-1 (database, API, tests) implemented**; 6G-2 (app screens) not
+> started. Implementation notes: section 9.
 > Based on the user's rules of 2026-11-23 (below).
 
 ## 1. Agreed rules (from the user)
@@ -194,3 +194,16 @@ audited); in the area but not allowed (e.g. after 7 days) = 403 `AMENDMENT_NOT_A
 - **Referral flags:** a referral linked to the session gets a PENDING reassessment flag; the
   referral row is unchanged.
 - **Encryption:** the reason and text values are stored as `enc1:` only.
+
+## 9. Implementation notes (6G-1)
+
+- The proposed unique key on `ScreeningAmendmentChange` was **not** created: PostgreSQL treats
+  NULL columns as distinct, so it would not prevent duplicates. "One change per item per amendment"
+  is enforced by the service (422 `DUPLICATE_CHANGE`, tested).
+- Two rules beyond the proposal: changes and referral flags can only be inserted in the same
+  transaction as their amendment, and an amendment can never be inserted as REVIEWED.
+- The 7-day limit is exclusive: at exactly 7 × 24 h after completion the conductor is refused
+  (tested 1 second before and at the limit).
+- Amending a measurement that has an in-session correction is refused: amend the latest value.
+- The "current version" is computed by one function (`amendmentOverlay.ts`), used both to show
+  values and to capture old values, so the two can never disagree.

@@ -17,7 +17,15 @@ export type TextField =
   | { kind: 'obs'; questionId: string; field: 'valueText' | 'notes' | 'notAssessedReason' }
   | { kind: 'cat'; category: string; field: 'notes' }
   | { kind: 'measurement'; measurementId: string; field: 'notes' | 'correctionReason' }
-  | { kind: 'session'; field: 'cancelReason' };
+  | { kind: 'session'; field: 'cancelReason' }
+  // Step 6G amendments: the reason / review notes, and free text inside old/new values.
+  | { kind: 'amendment'; amendmentId: string; field: 'reason' | 'reviewNotes' }
+  | {
+      kind: 'amendmentChange';
+      changeId: string;
+      side: 'old' | 'new';
+      field: 'value' | 'notes' | 'notAssessedReason';
+    };
 
 function contextOf(sessionId: string, f: TextField): string {
   switch (f.kind) {
@@ -29,6 +37,10 @@ function contextOf(sessionId: string, f: TextField): string {
       return `screening:${sessionId}:measurement:${f.measurementId}:${f.field}`;
     case 'session':
       return `screening:${sessionId}:session:${f.field}`;
+    case 'amendment':
+      return `screening:${sessionId}:amendment:${f.amendmentId}:${f.field}`;
+    case 'amendmentChange':
+      return `screening:${sessionId}:amendmentChange:${f.changeId}:${f.side}:${f.field}`;
   }
 }
 

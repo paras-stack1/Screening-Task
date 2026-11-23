@@ -10,7 +10,11 @@ import {
   createScreeningEligibilityRouter,
   createScreeningProtocolsRouter,
 } from '../modules/screening/protocols.routes';
-import { createChildScreeningsRouter, createScreeningsRouter } from '../modules/screening/screenings.routes';
+import {
+  createAmendmentQueueRouter,
+  createChildScreeningsRouter,
+  createScreeningsRouter,
+} from '../modules/screening/screenings.routes';
 import { createAssignmentsRouter, createRolesRouter, createUsersRouter } from '../modules/users/users.routes';
 import type { PiiCrypto } from '../utils/piiCrypto';
 import { createHealthRouter, type HealthDependencies } from './health.routes';
@@ -54,6 +58,7 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/children/:childId/screenings', createChildScreeningsRouter(childData));
   router.use('/screening-protocols', createScreeningProtocolsRouter(childData));
   router.use('/screenings', createScreeningsRouter(childData));
+  router.use('/screening-amendments', createAmendmentQueueRouter(childData));
   router.use('/children', createChildrenRouter(childData));
   router.use('/guardians', createGuardiansRouter(childData));
   router.use('/users', createUsersRouter(deps.auth));

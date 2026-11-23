@@ -76,3 +76,26 @@ session (`dobEstimatedAtStart`) and shown with the age.
 - Prisma 6 cannot express the triggers, CHECKs, partial index or exclusion constraint. `prisma
   migrate diff` shows no drift, but **every future generated migration must be reviewed** so it
   never drops them.
+
+## 5. Amendments (stage 6G-1, migration `20261123100000_step6g_screening_amendments`)
+
+| Entity | Meaning | Key rules |
+|---|---|---|
+| `ScreeningAmendment` | One new version of a COMPLETED screening | `(sessionId, sequence)` unique; basis CONDUCTOR_WITHIN_WINDOW / MEDICAL_OFFICER; reason encrypted; reviewStatus NOT_REQUIRED / PENDING / REVIEWED |
+| `ScreeningAmendmentChange` | One changed item: RESPONSE, MEASUREMENT or CATEGORY_NOTES | Exact old and new values (JSON; free text encrypted); clinically significant flag |
+| `ScreeningAmendmentReferralImpact` | A referral made from the screening, to be reassessed | Referral status at the time; PENDING → REASSESSED (Step 7) |
+
+Database rules (every account):
+
+- An amendment is accepted only for a COMPLETED session, with `sequence = last + 1`, while
+  holding the session row lock. It can never be inserted as REVIEWED.
+- No DELETE. The only UPDATE of an amendment is the one-time PENDING → REVIEWED review.
+  Changes can never be updated. Referral flags only PENDING → REASSESSED once.
+- Changes and referral flags can be added **only in the same transaction** as their amendment.
+- Change targets must belong to the same session; a question must belong to the protocol version
+  of its area.
+- CHECKs: reason present; review status matches significance; review and reassessment fields
+  complete.
+- Runtime account: no DELETE or TRUNCATE on the three tables.
+- The original completed session, its areas, answers and measurements are untouched: the 6B
+  completed-session lock is unchanged.

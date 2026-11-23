@@ -466,6 +466,8 @@ export const screeningResponseSchema = z.object({
   recordedAt: z.string(),
   updatedAt: z.string(),
   recordedByName: z.string(),
+  /** True when this is the amended (current) value, not the original. */
+  amended: z.boolean().default(false),
 });
 export type ScreeningResponse = z.infer<typeof screeningResponseSchema>;
 
@@ -478,6 +480,7 @@ export const sessionCategorySchema = z.object({
   /** True only if ACTIVE, non-demonstration content was used. */
   usedApprovedContent: z.boolean(),
   notes: z.string().nullable(),
+  notesAmended: z.boolean().default(false),
   startedAt: z.string(),
   completedAt: z.string().nullable(),
   completeness: categoryCompletenessSchema,
@@ -507,6 +510,8 @@ export const screeningMeasurementSchema = z.object({
   correctionReason: z.string().nullable(),
   /** False when a later correction replaced it (it stays in the history). */
   isCurrent: z.boolean(),
+  /** True when the shown values come from an amendment of the completed screening. */
+  amended: z.boolean().default(false),
 });
 export type ScreeningMeasurement = z.infer<typeof screeningMeasurementSchema>;
 
@@ -531,6 +536,141 @@ export const screeningSessionSummarySchema = z.object({
 });
 export type ScreeningSessionSummary = z.infer<typeof screeningSessionSummarySchema>;
 
+// =====================================================================================
+// Amendments of COMPLETED screenings (Step 6G; docs/step-6/amendment-design.md). Each amendment is
+// a new version; the original screening is never changed. A reason is mandatory.
+// =====================================================================================
+
+export const AMENDMENT_BASES = ['CONDUCTOR_WITHIN_WINDOW', 'MEDICAL_OFFICER'] as const;
+export const AMENDMENT_REVIEW_STATUSES = ['NOT_REQUIRED', 'PENDING', 'REVIEWED'] as const;
+export const AMENDMENT_CHANGE_KINDS = ['RESPONSE', 'MEASUREMENT', 'CATEGORY_NOTES'] as const;
+
+/** The original worker may amend for exactly 7 x 24 hours after completion (decision G3). */
+export const CONDUCTOR_AMENDMENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+const amendResponseSchema = z.strictObject({
+  kind: z.literal('RESPONSE'),
+  category: fourDCategorySchema,
+  questionId: z.uuid(),
+  status: observationStatusSchema,
+  source: responseSourceSchema,
+  value: responseValueSchema.optional(),
+  notAssessedReason: z.string().trim().min(1).max(200).optional(),
+  notes: z.string().trim().min(1).max(500).optional(),
+});
+
+const amendMeasurementSchema = z.strictObject({
+  kind: z.literal('MEASUREMENT'),
+  measurementId: z.uuid(),
+  value: decimalStringSchema,
+  unit: measurementUnitSchema,
+  source: z.enum(MEASUREMENT_SOURCES),
+  quality: z.enum(MEASUREMENT_QUALITIES),
+  measuredAt: z.iso.datetime({ offset: true }),
+  notes: z.string().trim().min(1).max(500).optional(),
+});
+
+const amendCategoryNotesSchema = z.strictObject({
+  kind: z.literal('CATEGORY_NOTES'),
+  category: fourDCategorySchema,
+  /** null removes the notes. */
+  notes: z.string().trim().min(1).max(500).nullable(),
+});
+
+export const amendmentChangeInputSchema = z
+  .discriminatedUnion('kind', [amendResponseSchema, amendMeasurementSchema, amendCategoryNotesSchema])
+  .superRefine((c, ctx) => {
+    if (c.kind !== 'RESPONSE') return;
+    if (c.status === 'ANSWERED' && c.value === undefined) {
+      ctx.addIssue({ code: 'custom', message: 'An answered question needs a value', path: ['value'] });
+    }
+    if (c.status !== 'ANSWERED' && c.value !== undefined) {
+      ctx.addIssue({ code: 'custom', message: 'Only an answered question has a value', path: ['value'] });
+    }
+    if (c.notAssessedReason && c.status !== 'NOT_ASSESSED' && c.status !== 'UNABLE_TO_ASSESS') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A reason is only for not assessed / unable to assess',
+        path: ['notAssessedReason'],
+      });
+    }
+  });
+export type AmendmentChangeInput = z.infer<typeof amendmentChangeInputSchema>;
+
+export const createAmendmentRequestSchema = z.strictObject({
+  clientOperationId: z.uuid(),
+  /** The latest amendment sequence the client saw (0 = never amended). Stale -> 409. */
+  expectedSequence: z.number().int().min(0),
+  /** Mandatory. Short, no names or phone numbers. */
+  reason: z.string().trim().min(3).max(500),
+  changes: z.array(amendmentChangeInputSchema).min(1).max(50),
+});
+export type CreateAmendmentRequest = z.infer<typeof createAmendmentRequestSchema>;
+
+export const reviewAmendmentRequestSchema = z.strictObject({
+  notes: z.string().trim().min(1).max(500).optional(),
+});
+export type ReviewAmendmentRequest = z.infer<typeof reviewAmendmentRequestSchema>;
+
+export const amendmentChangeSchema = z.object({
+  kind: z.enum(AMENDMENT_CHANGE_KINDS),
+  category: fourDCategorySchema.nullable(),
+  questionId: z.string().nullable(),
+  questionCode: z.string().nullable(),
+  measurementId: z.string().nullable(),
+  /** Exact previous and new values (decrypted for the authorised caller); null = none. */
+  oldValue: z.record(z.string(), z.unknown()).nullable(),
+  newValue: z.record(z.string(), z.unknown()).nullable(),
+  clinicallySignificant: z.boolean(),
+});
+export type AmendmentChange = z.infer<typeof amendmentChangeSchema>;
+
+export const screeningAmendmentSchema = z.object({
+  id: z.string(),
+  sequence: z.number(),
+  /** The screening version this amendment created (original = 1). */
+  version: z.number(),
+  amendedAt: z.string(),
+  amendedByName: z.string(),
+  basis: z.enum(AMENDMENT_BASES),
+  reason: z.string(),
+  clinicallySignificant: z.boolean(),
+  reviewStatus: z.enum(AMENDMENT_REVIEW_STATUSES),
+  reviewedByName: z.string().nullable(),
+  reviewedAt: z.string().nullable(),
+  reviewNotes: z.string().nullable(),
+  /** The reviewer is the person who made the amendment (decision G6). */
+  selfReviewed: z.boolean(),
+  referralsFlagged: z.number(),
+  changes: z.array(amendmentChangeSchema),
+});
+export type ScreeningAmendment = z.infer<typeof screeningAmendmentSchema>;
+
+export const amendmentQueueItemSchema = z.object({
+  amendmentId: z.string(),
+  sessionId: z.string(),
+  childId: z.string(),
+  childName: z.string(),
+  sequence: z.number(),
+  amendedAt: z.string(),
+  amendedByName: z.string(),
+  basis: z.enum(AMENDMENT_BASES),
+  changeCount: z.number(),
+});
+export const amendmentQueueResponseSchema = z.object({
+  items: z.array(amendmentQueueItemSchema),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+});
+export type AmendmentQueueResponse = z.infer<typeof amendmentQueueResponseSchema>;
+
+export const amendmentQueueQuerySchema = z.strictObject({
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type AmendmentQueueQuery = z.infer<typeof amendmentQueueQuerySchema>;
+
 export const screeningSessionDetailSchema = screeningSessionSummarySchema.extend({
   dateOfBirthAtStart: z.string(),
   ageAtStart: z.object({ years: z.number(), months: z.number() }),
@@ -548,6 +688,16 @@ export const screeningSessionDetailSchema = screeningSessionSummarySchema.extend
    * recommendation is generated (decision P).
    */
   screeningRulesApplied: z.literal(false),
+  /** Original = 1; each amendment adds one (Step 6G). Answers above are the CURRENT values. */
+  currentVersion: z.number().default(1),
+  amendments: z.array(screeningAmendmentSchema).default([]),
+  /** Decided by the API for the caller (conductor within 7 days, or medical officer). */
+  canAmend: z.boolean().default(false),
+  amendBasis: z.enum(AMENDMENT_BASES).nullable().default(null),
+  /** For the conducting worker: the end of their 7-day window. */
+  amendableUntil: z.string().nullable().default(null),
+  /** The caller may record medical-officer review of pending amendments. */
+  canReviewAmendments: z.boolean().default(false),
 });
 export type ScreeningSessionDetail = z.infer<typeof screeningSessionDetailSchema>;
 

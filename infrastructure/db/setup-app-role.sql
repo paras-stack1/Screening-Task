@@ -47,7 +47,10 @@ SELECT format('REVOKE DELETE, TRUNCATE ON public.%I FROM %I', 'Consent', :'app_u
 --    and changing final sessions for everyone; DELETE is also revoked where no delete is ever
 --    legitimate, and TRUNCATE (which bypasses row triggers) is revoked on every screening table.
 SELECT format('REVOKE DELETE, TRUNCATE ON public.%I FROM %I', t, :'app_user')
-  FROM unnest(ARRAY['ScreeningSession', 'ScreeningSessionCategory', 'Measurement']) AS t
+  FROM unnest(ARRAY['ScreeningSession', 'ScreeningSessionCategory', 'Measurement',
+                    -- Step 6G: amendment history is append-only.
+                    'ScreeningAmendment', 'ScreeningAmendmentChange',
+                    'ScreeningAmendmentReferralImpact']) AS t
  WHERE to_regclass(format('public.%I', t)) IS NOT NULL \gexec
 SELECT format('REVOKE TRUNCATE ON public.%I FROM %I', t, :'app_user')
   FROM unnest(ARRAY['ScreeningProtocol', 'ScreeningQuestion', 'ScreeningObservation']) AS t
