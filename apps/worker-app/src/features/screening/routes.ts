@@ -14,5 +14,8 @@ export const screeningRoutes = {
   session: (sessionId: string) => `/screening/${seg(sessionId)}` as Href,
   category: (sessionId: string, category: FourDCategoryCode) =>
     `/screening/${seg(sessionId)}/category/${category}` as Href,
+  review: (sessionId: string) => `/screening/${seg(sessionId)}/review` as Href,
+  summary: (sessionId: string) => `/screening/${seg(sessionId)}/summary` as Href,
+  history: (childId: string) => `/screening/history/${seg(childId)}` as Href,
   measurements: (sessionId: string) => `/screening/${seg(sessionId)}/measurements` as Href,
 };

@@ -32,8 +32,8 @@ export interface ApiRouterDependencies {
  * and is registered here.
  *
  * PUBLIC routes (no access token): /health/*, /auth/login, /auth/refresh, /auth/logout.
- * Every other route authenticates first and then checks a permission; the route inventory in
- * tests/apiSecurity.test.ts fails if a new route is reachable without a token.
+ * Every other route authenticates first and then checks a permission. The route inventory in
+ * tests/apiSecurity.test.ts is a MANUAL list: add every new protected route to it (bug S6-004).
  */
 export function createApiRouter(deps: ApiRouterDependencies): Router {
   const router = Router();

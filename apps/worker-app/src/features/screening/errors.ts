@@ -16,6 +16,7 @@ const SESSION_ERRORS: Record<string, TranslationKey> = {
   CATEGORY_COMPLETED: 'screening.errors.categoryCompleted',
   PROTOCOL_INTEGRITY_ERROR: 'screening.errors.protocolIntegrity',
   REQUIRED_QUESTIONS_MISSING: 'screening.errors.requiredMissing',
+  NO_COMPLETED_CATEGORY: 'screening.review.needOneFinished',
   INVALID_RESPONSE: 'screening.errors.invalidAnswer',
   QUESTION_NOT_IN_PROTOCOL: 'screening.errors.invalidAnswer',
   MEASUREMENT_ALREADY_CORRECTED: 'screening.errors.alreadyCorrected',

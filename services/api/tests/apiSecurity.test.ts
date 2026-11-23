@@ -137,6 +137,23 @@ describe('protected routes without a valid access token', () => {
     ['post', `/api/v1/assignments/${ID}/reactivate`],
     ['post', `/api/v1/assignments/${ID}/revoke`],
     ['get', '/api/v1/roles'],
+    // Step 6 screening (added in 6E - bug S6-004: they were missing from this inventory).
+    ['get', '/api/v1/screening-protocols'],
+    ['get', `/api/v1/screening-protocols/${ID}`],
+    ['get', `/api/v1/screening-protocols/${ID}/versions`],
+    ['get', `/api/v1/children/${ID}/screening-eligibility`],
+    ['get', `/api/v1/children/${ID}/screenings`],
+    ['get', '/api/v1/screenings'],
+    ['get', '/api/v1/screenings/summary'],
+    ['post', '/api/v1/screenings'],
+    ['get', `/api/v1/screenings/${ID}`],
+    ['post', `/api/v1/screenings/${ID}/categories`],
+    ['patch', `/api/v1/screenings/${ID}/categories/DISEASES`],
+    ['post', `/api/v1/screenings/${ID}/categories/DISEASES/responses`],
+    ['post', `/api/v1/screenings/${ID}/measurements`],
+    ['post', `/api/v1/screenings/${ID}/measurements/${ID}/corrections`],
+    ['post', `/api/v1/screenings/${ID}/complete`],
+    ['post', `/api/v1/screenings/${ID}/cancel`],
   ] as const)('%s %s requires authentication', async (method, path) => {
     const res = await request(app())[method](path);
     expect(res.status).toBe(401);

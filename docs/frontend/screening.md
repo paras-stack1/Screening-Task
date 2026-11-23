@@ -1,9 +1,7 @@
-# Worker App - Screening (Step 6, stage 6D)
+# Worker App - Screening (Step 6)
 
-> Status: 2026-11-22. Implemented: screening home, choose child, eligibility and consent check,
-> session hub with the four Four-D categories, category questions, measurements. Review and
-> completion, the completion summary, history and cancellation follow in stage 6E. All
-> question content in development is **demonstration content** (not clinically approved).
+> Status: Step 6 complete (6D + 6E, 2026-11-23). All question content in development is
+> **demonstration content** (not clinically approved).
 
 ## Screens and routes
 
@@ -15,6 +13,13 @@
 | `/screening/:sessionId` | Session hub | Child, age, who started it; four category cards with **workflow** state; measurements count. Read-only for anyone but the conducting worker or once closed |
 | `/screening/:sessionId/category/:category` | Questions | One section at a time, see below |
 | `/screening/:sessionId/measurements` | Measurements | Add and correct; history with "Corrected" |
+| `/screening/:sessionId/review` | Review and complete (6E) | Observations-only summary, incomplete-area warning, Complete disabled until one area is finished, confirmation dialog, one request on double tap; then the summary |
+| `/screening/:sessionId/summary` | Summary / details (6E) | Who, when, status (cancel reason), per-area answers with source and notes, incomplete and not-assessed areas, current measurements, number of corrections, and "no approved rules, so no result or recommendation" |
+| `/screening/history/:childId` | History (6E) | Newest first, 20 per page; completed and cancelled open the summary, the worker's own unfinished ones open the session |
+
+The hub also has **Review and complete**, **Cancel this screening** (a reason of 3+ characters and a
+confirmation; the record is kept as CANCELLED), and **View summary** once closed. The child profile
+has **Screening history**.
 
 Entry points: the dashboard "Start screening" card (needs `screening.conduct`) and "Start or
 continue screening" on the child profile. Screening is a stack inside the signed-in tabs with

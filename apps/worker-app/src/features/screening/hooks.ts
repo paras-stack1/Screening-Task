@@ -1,5 +1,5 @@
-import type { ScreeningSessionResponse } from '@balswasthya/shared-contracts';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ScreeningProtocolDetail, ScreeningSessionResponse } from '@balswasthya/shared-contracts';
+import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useAppServices } from '../../services/appServices';
 import { queryKeys } from '../../services/query/queryKeys';
@@ -86,6 +86,54 @@ export function useScreeningProtocol(protocolId: string | undefined) {
     queryFn: ({ signal }) => screening.protocol(protocolId!, { signal }).then((r) => r.protocol),
     enabled: userId !== 'none' && Boolean(protocolId),
     staleTime: Infinity,
+  });
+}
+
+/** The protocol versions used by a session's categories (at most four), for showing answers. */
+export function useScreeningProtocols(protocolIds: readonly string[]) {
+  const screening = useScreeningApi();
+  const userId = useUserId();
+  return useQueries({
+    queries: protocolIds.map((protocolId) => ({
+      queryKey: queryKeys.screeningProtocol(userId, protocolId),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        screening.protocol(protocolId, { signal }).then((r) => r.protocol),
+      enabled: userId !== 'none',
+      staleTime: Infinity,
+    })),
+  });
+}
+
+/** A session plus the protocol versions its categories used (for summaries). */
+export function useSessionWithProtocols(sessionId: string) {
+  const session = useScreeningSession(sessionId);
+  const ids = [...new Set((session.data?.sessionCategories ?? []).map((c) => c.protocol.id))];
+  const results = useScreeningProtocols(ids);
+  const protocols = new Map<string, ScreeningProtocolDetail>();
+  for (const r of results) if (r.data) protocols.set(r.data.id, r.data);
+  const failed = results.find((r) => r.isError);
+  return {
+    session: session.data,
+    protocols,
+    isError: session.isError || Boolean(failed),
+    error: session.error ?? failed?.error,
+    retry: () => {
+      void session.refetch();
+      for (const r of results) if (r.isError) void r.refetch();
+    },
+  };
+}
+
+/** A child's screening history, newest first, 20 per page ("load more"). */
+export function useChildScreeningHistory(childId: string, enabled = true) {
+  const screening = useScreeningApi();
+  const userId = useUserId();
+  return useInfiniteQuery({
+    queryKey: queryKeys.screeningHistory(userId, childId),
+    queryFn: ({ pageParam, signal }) => screening.history(childId, pageParam, { signal }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page * last.pageSize < last.total ? last.page + 1 : undefined),
+    enabled: enabled && userId !== 'none' && Boolean(childId),
   });
 }
 

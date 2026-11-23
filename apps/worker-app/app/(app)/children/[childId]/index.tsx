@@ -144,6 +144,15 @@ export default function ChildProfileScreen() {
             testID="profile-start-screening"
           />
         ) : null}
+        {permissions.canRead ? (
+          <AppButton
+            variant="ghost"
+            icon="history"
+            label={t('screening.history.open')}
+            onPress={() => router.push(screeningRoutes.history(data.id))}
+            testID="profile-screening-history"
+          />
+        ) : null}
       </AppCard>
     </ScreenContainer>
   );

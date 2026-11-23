@@ -9,11 +9,13 @@ import {
   ErrorState,
   InlineAlert,
   LoadingIndicator,
+  PrimaryButton,
   ScreenContainer,
   SectionHeader,
   StatusBadge,
 } from '../../../../src/components';
 import { formatIndiaDate } from '../../../../src/features/children/labels';
+import { CancelSessionCard } from '../../../../src/features/screening/components/CancelSessionCard';
 import {
   CategoryCard,
   DemoContentBanner,
@@ -184,10 +186,27 @@ export default function ScreeningSessionScreen() {
       </AppCard>
 
       {s.canEdit ? (
-        <AppText variant="bodySmall" color="textSecondary" testID="session-saved-note">
-          {t('screening.session.savedNote')}
-        </AppText>
-      ) : null}
+        <>
+          <AppText variant="bodySmall" color="textSecondary" testID="session-saved-note">
+            {t('screening.session.savedNote')}
+          </AppText>
+          <PrimaryButton
+            icon="clipboard-check-outline"
+            label={t('screening.session.review')}
+            onPress={() => router.push(screeningRoutes.review(s.id))}
+            testID="session-review"
+          />
+          <CancelSessionCard session={s} />
+        </>
+      ) : (
+        <AppButton
+          variant="secondary"
+          icon="file-document-outline"
+          label={t('screening.session.viewSummary')}
+          onPress={() => router.push(screeningRoutes.summary(s.id))}
+          testID="session-view-summary"
+        />
+      )}
       <NotADiagnosisNote />
     </ScreenContainer>
   );

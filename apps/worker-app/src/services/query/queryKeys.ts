@@ -23,6 +23,7 @@ export const queryKeys = {
   screeningMine: (userId: string, status: string) => [userId, 'screening', 'mine', status] as const,
   screeningEligibility: (userId: string, childId: string) =>
     [userId, 'screening', 'eligibility', childId] as const,
+  screeningHistory: (userId: string, childId: string) => [userId, 'screening', 'history', childId] as const,
   screeningSession: (userId: string, sessionId: string) =>
     [userId, 'screening', 'session', sessionId] as const,
   /** Protocol versions are immutable once used, so they may be cached for the app session. */

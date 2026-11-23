@@ -136,6 +136,8 @@ interface Session {
   version: number;
   startedAt: string;
   completedAt: string | null;
+  cancelledAt?: string;
+  cancelReason?: string;
   consentId: string;
   ageInDays: number;
   dob: string;
@@ -199,7 +201,7 @@ export function createFakeScreening(children: FakeChildren) {
       startedAt: s.startedAt,
       updatedAt: new Date(clock).toISOString(),
       completedAt: s.completedAt,
-      cancelledAt: null,
+      cancelledAt: s.cancelledAt ?? null,
       conductedByName: s.ownerName,
       isMine: s.ownerId === userId,
       ageInDaysAtStart: s.ageInDays,
@@ -209,8 +211,8 @@ export function createFakeScreening(children: FakeChildren) {
       dateOfBirthAtStart: s.dob,
       ageAtStart: ageOn(birth, todayInIndia(new Date(s.startedAt))),
       screeningConsentId: s.consentId,
-      cancelReason: null,
-      cancelledByName: null,
+      cancelReason: s.cancelReason ?? null,
+      cancelledByName: s.cancelledAt ? s.ownerName : null,
       canEdit: s.ownerId === userId && (s.status === 'DRAFT' || s.status === 'IN_PROGRESS'),
       sessionCategories: cats.map((c) => {
         const p = protocolOf(c.category);
@@ -253,6 +255,29 @@ export function createFakeScreening(children: FakeChildren) {
         };
       }),
       screeningRulesApplied: false,
+    };
+  }
+
+  /** List row: the summary fields only (no answers, notes or measurements). */
+  function listItem(s: Session, userId: string) {
+    const d = detail(s, userId);
+    return {
+      id: d.id,
+      childId: d.childId,
+      childName: d.childName,
+      status: d.status,
+      version: d.version,
+      screeningDate: d.screeningDate,
+      startedAt: d.startedAt,
+      updatedAt: d.updatedAt,
+      completedAt: d.completedAt,
+      cancelledAt: d.cancelledAt,
+      conductedByName: d.conductedByName,
+      isMine: d.isMine,
+      ageInDaysAtStart: d.ageInDaysAtStart,
+      dobEstimatedAtStart: d.dobEstimatedAtStart,
+      categories: d.categories,
+      usesUnapprovedContent: d.usesUnapprovedContent,
     };
   }
 
@@ -334,6 +359,16 @@ export function createFakeScreening(children: FakeChildren) {
       if (!children.children.has(m[1]!)) return err(404, 'NOT_FOUND');
       return ok(200, eligibility(m[1]!));
     }
+    if (method === 'GET' && (m = /^\/children\/([^/]+)\/screenings$/.exec(path!))) {
+      if (!read) return err(403, 'FORBIDDEN');
+      if (!children.children.has(m[1]!)) return err(404, 'NOT_FOUND');
+      const page = Number(params.get('page') ?? '1');
+      const all = [...sessions.values()]
+        .filter((s) => s.childId === m![1])
+        .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+        .map((s) => listItem(s, user.id));
+      return ok(200, { items: all.slice((page - 1) * 20, page * 20), page, pageSize: 20, total: all.length });
+    }
     if (!path!.startsWith('/screenings')) return null;
 
     if (method === 'GET' && path === '/screenings/summary') {
@@ -351,27 +386,7 @@ export function createFakeScreening(children: FakeChildren) {
       const items = [...sessions.values()]
         .filter((s) => params.get('mine') !== 'true' || s.ownerId === user.id)
         .filter((s) => !params.get('status') || s.status === params.get('status'))
-        .map((s) => {
-          const d = detail(s, user.id);
-          return {
-            id: d.id,
-            childId: d.childId,
-            childName: d.childName,
-            status: d.status,
-            version: d.version,
-            screeningDate: d.screeningDate,
-            startedAt: d.startedAt,
-            updatedAt: d.updatedAt,
-            completedAt: d.completedAt,
-            cancelledAt: d.cancelledAt,
-            conductedByName: d.conductedByName,
-            isMine: d.isMine,
-            ageInDaysAtStart: d.ageInDaysAtStart,
-            dobEstimatedAtStart: d.dobEstimatedAtStart,
-            categories: d.categories,
-            usesUnapprovedContent: d.usesUnapprovedContent,
-          };
-        });
+        .map((s) => listItem(s, user.id));
       return ok(200, { items, page: 1, pageSize: 20, total: items.length });
     }
     if (method === 'POST' && path === '/screenings') {
@@ -505,6 +520,30 @@ export function createFakeScreening(children: FakeChildren) {
       }
     }
 
+    if (method === 'POST' && rest === '/complete') {
+      const body = rawBody as { expectedVersion?: number };
+      // Idempotent: completing again returns the original completion.
+      if (s.status === 'COMPLETED' && s.ownerId === user.id) return ok(200, { session: detail(s, user.id) });
+      const blocked = guard(s, user.id, Number(body.expectedVersion));
+      if (blocked) return blocked;
+      if (!s.categories.some((c) => c.status === 'COMPLETED')) return err(422, 'NO_COMPLETED_CATEGORY');
+      s.status = 'COMPLETED';
+      s.completedAt = tick();
+      s.version += 1;
+      return ok(200, { session: detail(s, user.id) });
+    }
+    if (method === 'POST' && rest === '/cancel') {
+      const body = rawBody as { expectedVersion?: number; reason?: string };
+      if (!body.reason || body.reason.trim().length < 3) return err(400, 'VALIDATION_ERROR');
+      const blocked = guard(s, user.id, Number(body.expectedVersion), false);
+      if (blocked) return blocked;
+      s.status = 'CANCELLED';
+      s.cancelledAt = tick();
+      s.cancelReason = body.reason.trim();
+      s.version += 1;
+      return ok(200, { session: detail(s, user.id) });
+    }
+
     const mm = /^\/measurements(?:\/([^/]+)\/corrections)?$/.exec(rest);
     if (method === 'POST' && mm) {
       const correcting = mm[1];
@@ -564,6 +603,51 @@ export function createFakeScreening(children: FakeChildren) {
     },
     question(category: FourDCategoryCode, code: string) {
       return protocolOf(category).questions.find((q) => q.code === code)!;
+    },
+    /** Records a finished category: Yes for yes/no questions, "not assessed" for the others. */
+    finishCategory(sessionId: string, category: FourDCategoryCode, notes: string | null = null) {
+      const s = sessions.get(sessionId)!;
+      const p = protocolOf(category);
+      s.categories.push({
+        id: uuid(),
+        category,
+        status: 'COMPLETED',
+        notes,
+        startedAt: tick(),
+        completedAt: tick(),
+        responses: p.questions
+          .filter((q) => q.isRequired)
+          .map((q) => ({
+            id: uuid(),
+            questionId: q.id,
+            questionCode: q.code,
+            status: q.answerType === 'YES_NO' ? ('ANSWERED' as const) : ('NOT_ASSESSED' as const),
+            source: 'WORKER_OBSERVED' as const,
+            value: q.answerType === 'YES_NO' ? true : null,
+            notAssessedReason: q.answerType === 'YES_NO' ? null : 'Child asleep',
+            notes: null,
+            recordedAt: tick(),
+            updatedAt: new Date(clock).toISOString(),
+            recordedByName: s.ownerName,
+          })),
+      });
+      s.status = 'IN_PROGRESS';
+      s.version += 1;
+    },
+    /** Starts a category without finishing it. */
+    startCategory(sessionId: string, category: FourDCategoryCode) {
+      const s = sessions.get(sessionId)!;
+      s.categories.push({
+        id: uuid(),
+        category,
+        status: 'IN_PROGRESS',
+        notes: null,
+        startedAt: tick(),
+        completedAt: null,
+        responses: [],
+      });
+      s.status = 'IN_PROGRESS';
+      s.version += 1;
     },
     /** Seeds a session owned by `ownerId` (synthetic). */
     seedSession(childId: string, ownerId: string, ownerName = 'Sunita Devi') {

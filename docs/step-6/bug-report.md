@@ -8,6 +8,33 @@
 | S6-001 | 6C | Medium | Categories in a session were ordered by start time; two categories started in the same millisecond came back in an arbitrary order | Fixed |
 | S6-002 | 6C | Medium | A database integrity-rule violation that the service did not pre-check reached the client as 500 `INTERNAL_ERROR` | Fixed |
 | S6-003 | 6D | Medium | Hiding the screening section from the tab bar with `href: null` made every `/screening` URL unreachable (silently redirected to the dashboard) | Fixed |
+| S6-004 | 6E | Medium | The 16 screening routes were missing from the API's route inventory test (the list that proves every protected route rejects a missing token) | Fixed |
+| S6-005 | 6E | Low | One DB test timed out (20 s) once in five full runs; normally ~0.5 s | Open - not reproducible |
+
+## S6-004 - Screening routes missing from the authentication inventory
+
+- **Reproduction:** read `services/api/tests/apiSecurity.test.ts`. The inventory is a manual
+  list ("add every new protected route here") and had no `/screening*` entry after 6B/6C.
+- **Root cause:** process gap. A comment in `services/api/src/routes/index.ts` said the inventory
+  "fails if a new route is reachable without a token"; it does not - the list is manual. The
+  comment is corrected.
+- **Affected files:** `services/api/tests/apiSecurity.test.ts`, `services/api/src/routes/index.ts` (comment).
+- **Impact:** test coverage only. The routes did require a token (they use the same
+  `authenticate` middleware, and the DB tests showed 401 on `/screenings`), but the guarantee was
+  not checked for every route.
+- **Fix:** all 16 screening routes added; all return 401 without a token.
+- **Verification:** 71/71 in `apiSecurity.test.ts`. Recommendation for later steps: generate the
+  inventory from the Express router so a new route cannot be missed.
+
+## S6-005 - One-off DB test timeout
+
+- **Observed:** `screeningSessions.test.ts` "completes a category only when every required
+  question has an explicit state" hit the 20 s timeout once (run 5 of 5 full runs on 2026-11-22).
+- **Investigation:** no lock path found (the transaction locks only its own session row; the
+  trigger's `FOR SHARE` is on the same row in the same transaction). Three reruns of the file
+  passed at 387-578 ms, and the next full DB run passed 299/299.
+- **Assessment:** probably an environment stall (Windows + Docker Desktop + OneDrive folder), but
+  **not proven**. Kept open; if it recurs, capture `pg_stat_activity` during the run.
 
 ## S6-003 - Screening screens unreachable
 
