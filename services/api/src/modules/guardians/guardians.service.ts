@@ -256,6 +256,16 @@ export function createGuardiansService({ db, pii }: GuardiansServiceDependencies
           where: { id: linkId },
           data: { endedAt: tctx.at, endedById: ctx.userId, endReason: reason },
         });
+        // Step 8 (PP11): Parent Portal access to this child ends with the link.
+        const portalAccess = await tx.guardianChildAccess.updateMany({
+          where: { childGuardianId: linkId, status: { not: 'REVOKED' } },
+          data: {
+            status: 'REVOKED',
+            revokedAt: tctx.at,
+            revokedById: ctx.userId,
+            revokeReason: 'Guardian link ended',
+          },
+        });
         await recordAudit(tx, {
           actorUserId: ctx.userId,
           action: 'child_guardian.ended',
@@ -265,7 +275,12 @@ export function createGuardiansService({ db, pii }: GuardiansServiceDependencies
           outcome: 'SUCCESS',
           requestId: ctx.requestId,
           // The reason text is free text and could contain personal data: not copied to the audit.
-          details: { childId, guardianId: link.guardianId, wasPrimaryContact: link.isPrimaryContact },
+          details: {
+            childId,
+            guardianId: link.guardianId,
+            wasPrimaryContact: link.isPrimaryContact,
+            parentPortalAccessRevoked: portalAccess.count,
+          },
         });
       }, TX_OPTIONS);
       return loadLink(linkId);

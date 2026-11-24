@@ -17,7 +17,11 @@ import {
   createReportsRouter,
 } from '../modules/follow-ups/followUps.routes';
 import { createGuardiansRouter } from '../modules/guardians/guardians.routes';
-import { createGuardianInvitationsRouter } from '../modules/parent-portal/invitations.routes';
+import {
+  createGuardianChildAccessRouter,
+  createGuardianInvitationsRouter,
+} from '../modules/parent-portal/invitations.routes';
+import { createParentChildrenRouter } from '../modules/parent-portal/parentChildren.routes';
 import type { ParentPortalSettings } from '../modules/parent-portal/invitations.service';
 import { createParentOnboardingRouter } from '../modules/parent-portal/onboarding.routes';
 import { createParentAuthRouter } from '../modules/parent-portal/parentAuth.routes';
@@ -85,6 +89,10 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/auth', createAuthRouter(deps.auth));
   // Step 8 Parent Portal onboarding: PUBLIC, authorised by the invitation token (see the module).
   router.use(
+    '/parent/children',
+    createParentChildrenRouter({ db: deps.auth.db, parentAuth: deps.parentAuth, now: deps.auth.now }),
+  );
+  router.use(
     '/parent/auth',
     createParentAuthRouter({
       db: deps.auth.db,
@@ -126,6 +134,10 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use(
     '/guardians/:guardianId/invitations',
     createGuardianInvitationsRouter({ ...childData, parentPortal: deps.parentPortal }),
+  );
+  router.use(
+    '/guardians/:guardianId/child-access',
+    createGuardianChildAccessRouter({ ...childData, parentPortal: deps.parentPortal }),
   );
   router.use('/guardians', createGuardiansRouter(childData));
   router.use('/users', createUsersRouter(deps.auth));

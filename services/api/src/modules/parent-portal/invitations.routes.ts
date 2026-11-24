@@ -1,5 +1,9 @@
 import {
   createParentInvitationRequestSchema,
+  grantChildAccessRequestSchema,
+  revokeChildAccessRequestSchema,
+  type GrantChildAccessRequest,
+  type RevokeChildAccessRequest,
   revokeParentInvitationRequestSchema,
   type CreateParentInvitationRequest,
   type RevokeParentInvitationRequest,
@@ -70,6 +74,50 @@ export function createGuardianInvitationsRouter(deps: InvitationsRouterDependenc
       const { guardianId, invitationId } = getValidated<InvitationParams>(res, 'params');
       const body = getValidated<RevokeParentInvitationRequest>(res, 'body');
       res.json({ portal: await service.revoke(ctx(res), guardianId, invitationId, body) });
+    },
+  );
+
+  return router;
+}
+
+const accessParams = z.strictObject({ guardianId: z.uuid(), childId: z.uuid() });
+
+/**
+ * /api/v1/guardians/:guardianId/child-access (Step 8, stage 6; PP11). Staff with guardian.invite in
+ * the child's area: share more children with an activated parent, or stop sharing one.
+ */
+export function createGuardianChildAccessRouter(deps: InvitationsRouterDependencies): Router {
+  const router = Router({ mergeParams: true });
+  const requirePermission = createRequirePermission(deps);
+  const service = createInvitationService(deps);
+  const now = deps.now ?? (() => new Date());
+  const ctx = (res: Response): AccessContext => ({
+    userId: getAuth(res).userId,
+    requestId: getRequestId(res),
+    at: now(),
+  });
+
+  router.use(createAuthenticate(deps)(), deps.dataRateLimit);
+
+  router.post(
+    '/',
+    requirePermission('guardian.invite'),
+    validate({ params: guardianParams, body: grantChildAccessRequestSchema }),
+    async (_req, res) => {
+      const { guardianId } = getValidated<GuardianParams>(res, 'params');
+      const { childIds } = getValidated<GrantChildAccessRequest>(res, 'body');
+      res.json({ portal: await service.grantChildren(ctx(res), guardianId, childIds) });
+    },
+  );
+
+  router.post(
+    '/:childId/revoke',
+    requirePermission('guardian.invite'),
+    validate({ params: accessParams, body: revokeChildAccessRequestSchema }),
+    async (_req, res) => {
+      const { guardianId, childId } = getValidated<z.infer<typeof accessParams>>(res, 'params');
+      const { reason } = getValidated<RevokeChildAccessRequest>(res, 'body');
+      res.json({ portal: await service.revokeChild(ctx(res), guardianId, childId, reason) });
     },
   );
 
