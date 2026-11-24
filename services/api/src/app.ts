@@ -36,6 +36,10 @@ function defaultDependencies(): AppDependencies {
     parentPortal: {
       portalUrl: env.PARENT_PORTAL_URL,
       inviteTtlHours: env.PARENT_INVITE_TTL_HOURS,
+      otpKey: env.OTP_HMAC_KEY,
+      otpTtlMinutes: env.PARENT_OTP_TTL_MINUTES,
+      // Placeholder privacy notice / terms are never accepted in production (PP13).
+      allowDraftLegal: !isProduction,
       sms:
         !isProduction && (env.SMS_PROVIDER ?? (env.NODE_ENV === 'development' ? 'mock' : 'none')) === 'mock'
           ? createMockSmsSender()

@@ -19,6 +19,7 @@ import {
 import { createGuardiansRouter } from '../modules/guardians/guardians.routes';
 import { createGuardianInvitationsRouter } from '../modules/parent-portal/invitations.routes';
 import type { ParentPortalSettings } from '../modules/parent-portal/invitations.service';
+import { createParentOnboardingRouter } from '../modules/parent-portal/onboarding.routes';
 import {
   createClinicalReviewsRouter,
   createFacilitiesRouter,
@@ -60,7 +61,8 @@ export interface ApiRouterDependencies {
  *
  * PUBLIC routes (no access token): /health/*, /auth/login, /auth/refresh, /auth/logout, and the
  * admin portal's /auth/web/login, /auth/web/refresh, /auth/web/logout (listed origin + portal
- * header required; the refresh token is an httpOnly cookie).
+ * header required; the refresh token is an httpOnly cookie), and the Parent Portal onboarding
+ * routes under /parent (authorised by the invitation token and a verified code; Step 8).
  * Every other route authenticates first and then checks a permission. The route inventory in
  * tests/apiSecurity.test.ts is a MANUAL list: add every new protected route to it (bug S6-004).
  */
@@ -77,6 +79,16 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/health', createHealthRouter(deps.health));
   router.use('/auth/web', createWebAuthRouter(deps.auth, deps.webSession));
   router.use('/auth', createAuthRouter(deps.auth));
+  // Step 8 Parent Portal onboarding: PUBLIC, authorised by the invitation token (see the module).
+  router.use(
+    '/parent',
+    createParentOnboardingRouter({
+      db: deps.auth.db,
+      pii: deps.pii,
+      parentPortal: deps.parentPortal,
+      now: deps.auth.now,
+    }),
+  );
   router.use('/consent-notices', createConsentNoticesRouter(childData));
   // Before '/children' so the nested consent and screening routes are matched first.
   router.use('/children/:childId/consents', createChildConsentsRouter(childData));

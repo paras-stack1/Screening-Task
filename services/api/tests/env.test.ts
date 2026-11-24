@@ -10,6 +10,7 @@ const validProduction = {
   AI_SERVICE_API_KEY: 'k'.repeat(40),
   PII_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
   PII_LOOKUP_KEY: Buffer.alloc(32, 2).toString('base64'),
+  OTP_HMAC_KEY: Buffer.alloc(32, 3).toString('base64'),
 };
 
 /** The smallest valid development configuration. */
@@ -103,6 +104,8 @@ describe('environment configuration', () => {
     // Step 8: the development SMS mock and a non-HTTPS Parent Portal address are refused.
     ['SMS_PROVIDER', { SMS_PROVIDER: 'mock' }],
     ['PARENT_PORTAL_URL', { PARENT_PORTAL_URL: 'http://parent.example.in' }],
+    ['OTP_HMAC_KEY', { OTP_HMAC_KEY: undefined }],
+    ['OTP_HMAC_KEY', { OTP_HMAC_KEY: Buffer.alloc(32, 2).toString('base64') }],
   ])('production rejects an insecure %s', (path, override) => {
     expect(failingPaths({ ...validProduction, ...override })).toContain(path);
   });
@@ -123,6 +126,14 @@ describe('Parent Portal configuration (Step 8)', () => {
     });
     expect(result.success).toBe(true);
     expect(result.data?.PARENT_PORTAL_URL).toBe('https://parent.example.in');
+  });
+
+  it('code settings: 5-minute default, 1-10 allowed, OTP key optional outside production', () => {
+    expect(parseEnv(minimalDevelopment).data?.PARENT_OTP_TTL_MINUTES).toBe(5);
+    expect(failingPaths({ ...minimalDevelopment, PARENT_OTP_TTL_MINUTES: '11' })).toContain(
+      'PARENT_OTP_TTL_MINUTES',
+    );
+    expect(failingPaths({ ...minimalDevelopment, OTP_HMAC_KEY: 'c2hvcnQ=' })).toContain('OTP_HMAC_KEY');
   });
 
   it('rejects an unknown SMS provider and an out-of-range invitation lifetime', () => {

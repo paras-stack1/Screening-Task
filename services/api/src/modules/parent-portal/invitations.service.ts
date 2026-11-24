@@ -21,6 +21,19 @@ export interface ParentPortalSettings {
   /** Rate limits (assumptions, PP5). */
   maxInvitationsPerGuardianPerDay?: number;
   maxInvitationsPerWorkerPerHour?: number;
+  /** HMAC key for one-time codes and activation tickets (OTP_HMAC_KEY); absent = codes unavailable (503). */
+  otpKey?: Buffer | undefined;
+  /** Code lifetime in minutes (PARENT_OTP_TTL_MINUTES, default 5). */
+  otpTtlMinutes?: number;
+  /** Placeholder privacy notice / terms may be accepted (never in production). */
+  allowDraftLegal?: boolean;
+  /** Per-IP limits for the public onboarding routes, per 15 minutes (tests raise them). */
+  publicRateLimits?: {
+    validatePerIp: number;
+    sendOtpPerIp: number;
+    verifyOtpPerIp: number;
+    activatePerIp: number;
+  };
 }
 
 export interface InvitationServiceDependencies {

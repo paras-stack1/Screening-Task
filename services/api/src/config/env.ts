@@ -86,6 +86,12 @@ const envSchema = z
       .transform((value) => value.replace(/\/+$/, '')),
     PARENT_INVITE_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
     SMS_PROVIDER: z.enum(['none', 'mock']).optional(),
+    /**
+     * Parent Portal one-time codes (PP6). OTP_HMAC_KEY: base64, 32+ bytes; only HMACs of codes are
+     * stored. Required in production; without it elsewhere, codes cannot be sent (503).
+     */
+    OTP_HMAC_KEY: base64Key(32, 128).optional(),
+    PARENT_OTP_TTL_MINUTES: z.coerce.number().int().min(1).max(10).default(5),
     /** Defaults: "silent" under NODE_ENV=test, otherwise "info". */
     LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
     /** Owner credentials for Prisma Migrate. Only checked here so production can refuse them. */
@@ -125,6 +131,15 @@ const envSchema = z
     }
     if (!env.PII_ENCRYPTION_KEY) fail('PII_ENCRYPTION_KEY', 'is required in production');
     if (!env.PII_LOOKUP_KEY) fail('PII_LOOKUP_KEY', 'is required in production');
+    if (!env.OTP_HMAC_KEY) fail('OTP_HMAC_KEY', 'is required in production');
+    if (
+      env.OTP_HMAC_KEY &&
+      [env.PII_ENCRYPTION_KEY, env.PII_LOOKUP_KEY].some(
+        (k) => k && Buffer.compare(k, env.OTP_HMAC_KEY!) === 0,
+      )
+    ) {
+      fail('OTP_HMAC_KEY', 'must differ from the phone-protection keys');
+    }
     if (
       env.PII_ENCRYPTION_KEY &&
       env.PII_LOOKUP_KEY &&

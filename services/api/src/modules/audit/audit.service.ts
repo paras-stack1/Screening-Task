@@ -8,6 +8,8 @@ type Db = PrismaClient | Prisma.TransactionClient;
  */
 export interface AuditEntry {
   actorUserId?: string;
+  /** Step 8: a parent (Parent Portal) acting, instead of a staff user. */
+  actorParentAccountId?: string;
   action: string;
   entityType: string;
   entityId?: string;
