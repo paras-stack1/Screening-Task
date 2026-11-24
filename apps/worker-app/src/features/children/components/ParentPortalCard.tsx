@@ -38,6 +38,8 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   CHILD_NOT_LINKED: 'parentPortal.errors.childNotLinked',
   ALREADY_ACTIVATED: 'parentPortal.errors.alreadyActivated',
   INVITATION_NOT_OPEN: 'parentPortal.errors.notOpen',
+  NOT_SHARED: 'parentPortal.errors.notShared',
+  NOT_ACTIVATED: 'parentPortal.errors.notActivated',
 };
 
 function errorKey(error: unknown): TranslationKey {
@@ -74,7 +76,9 @@ function PortalBody({ status, canInvite }: { status: ParentPortalStatus; canInvi
   const { t } = useTranslation();
   const api = useChildrenApi();
   const invalidate = useInvalidateChildData();
-  const [mode, setMode] = useState<'view' | 'invite' | 'revoke'>('view');
+  const [mode, setMode] = useState<'view' | 'invite' | 'revoke' | 'stopChild'>('view');
+  /** Child whose sharing is being stopped (Step 8 stage 6). */
+  const [stopChildId, setStopChildId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [agreed, setAgreed] = useState(false);
   const [reason, setReason] = useState('');
@@ -121,6 +125,15 @@ function PortalBody({ status, canInvite }: { status: ParentPortalStatus; canInvi
     run(() => api.revokeParentInvitation(status.guardianId, invitation!.id, reason.trim()));
   };
 
+  /** After activation: share another linked child, or stop sharing one (PP11). */
+  const activated = status.status === 'ACTIVATED';
+  const share = (childId: string) => run(() => api.grantChildAccess(status.guardianId, [childId]));
+  const stopSharing = () => {
+    if (reason.trim().length < 3) return setFormError('parentPortal.errors.reasonRequired');
+    setFormError(null);
+    run(() => api.revokeChildAccess(status.guardianId, stopChildId!, reason.trim()));
+  };
+
   const toggle = (childId: string) =>
     setSelected((current) =>
       current.includes(childId) ? current.filter((id) => id !== childId) : [...current, childId],
@@ -147,11 +160,36 @@ function PortalBody({ status, canInvite }: { status: ParentPortalStatus; canInvi
             </AppText>
           ) : null}
           {status.children.map((child) => (
-            <AppText key={child.childId} variant="bodySmall">
-              {`${child.childName} (${relationshipLabel(t, child.relationship)}): ${t(
-                `parentPortal.access.${child.access}`,
-              )}`}
-            </AppText>
+            <View key={child.childId} style={styles.childRow}>
+              <AppText variant="bodySmall" style={styles.childText}>
+                {`${child.childName} (${relationshipLabel(t, child.relationship)}): ${t(
+                  `parentPortal.access.${child.access}`,
+                )}`}
+              </AppText>
+              {activated && mayAct && mode === 'view' ? (
+                child.access === 'ACTIVE' ? (
+                  <AppButton
+                    variant="ghost"
+                    label={t('parentPortal.stopSharing')}
+                    onPress={() => {
+                      setFormError(null);
+                      setStopChildId(child.childId);
+                      setMode('stopChild');
+                    }}
+                    disabled={busy}
+                    testID={`parent-portal-stop-${child.childId}`}
+                  />
+                ) : (
+                  <AppButton
+                    variant="ghost"
+                    label={t('parentPortal.share')}
+                    onPress={() => share(child.childId)}
+                    disabled={busy}
+                    testID={`parent-portal-share-${child.childId}`}
+                  />
+                )
+              ) : null}
+            </View>
           ))}
         </View>
       </AppCard>
@@ -226,6 +264,34 @@ function PortalBody({ status, canInvite }: { status: ParentPortalStatus; canInvi
             loading={busy}
             onPress={send}
             testID="parent-portal-send"
+          />
+          <AppButton
+            variant="ghost"
+            label={t('common.cancel')}
+            onPress={() => setMode('view')}
+            disabled={busy}
+          />
+        </View>
+      ) : null}
+
+      {mode === 'stopChild' ? (
+        <View style={styles.stack} testID="parent-portal-stop-form">
+          <AppText variant="bodySmall">{t('parentPortal.stopSharingNote')}</AppText>
+          <AppInput
+            label={t('parentPortal.stopSharingReason')}
+            value={reason}
+            onChangeText={setReason}
+            maxLength={300}
+            editable={!busy}
+            testID="parent-portal-stop-reason"
+          />
+          {formError ? <InlineAlert message={t(formError)} testID="parent-portal-form-error" /> : null}
+          <AppButton
+            variant="danger"
+            label={t('parentPortal.stopSharingConfirm')}
+            loading={busy}
+            onPress={stopSharing}
+            testID="parent-portal-stop-confirm"
           />
           <AppButton
             variant="ghost"
@@ -311,4 +377,6 @@ const styles = StyleSheet.create({
   checked: { borderColor: colors.primary, backgroundColor: colors.primarySurface },
   pressed: { backgroundColor: colors.surfaceMuted },
   checkboxText: { flex: 1 },
+  childRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  childText: { flex: 1, minWidth: 160 },
 });

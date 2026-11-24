@@ -382,6 +382,14 @@ export const en = {
     'One of the chosen children is no longer linked to this guardian. Reload and try again.',
   'parentPortal.errors.alreadyActivated': 'This guardian has already activated their account.',
   'parentPortal.errors.notOpen': 'This invitation is no longer open.',
+  'parentPortal.share': 'Share',
+  'parentPortal.stopSharing': 'Stop sharing',
+  'parentPortal.stopSharingNote': 'The parent will no longer see this child in the Parent Portal.',
+  'parentPortal.stopSharingReason': 'Reason for stopping',
+  'parentPortal.stopSharingConfirm': 'Stop sharing this child',
+  'parentPortal.errors.notShared': 'This child is not shared with the parent any more.',
+  'parentPortal.errors.notActivated':
+    'The guardian has no active Parent Portal account. Send an invitation instead.',
 
   'dashboard.recent.title': 'Recently registered',
   'dashboard.recent.empty': 'No children registered yet.',

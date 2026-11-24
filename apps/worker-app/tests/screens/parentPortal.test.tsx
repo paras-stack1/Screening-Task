@@ -117,4 +117,28 @@ describe('Parent Portal invitation card', () => {
     expect(await screen.findByText('Record the guardian mobile number before inviting.')).toBeOnTheScreen();
     expect(screen.queryByTestId('parent-portal-invite')).toBeNull();
   });
+
+  it('after activation: stops sharing a child with a reason, then shares it again', async () => {
+    const { child, guardian } = seed();
+    context.backend.children.portal.activated.add(guardian.id);
+    context.backend.children.portalAccess.set(guardian.id, new Map([[child.id, 'ACTIVE' as const]]));
+    await seedSavedSession(context, INVITER);
+    await renderApp(`/children/guardian/${guardian.id}`);
+    expect(await screen.findByText('Account activated')).toBeOnTheScreen();
+    expect(screen.queryByTestId('parent-portal-invite')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId(`parent-portal-stop-${child.id}`));
+    await fireEvent.press(screen.getByTestId('parent-portal-stop-confirm'));
+    expect(await screen.findByText('Enter a reason (at least 3 characters).')).toBeOnTheScreen();
+    await fireEvent.changeText(screen.getByTestId('parent-portal-stop-reason'), 'Guardian asked to stop');
+    await fireEvent.press(screen.getByTestId('parent-portal-stop-confirm'));
+    expect(await screen.findByText(/not shared \(cancelled\)/)).toBeOnTheScreen();
+    expect(context.backend.children.portalAccess.get(guardian.id)!.get(child.id)).toBe('REVOKED');
+
+    await fireEvent.press(screen.getByTestId(`parent-portal-share-${child.id}`));
+    await waitFor(() =>
+      expect(context.backend.children.portalAccess.get(guardian.id)!.get(child.id)).toBe('ACTIVE'),
+    );
+    expect(await screen.findByTestId(`parent-portal-stop-${child.id}`)).toBeOnTheScreen();
+  });
 });
