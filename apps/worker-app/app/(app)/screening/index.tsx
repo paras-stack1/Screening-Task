@@ -22,6 +22,7 @@ import {
   useScreeningPermissions,
   useScreeningSummary,
 } from '../../../src/features/screening/hooks';
+import { resultRoutes } from '../../../src/features/results/routes';
 import { screeningRoutes } from '../../../src/features/screening/routes';
 import { useTranslation } from '../../../src/localization';
 import { apiErrorMessageKey } from '../../../src/services/api/errorMessages';
@@ -91,6 +92,25 @@ export default function ScreeningHomeScreen() {
         onPress={() => router.push(screeningRoutes.selectChild)}
         testID="screening-start"
       />
+      {permissions.canRead ? (
+        <AppButton
+          variant="secondary"
+          icon="clipboard-pulse-outline"
+          label={t('results.listTitle')}
+          onPress={() => router.push(resultRoutes.list)}
+          testID="screening-results"
+        />
+      ) : null}
+      {permissions.canReview ? (
+        <AppButton
+          variant="secondary"
+          icon="stethoscope"
+          label={t('reviews.title')}
+          accessibilityHint={t('reviews.hint')}
+          onPress={() => router.push(resultRoutes.reviewQueue)}
+          testID="screening-clinical-reviews"
+        />
+      ) : null}
       {permissions.canReview ? (
         <AppButton
           variant="secondary"

@@ -10,8 +10,8 @@
 | Phases 1-4 | Audit, architecture, schema proposal (`47b8b4c`) | Done |
 | 7B | Migration (all Step 7 tables and rules), permissions, rule DSL + evaluator, rule-set CLIs, demonstration rule sets, result generation, results and rule-set read API, tests | Done (`01af3c6`) |
 | 7C | Clinical review actions, referral create/approve/reject/issue/cancel/history, facility read API | Done (`f9bcc84`) |
-| **7D** | Referral tracking, follow-ups, notifications + reminder job, dashboard/report APIs | **Done - awaiting review** |
-| 7E | Worker app: results, review, notifications | Not started |
+| 7D | Referral tracking, follow-ups, notifications + reminder job, dashboard/report APIs | Done (`986e676`) |
+| **7E** | Worker app: results, review, notifications | **Done - awaiting review** |
 | 7F | Worker app: referrals, follow-ups, dashboards | Not started |
 | 7G | Admin portal facilities and reports; security and regression testing; all docs; final report | Not started |
 
@@ -174,3 +174,30 @@ Worker app and admin portal suites not re-run (no app code changed in 7D).
 
 A correction does not revert an appointment time. Notifications are in-app only (no push).
 Reports list sub-areas one level down only.
+
+## Stage 7E
+
+### Built (worker app)
+
+Result screen per screening (four layers kept apart, version history), results list with real
+counts and an outcome filter, clinical review queue and review screen (claim, release, decision
+form with notes, referral area and priority, repeat-screening date), and the Notifications tab
+(generic text, unread count, mark read). Details: [docs/frontend/results.md](../frontend/results.md).
+English and Hindi text added (Hindi drafted, needs translator review). Contract change:
+`clinicalReviewSummary.overallOutcome` is now typed as a result outcome (was a plain string).
+
+### Test results (actually run, 2026-11-24)
+
+| Suite | Before 7E | After 7E | Result |
+|---|---|---|---|
+| Worker app (Jest) | 2297 passed / 20 skipped | 2684 passed / 20 skipped | All pass (+11 screen tests, + per-key translation checks) |
+| App typecheck, expo lint, Prettier (repository) | clean | clean | - |
+| API typecheck after the contract change | clean | clean | - |
+
+In one full parallel run two result-screen tests timed out (known Jest load flakiness on this
+machine); they pass alone, with the other screen tests, and in the next full run.
+
+### Limitations
+
+Referral and follow-up notifications do not open a screen yet (those screens come in 7F). The
+repeat-screening date is typed as YYYY-MM-DD (no date picker).

@@ -11,6 +11,7 @@ import {
   ScreenContainer,
 } from '../../../../src/components';
 import { formatIndiaDateTime } from '../../../../src/features/children/labels';
+import { resultRoutes } from '../../../../src/features/results/routes';
 import { SessionSummary } from '../../../../src/features/screening/components/SessionSummary';
 import { useSessionWithProtocols } from '../../../../src/features/screening/hooks';
 import { screeningRoutes } from '../../../../src/features/screening/routes';
@@ -66,6 +67,15 @@ export default function ScreeningSummaryScreen() {
             label={t('screening.summary.continue')}
             onPress={() => router.replace(screeningRoutes.session(session.id))}
             testID="summary-continue"
+          />
+        ) : null}
+        {session.status === 'COMPLETED' ? (
+          <AppButton
+            variant="secondary"
+            icon="clipboard-pulse-outline"
+            label={t('results.open')}
+            onPress={() => router.push(resultRoutes.sessionResult(session.id))}
+            testID="summary-result"
           />
         ) : null}
         <AppButton

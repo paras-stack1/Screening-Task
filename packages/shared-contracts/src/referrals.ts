@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { referralPrioritySchema } from './clinicalRules.js';
-import { resultRunSchema, reviewDecisionSchema, reviewStatusSchema } from './results.js';
+import { resultOutcomeSchema, resultRunSchema, reviewDecisionSchema, reviewStatusSchema } from './results.js';
 import { fourDCategorySchema } from './screening.js';
 
 /**
@@ -37,7 +37,7 @@ export const clinicalReviewSummarySchema = z.object({
   screeningVersion: z.number(),
   /** False when the screening was amended after this review task was created. */
   isCurrent: z.boolean(),
-  overallOutcome: z.string(),
+  overallOutcome: resultOutcomeSchema,
   usesUnapprovedContent: z.boolean(),
   claimedByName: z.string().nullable(),
   claimedByMe: z.boolean(),

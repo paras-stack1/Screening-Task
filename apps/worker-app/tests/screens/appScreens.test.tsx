@@ -128,7 +128,7 @@ describe('dashboard', () => {
     const app = await renderApp('/');
     await fireEvent.press(await screen.findByRole('button', { name: 'Open notifications' }));
     expect(app.getPathname()).toBe('/notifications');
-    expect(await screen.findByText('Notifications are not available yet')).toBeOnTheScreen();
+    expect(await screen.findByText('No notifications')).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     await fireEvent.press(await screen.findByRole('button', { name: 'Open profile' }));
     expect(app.getPathname()).toBe('/profile');

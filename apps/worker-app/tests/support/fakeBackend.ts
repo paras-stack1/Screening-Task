@@ -4,6 +4,7 @@
  * logout, the mustChangePassword gate, generic 401s and the error envelope.
  */
 import { createFakeChildren } from './fakeChildren';
+import { createFakeResults } from './fakeResults';
 import { createFakeScreening } from './fakeScreening';
 
 export const TEST_BASE_URL = 'https://api.test/api/v1';
@@ -82,6 +83,7 @@ export function createFakeBackend() {
   const childStore = createFakeChildren();
   /** Step 6 screening API (tests/support/fakeScreening.ts). */
   const screeningStore = createFakeScreening(childStore);
+  const resultsStore = createFakeResults();
 
   const user = (input: Partial<FakeUser> & { loginId: string; password: string }): FakeUser => {
     const created: FakeUser = {
@@ -210,6 +212,12 @@ export function createFakeBackend() {
       if (!owner.permissions.includes('child.read')) return error(403, 'FORBIDDEN');
       return json(200, { items: [], page: 1, pageSize: 1, total: childrenTotal });
     }
+    const step7 = resultsStore.route(method, path, body, {
+      id: owner.id,
+      name: owner.displayName,
+      permissions: owner.permissions,
+    });
+    if (step7) return json(step7.status, step7.body);
     const screeningResult = screeningStore.route(method, path, body, {
       id: owner.id,
       name: owner.displayName,
@@ -254,6 +262,7 @@ export function createFakeBackend() {
     user,
     children: childStore,
     screening: screeningStore,
+    results: resultsStore,
     /** Next response(s) for a path, consumed in order. */
     override(path: string, ...responses: Override[]) {
       overrides.set(path, [...(overrides.get(path) ?? []), ...responses]);

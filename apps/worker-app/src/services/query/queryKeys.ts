@@ -28,6 +28,13 @@ export const queryKeys = {
     [userId, 'screening', 'session', sessionId] as const,
   /** Medical officer's queue of amendments waiting for review (Step 6G-2). */
   amendmentQueue: (userId: string) => [userId, 'screening', 'amendment-queue'] as const,
+  // Step 7: results, clinical review, notifications. All result keys share [userId, 'results'].
+  sessionResults: (userId: string, sessionId: string) => [userId, 'results', 'session', sessionId] as const,
+  resultList: (userId: string, outcome: string) => [userId, 'results', 'list', outcome] as const,
+  resultDashboard: (userId: string) => [userId, 'results', 'dashboard'] as const,
+  reviewQueue: (userId: string) => [userId, 'reviews', 'queue'] as const,
+  review: (userId: string, reviewId: string) => [userId, 'reviews', 'detail', reviewId] as const,
+  notifications: (userId: string) => [userId, 'notifications'] as const,
   /** Protocol versions are immutable once used, so they may be cached for the app session. */
   screeningProtocol: (userId: string, protocolId: string) =>
     [userId, 'screening-protocol', protocolId] as const,
