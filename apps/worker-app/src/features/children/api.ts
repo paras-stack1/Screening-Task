@@ -86,6 +86,14 @@ export function createChildrenApi(api: ApiClient) {
       api.get(`/guardians/${id(guardianId)}/invitations`, parentPortalStatusResponseSchema, options),
     inviteParent: (guardianId: string, body: CreateParentInvitationRequest) =>
       api.post(`/guardians/${id(guardianId)}/invitations`, body, parentPortalStatusResponseSchema),
+    grantChildAccess: (guardianId: string, childIds: string[]) =>
+      api.post(`/guardians/${id(guardianId)}/child-access`, { childIds }, parentPortalStatusResponseSchema),
+    revokeChildAccess: (guardianId: string, childId: string, reason: string) =>
+      api.post(
+        `/guardians/${id(guardianId)}/child-access/${id(childId)}/revoke`,
+        { reason },
+        parentPortalStatusResponseSchema,
+      ),
     revokeParentInvitation: (guardianId: string, invitationId: string, reason: string) =>
       api.post(
         `/guardians/${id(guardianId)}/invitations/${id(invitationId)}/revoke`,

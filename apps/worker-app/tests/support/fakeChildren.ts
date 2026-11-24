@@ -4,6 +4,8 @@ import {
   withdrawConsentRequestSchema,
   addGuardianLinkRequestSchema,
   createParentInvitationRequestSchema,
+  grantChildAccessRequestSchema,
+  revokeChildAccessRequestSchema,
   revokeParentInvitationRequestSchema,
   compareCalendarDates,
   maskIndianMobile,
@@ -402,23 +404,28 @@ export function createFakeChildren() {
     revokedReason: string | null;
   }
   const invitations = new Map<string, FakeInvitation[]>();
-  const portalAccess = new Map<string, Map<string, 'PENDING' | 'REVOKED'>>();
-  const portal = { smsConfigured: true };
+  const portalAccess = new Map<string, Map<string, 'PENDING' | 'ACTIVE' | 'REVOKED'>>();
+  /** smsConfigured=false mimics a server without an SMS provider; `activated` = guardians with an account. */
+  const portal = { smsConfigured: true, activated: new Set<string>() };
 
   function portalDto(guardian: Guardian, permissions: string[]) {
     const latest = invitations.get(guardian.id)?.at(-1) ?? null;
-    const state = !latest
-      ? 'NOT_INVITED'
-      : latest.status === 'REVOKED'
-        ? 'REVOKED'
-        : latest.status === 'SENT'
-          ? 'INVITATION_SENT'
-          : 'INVITATION_PENDING';
+    const state = portal.activated.has(guardian.id)
+      ? 'ACTIVATED'
+      : !latest
+        ? 'NOT_INVITED'
+        : latest.status === 'REVOKED'
+          ? 'REVOKED'
+          : latest.status === 'SENT'
+            ? 'INVITATION_SENT'
+            : 'INVITATION_PENDING';
     const blockedReason = !permissions.includes('guardian.invite')
       ? 'NOT_ALLOWED'
       : !guardian.phone
         ? 'NO_PHONE'
-        : null;
+        : portal.activated.has(guardian.id)
+          ? 'ALREADY_ACTIVATED'
+          : null;
     const access = portalAccess.get(guardian.id) ?? new Map();
     return {
       portal: {
@@ -461,7 +468,7 @@ export function createFakeChildren() {
     if (!permissions.includes('guardian.invite')) return err(403, 'FORBIDDEN');
     if (!guardian || !visible) return err(404, 'NOT_FOUND');
     const list = invitations.get(guardian.id) ?? [];
-    const access = portalAccess.get(guardian.id) ?? new Map<string, 'PENDING' | 'REVOKED'>();
+    const access = portalAccess.get(guardian.id) ?? new Map<string, 'PENDING' | 'ACTIVE' | 'REVOKED'>();
     if (parts.length === 3) {
       const parsed = createParentInvitationRequestSchema.safeParse(rawBody);
       if (!parsed.success) return err(400, 'VALIDATION_ERROR');
@@ -513,6 +520,28 @@ export function createFakeChildren() {
 
     if (parts[0] === 'guardians' && parts[2] === 'invitations')
       return invitationRoute(method, parts, rawBody, permissions);
+    if (parts[0] === 'guardians' && parts[2] === 'child-access' && method === 'POST') {
+      const guardian = guardians.get(parts[1]!);
+      if (!can('guardian.invite')) return err(403, 'FORBIDDEN');
+      if (!guardian) return err(404, 'NOT_FOUND');
+      const access = portalAccess.get(guardian.id) ?? new Map<string, 'PENDING' | 'ACTIVE' | 'REVOKED'>();
+      portalAccess.set(guardian.id, access);
+      if (parts.length === 3) {
+        const parsed = grantChildAccessRequestSchema.safeParse(rawBody);
+        if (!parsed.success) return err(400, 'VALIDATION_ERROR');
+        if (!portal.activated.has(guardian.id)) return err(409, 'NOT_ACTIVATED');
+        for (const id of parsed.data.childIds) access.set(id, 'ACTIVE');
+        return { status: 200, body: portalDto(guardian, permissions) };
+      }
+      if (parts.length === 5 && parts[4] === 'revoke') {
+        const parsed = revokeChildAccessRequestSchema.safeParse(rawBody);
+        if (!parsed.success) return err(400, 'VALIDATION_ERROR');
+        if (access.get(parts[3]!) !== 'ACTIVE' && access.get(parts[3]!) !== 'PENDING')
+          return err(409, 'NOT_SHARED');
+        access.set(parts[3]!, 'REVOKED');
+        return { status: 200, body: portalDto(guardian, permissions) };
+      }
+    }
 
     if (parts[0] === 'guardians' && parts.length === 2) {
       const guardian = guardians.get(parts[1]!);

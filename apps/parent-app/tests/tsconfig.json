@@ -1,0 +1,17 @@
+{
+  // Tests run in Node under Jest, so they get Jest and Node types; app code (../tsconfig.json) does not.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["jest", "node"]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../app/**/*.tsx",
+    "../src/**/*.ts",
+    "../src/**/*.tsx",
+    "../.expo/types/**/*.ts",
+    "../expo-env.d.ts"
+  ],
+  "exclude": []
+}

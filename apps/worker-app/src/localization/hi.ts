@@ -384,6 +384,14 @@ export const hi: Record<TranslationKey, string> = {
     'चुना गया कोई बच्चा अब इस अभिभावक से जुड़ा नहीं है। फिर से लोड करके प्रयास करें।',
   'parentPortal.errors.alreadyActivated': 'इस अभिभावक ने अपना खाता पहले ही सक्रिय कर लिया है।',
   'parentPortal.errors.notOpen': 'यह आमंत्रण अब खुला नहीं है।',
+  'parentPortal.share': 'साझा करें',
+  'parentPortal.stopSharing': 'साझा करना बंद करें',
+  'parentPortal.stopSharingNote': 'अभिभावक इस बच्चे को अब अभिभावक पोर्टल में नहीं देख पाएँगे।',
+  'parentPortal.stopSharingReason': 'बंद करने का कारण',
+  'parentPortal.stopSharingConfirm': 'इस बच्चे की जानकारी साझा करना बंद करें',
+  'parentPortal.errors.notShared': 'इस बच्चे की जानकारी अब अभिभावक के साथ साझा नहीं है।',
+  'parentPortal.errors.notActivated':
+    'इस अभिभावक का कोई सक्रिय अभिभावक पोर्टल खाता नहीं है। इसके बजाय आमंत्रण भेजें।',
 
   'dashboard.recent.title': 'हाल ही में पंजीकृत',
   'dashboard.recent.empty': 'अभी कोई बच्चा पंजीकृत नहीं है।',

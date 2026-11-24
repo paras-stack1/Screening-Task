@@ -5,9 +5,10 @@ are as in [children.md](children.md). Contracts: `packages/shared-contracts/src/
 Design and decisions: [../step-8/parent-portal-plan.md](../step-8/parent-portal-plan.md) (PP1-PP18).
 Examples use synthetic data.
 
-> **Stages 3-5 (server side).** Workers invite (stage 3); parents check the link, verify their
-> number with a code and activate an account (stage 4); parents sign in, manage sessions, reset
-> their password and change their number (stage 5). The parent screens arrive in stage 6. **No real SMS provider is configured**: in production nothing is sent and invitations stay
+> **Stages 3-6.** Workers invite (stage 3); parents check the link, verify their number with a
+> code and activate an account (stage 4); parents sign in, manage sessions, reset their password
+> and change their number (stage 5); parents see the children shared with them and workers control
+> sharing; the Parent Portal app (`apps/parent-app`) uses all of it (stage 6). **No real SMS provider is configured**: in production nothing is sent and invitations stay
 > `INVITATION_PENDING` with SMS status `NOT_CONFIGURED`.
 
 ## Worker invitation endpoints (staff access token)
@@ -182,6 +183,34 @@ the guardian has a live parent account (other details stay editable). The parent
 hour); `confirm` with that number and code updates the account and the guardian record together,
 ends the account's other sessions, and is audited. A number already used by another live parent
 account: `409 PHONE_IN_USE`.
+
+## Children shared with a parent (stage 6)
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/parent/children` | parent | children shared with this parent |
+| GET | `/parent/children/:childId` | parent | one child, with upcoming check-ups and appointments |
+| POST | `/guardians/:guardianId/child-access` | staff, `guardian.invite` | `{ childIds }` share more children with an ACTIVATED parent |
+| POST | `/guardians/:guardianId/child-access/:childId/revoke` | staff, `guardian.invite` | `{ reason }` stop sharing one child |
+
+**Access rule (IDOR/BOLA).** Every parent query is filtered by: child not deleted, an ACTIVE
+`GuardianChildAccess` row for the guardian of the signed-in account (taken from the account in the
+database - never from the request), and a guardian-child link that is still active. Another family's
+child, an unshared sibling, a revoked or ended link and an unknown id all give the same `404`, and
+the attempt is audited (`parent_child.access_denied`). Reads are limited per account (300 per 15 min).
+
+**What a parent sees (PP12, PP16).** Name, age (years and months; marked when the birth date is
+estimated), centre / village (English and Hindi), the name of the ASHA or Anganwadi worker for the
+child's area, the next and upcoming health check-up dates (open follow-ups) and doctor appointments
+(referrals with a scheduled appointment, with the facility name). Never: screening results, risk
+levels, notes, referral reasons, diagnoses or phone numbers.
+
+**Worker controls (PP11).** Before activation, children are chosen in the invitation. After
+activation the worker can share another linked child in their area (`409 NOT_ACTIVATED` before
+activation, `422 CHILD_NOT_LINKED` for a child not linked to the guardian) or stop sharing one
+(`409 NOT_SHARED` if it is not shared). Ending a guardian-child link (`DELETE
+/children/:childId/guardians/:linkId`) revokes the parent's access to that child in the same
+transaction. Out-of-area workers get `404`.
 
 ## Database rules (migration `20261125100000_step8_parent_portal_accounts`)
 

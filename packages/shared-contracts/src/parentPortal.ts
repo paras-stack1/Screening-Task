@@ -245,3 +245,47 @@ export const parentPhoneChangeConfirmRequestSchema = z.strictObject({
   code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
 });
 export type ParentPhoneChangeConfirmRequest = z.input<typeof parentPhoneChangeConfirmRequestSchema>;
+
+// ------------------------------------------------- children shared with a parent (stage 6, PP12)
+// Only what the programme agreed a parent may see: name, age, the centre and worker, and upcoming
+// dates. No screening results, risk levels, notes, referral reasons or diagnoses.
+
+export const parentChildSchema = z.object({
+  childId: z.string(),
+  fullName: z.string(),
+  ageYears: z.number().int(),
+  ageMonths: z.number().int(),
+  dobIsEstimated: z.boolean(),
+  /** Anganwadi centre / village of the child (both languages). */
+  centre: z.object({ nameEn: z.string(), nameHi: z.string().nullable() }),
+  /** The ASHA or Anganwadi worker for the child's area (name only - no phone numbers, PP16). */
+  workerName: z.string().nullable(),
+  /** Next scheduled health check-up (follow-up due date, YYYY-MM-DD). */
+  nextCheckUp: z.string().nullable(),
+  /** Next doctor appointment at a facility. */
+  nextAppointment: z.object({ at: z.string(), facilityName: z.string().nullable() }).nullable(),
+});
+export type ParentChild = z.infer<typeof parentChildSchema>;
+
+export const parentChildListResponseSchema = z.object({ children: z.array(parentChildSchema) });
+export type ParentChildListResponse = z.infer<typeof parentChildListResponseSchema>;
+
+export const parentChildDetailSchema = parentChildSchema.extend({
+  upcomingCheckUps: z.array(z.string()),
+  upcomingAppointments: z.array(z.object({ at: z.string(), facilityName: z.string().nullable() })),
+});
+export type ParentChildDetail = z.infer<typeof parentChildDetailSchema>;
+export const parentChildDetailResponseSchema = z.object({ child: parentChildDetailSchema });
+export type ParentChildDetailResponse = z.infer<typeof parentChildDetailResponseSchema>;
+
+/** Worker: share more children with an ACTIVATED parent (each must be an active link in the worker's area). */
+export const grantChildAccessRequestSchema = z.strictObject({
+  childIds: z.array(z.uuid()).min(1).max(20),
+});
+export type GrantChildAccessRequest = z.infer<typeof grantChildAccessRequestSchema>;
+
+/** Worker: stop sharing one child with the parent. */
+export const revokeChildAccessRequestSchema = z.strictObject({
+  reason: z.string().trim().min(3).max(300),
+});
+export type RevokeChildAccessRequest = z.infer<typeof revokeChildAccessRequestSchema>;

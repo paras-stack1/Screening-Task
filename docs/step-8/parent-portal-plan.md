@@ -3,8 +3,9 @@
 > Stages 1-2 of the Parent Portal brief (2026-11-24). Status: **APPROVED 2026-11-24** ("approve all
 > recommendations": PP1-PP18 and the schema in section 5).
 >
-> Progress: stages 3 and 4 approved (2026-11-24). Stage 5 (sign-in, sessions, reset, number change;
-> server side) implemented - sections 7-9 and [../api/parent-portal.md](../api/parent-portal.md). Stages 6-7 not started.
+> Progress: stages 3-5 approved (2026-11-24). Stage 6 (guardian-child access, Parent Portal app,
+> worker sharing controls) implemented - sections 7-10, [../api/parent-portal.md](../api/parent-portal.md)
+> and [apps/parent-app/README.md](../../apps/parent-app/README.md). Stage 7 not started.
 >
 > Context: the Parent Care decisions C1-C18 in [initial-audit.md](initial-audit.md) were approved on
 > 2026-11-24 ("approve all"), **except C3 (no parent accounts), which this brief replaces**: parents get
@@ -209,7 +210,7 @@ what parents may see (PP12); decision on official worker contact numbers (PP16).
   link ended before activation, the access row is revoked in the name of the worker who granted it
   (no system user exists; reason text says why). Per-IP counters are per API process (as staff login).
 
-## 9. Stage 5 - sign-in, sessions, reset and number change (implemented, waiting for review)
+## 9. Stage 5 - sign-in, sessions, reset and number change (approved 2026-11-24)
 
 - `/api/v1/parent/auth`: login, refresh, logout, logout-all, me, change-password, forgot-password,
   reset-password, phone-change start/confirm; browser variant `/web/*` with an httpOnly cookie.
@@ -222,3 +223,19 @@ what parents may see (PP12); decision on official worker contact numbers (PP16).
 - Known limits: forgot-password timing differs slightly when a code is really sent (SMS call);
   per-IP counters are per API process; the old number is not told about a change (no approved SMS
   template yet); a DISABLED account cannot be re-activated through a new invitation yet.
+
+## 10. Stage 6 - guardian-child access, Parent Portal app, worker sharing (implemented, waiting for review)
+
+- API: `GET /parent/children`, `GET /parent/children/:childId` (IDOR-safe access rule, same 404,
+  audited); worker `POST /guardians/:id/child-access` and `.../:childId/revoke`; ending a guardian
+  link revokes portal access.
+- New app `apps/parent-app` (Expo SDK 58, Android + web, same stack as the worker app): all ten
+  brief screens - invitation landing, verification, code, create password, activation success,
+  login, forgot password, dashboard (mock-up), child selection, account and security - plus
+  follow-up dates, assistance, and "coming soon" care plan / videos. Hindi default, brand colours
+  #1769AA / #16A6A0, large touch targets, initials instead of photos.
+- Worker app: the guardian page card can share another child or stop sharing one after activation.
+- Known limits: My Care Plan and Learning Videos wait for Parent Care content (8B-8F); opening the
+  SMS link directly in the Android app needs App Links for the production domain; the worker shown
+  is the ASHA / AWW assigned to the child's area (not a named case worker); appointment and
+  check-up data come from Step 7 referrals and follow-ups.

@@ -382,5 +382,113 @@ export function createInvitationService({ db, pii, parentPortal }: InvitationSer
       });
       return status(ctx, guardianId);
     },
+    /**
+     * Share more children with an ACTIVATED parent (PP11): each must be an active link of this
+     * guardian with the child in the caller's area. Already shared children are left as they are.
+     */
+    async grantChildren(
+      ctx: AccessContext,
+      guardianId: string,
+      childIds: string[],
+    ): Promise<ParentPortalStatus> {
+      const now = at(ctx);
+      const g = await guardianInScope(ctx, guardianId, 'guardian.invite');
+      if (!g) throw await notFound(ctx, guardianId, 'grant');
+      const account = await db.parentAccount.findUnique({ where: { guardianId }, select: { status: true } });
+      if (!account || account.status === 'DISABLED') {
+        throw AppError.conflict(
+          'NOT_ACTIVATED',
+          'The guardian has no active Parent Portal account. Send an invitation instead.',
+        );
+      }
+      const ids = [...new Set(childIds)];
+      const links = await db.childGuardian.findMany({
+        where: {
+          guardianId,
+          endedAt: null,
+          childId: { in: ids },
+          child: childScopeWhere(ctx.userId, 'guardian.invite', now),
+        },
+        select: { id: true, childId: true },
+      });
+      if (links.length !== ids.length) {
+        throw AppError.unprocessable(
+          'CHILD_NOT_LINKED',
+          'Choose only children linked to this guardian in your area.',
+        );
+      }
+      await db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Guardian" WHERE id = ${guardianId}::uuid FOR UPDATE`;
+        const granted: string[] = [];
+        for (const link of links) {
+          const live = await tx.guardianChildAccess.findFirst({
+            where: { childGuardianId: link.id, status: { not: 'REVOKED' } },
+          });
+          if (live?.status === 'ACTIVE') continue;
+          const row =
+            live ??
+            (await tx.guardianChildAccess.create({
+              data: {
+                childGuardianId: link.id,
+                guardianId,
+                childId: link.childId,
+                grantedById: ctx.userId,
+                grantedAt: now,
+              },
+            }));
+          await tx.guardianChildAccess.update({
+            where: { id: row.id },
+            data: { status: 'ACTIVE', activatedAt: now },
+          });
+          granted.push(link.childId);
+        }
+        await recordAudit(tx, {
+          actorUserId: ctx.userId,
+          action: 'parent_access.granted',
+          entityType: 'guardian',
+          entityId: guardianId,
+          outcome: 'SUCCESS',
+          requestId: ctx.requestId,
+          details: { childIds: granted },
+        });
+      });
+      return status(ctx, guardianId);
+    },
+
+    /** Stop sharing one child with the parent (pending or active). Takes effect on the next request. */
+    async revokeChild(
+      ctx: AccessContext,
+      guardianId: string,
+      childId: string,
+      reason: string,
+    ): Promise<ParentPortalStatus> {
+      const now = at(ctx);
+      const g = await guardianInScope(ctx, guardianId, 'guardian.invite');
+      if (!g) throw await notFound(ctx, guardianId, 'revoke_child');
+      const inArea = await db.child.count({
+        where: { id: childId, ...childScopeWhere(ctx.userId, 'guardian.invite', now) },
+      });
+      if (inArea === 0) throw await notFound(ctx, guardianId, 'revoke_child');
+      const updated = await db.$transaction(async (tx) => {
+        const result = await tx.guardianChildAccess.updateMany({
+          where: { guardianId, childId, status: { not: 'REVOKED' } },
+          data: { status: 'REVOKED', revokedAt: now, revokedById: ctx.userId, revokeReason: reason },
+        });
+        if (result.count > 0) {
+          await recordAudit(tx, {
+            actorUserId: ctx.userId,
+            action: 'parent_access.revoked',
+            entityType: 'guardian',
+            entityId: guardianId,
+            outcome: 'SUCCESS',
+            requestId: ctx.requestId,
+            details: { childId },
+          });
+        }
+        return result.count;
+      });
+      if (updated === 0) throw AppError.conflict('NOT_SHARED', 'This child is not shared with the parent.');
+      return status(ctx, guardianId);
+    },
   };
 }
