@@ -7,6 +7,9 @@ import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 import { AddAssignmentPage } from '../features/assignments/AddAssignmentPage';
 import { AssignmentsPage } from '../features/assignments/AssignmentsPage';
+import { CreateFacilityPage, FacilitiesPage } from '../features/facilities/FacilitiesPage';
+import { FacilityDetailPage } from '../features/facilities/FacilityDetailPage';
+import { ReportsPage } from '../features/facilities/ReportsPage';
 import { CreateUserPage } from '../features/users/CreateUserPage';
 import { UserDetailPage } from '../features/users/UserDetailPage';
 import { UsersPage } from '../features/users/UsersPage';
@@ -62,10 +65,15 @@ export function App() {
   if (state.user.mustChangePassword) return <ChangePasswordPage forced />;
   if (!canUsePortal(state.access)) return <NotAdminPage name={state.user.displayName} />;
   const canManageUsers = state.access.permissions.includes('user.manage');
+  // Step 7G (decisions P, T, U): facility directory and aggregate reports.
+  const canManageFacilities = state.access.permissions.includes('facility.manage');
+  const canReport = state.access.permissions.includes('report.aggregate');
 
   return (
     <Routes>
-      <Route element={<Layout user={state.user} />}>
+      <Route
+        element={<Layout user={state.user} canManageFacilities={canManageFacilities} canReport={canReport} />}
+      >
         <Route index element={<HomePage user={state.user} access={state.access} />} />
         <Route path="users" element={<UsersPage canManageUsers={canManageUsers} />} />
         <Route
@@ -78,6 +86,14 @@ export function App() {
         <Route path="assignments" element={<AssignmentsPage canManageUsers={canManageUsers} />} />
         <Route path="assignments/new" element={<AddAssignmentPage access={state.access} />} />
         <Route path="account/password" element={<ChangePasswordPage forced={false} />} />
+        {canManageFacilities ? (
+          <>
+            <Route path="facilities" element={<FacilitiesPage />} />
+            <Route path="facilities/new" element={<CreateFacilityPage />} />
+            <Route path="facilities/:facilityId" element={<FacilityDetailPage />} />
+          </>
+        ) : null}
+        {canReport ? <Route path="reports" element={<ReportsPage />} /> : null}
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

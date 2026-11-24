@@ -1,4 +1,12 @@
 import {
+  createFacilityRequestSchema,
+  facilityReasonRequestSchema,
+  updateFacilityRequestSchema,
+  verifyFacilityRequestSchema,
+  type CreateFacilityRequest,
+  type FacilityReasonRequest,
+  type UpdateFacilityRequest,
+  type VerifyFacilityRequest,
   referralCloseRequestSchema,
   referralCorrectionRequestSchema,
   referralTrackingRequestSchema,
@@ -34,6 +42,7 @@ import { getRequestId } from '../../middleware/requestId';
 import { getValidated, validate } from '../../middleware/validate';
 import type { AccessContext } from '../access-control/accessScope';
 import { createReviewService } from '../clinical-review/review.service';
+import { createFacilityAdminService } from '../facilities/facilityAdmin.service';
 import { createFacilitiesService } from '../facilities/facilities.service';
 import type { ScreeningRouterDependencies } from '../screening/protocols.routes';
 import { createReferralsService } from './referrals.service';
@@ -250,6 +259,7 @@ export function createReferralsRouter(deps: ScreeningRouterDependencies): Router
 export function createFacilitiesRouter(deps: ScreeningRouterDependencies): Router {
   const router = Router();
   const service = createFacilitiesService(deps);
+  const admin = createFacilityAdminService(deps);
   const now = deps.now ?? (() => new Date());
   const read = createRequirePermission(deps)([
     'referral.create',
@@ -263,7 +273,51 @@ export function createFacilitiesRouter(deps: ScreeningRouterDependencies): Route
     res.json(await service.list(contextOf(res, now), getValidated<FacilityListQuery>(res, 'query')));
   });
   router.get('/:id', read, validate({ params: idParams }), async (_req, res) => {
-    res.json(await service.get(getValidated<Id>(res, 'params').id));
+    res.json({ facility: await admin.detail(contextOf(res, now), getValidated<Id>(res, 'params').id) });
   });
+
+  // Stage 7G: facility administration (facility.manage over the facility's area; decision P).
+  const manage = createRequirePermission(deps)('facility.manage');
+  const ctx = (res: Response) => contextOf(res, now);
+  router.post('/', manage, validate({ body: createFacilityRequestSchema }), async (_req, res) => {
+    res
+      .status(201)
+      .json({ facility: await admin.create(ctx(res), getValidated<CreateFacilityRequest>(res, 'body')) });
+  });
+  router.patch(
+    '/:id',
+    manage,
+    validate({ params: idParams, body: updateFacilityRequestSchema }),
+    async (_req, res) => {
+      const { id } = getValidated<Id>(res, 'params');
+      res.json({
+        facility: await admin.update(ctx(res), id, getValidated<UpdateFacilityRequest>(res, 'body')),
+      });
+    },
+  );
+  router.post(
+    '/:id/verify',
+    manage,
+    validate({ params: idParams, body: verifyFacilityRequestSchema }),
+    async (_req, res) => {
+      const { id } = getValidated<Id>(res, 'params');
+      res.json({
+        facility: await admin.verify(ctx(res), id, getValidated<VerifyFacilityRequest>(res, 'body')),
+      });
+    },
+  );
+  for (const action of ['unverify', 'deactivate', 'reactivate'] as const) {
+    router.post(
+      `/:id/${action}`,
+      manage,
+      validate({ params: idParams, body: facilityReasonRequestSchema }),
+      async (_req, res) => {
+        const { id } = getValidated<Id>(res, 'params');
+        res.json({
+          facility: await admin[action](ctx(res), id, getValidated<FacilityReasonRequest>(res, 'body')),
+        });
+      },
+    );
+  }
   return router;
 }

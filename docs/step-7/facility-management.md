@@ -1,8 +1,7 @@
 # Facility management (Step 7)
 
-> Status: database rules (7B) and the read API for choosing a referral destination (7C) are
-> implemented. Creating, editing, verifying and deactivating facilities comes with the admin portal
-> in stage 7G. Decision P in [architecture.md](architecture.md).
+> Status: database rules (7B), the selection API (7C) and the administration API with admin portal
+> pages (7G) are implemented. Decision P in [architecture.md](architecture.md).
 
 ## 1. Rules
 
@@ -34,7 +33,26 @@ Order: in-district first, then selectable, then by name.
 `GET /facilities` without a child is the directory for `facility.manage` holders (their area
 scope); field workers must name the child (400). `GET /facilities/:id` returns one facility.
 
-## 3. Needed from the programme
+## 3. Administration (stage 7G)
+
+Admin portal: **Facilities** (list, search) -> **Add facility** -> facility page (details, change
+history, edit with reason, record verification, remove verification, deactivate / reactivate with
+reason). Only `facility.manage` holders (district / state administrators) whose area scope covers
+the facility's area; others see it read-only, or get 404 (audited) when they try to change it.
+
+| Route | Body | Rule |
+|---|---|---|
+| `POST /facilities` | name, nameHi?, officialCode?, type, areaId, address?, contactPhone? | Always UNVERIFIED and not accepting referrals; area must be in scope |
+| `PATCH /facilities/:id` | expectedVersion, changed fields, reason | Descriptive fields only; old/new values in the history |
+| `POST /facilities/:id/verify` | expectedVersion, verificationReference, services[], acceptsReferrals | Records who, when and the reference; an inactive facility cannot accept referrals |
+| `POST /facilities/:id/unverify` | expectedVersion, reason | Clears services and acceptance |
+| `POST /facilities/:id/deactivate`, `/reactivate` | expectedVersion, reason | Deactivation stops referrals and keeps all history; reactivation does **not** restore acceptance (a new verification is needed) |
+| `GET /facilities/:id` | - | Details, history, `canManage` |
+
+Duplicates (same official code, or same name and type in the area) -> 409 `FACILITY_DUPLICATE`.
+Assumption: verification is recorded by a `facility.manage` holder.
+
+## 4. Needed from the programme
 
 The facility list with official codes and verified services; confirmation of the district rule;
 who verifies facilities.

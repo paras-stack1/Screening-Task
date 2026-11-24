@@ -202,6 +202,13 @@ describe('protected routes without a valid access token', () => {
     ['get', '/api/v1/dashboards/referrals'],
     ['get', '/api/v1/dashboards/results'],
     ['get', '/api/v1/reports/aggregate'],
+    // Step 7G facility administration.
+    ['post', '/api/v1/facilities'],
+    ['patch', `/api/v1/facilities/${ID}`],
+    ['post', `/api/v1/facilities/${ID}/verify`],
+    ['post', `/api/v1/facilities/${ID}/unverify`],
+    ['post', `/api/v1/facilities/${ID}/deactivate`],
+    ['post', `/api/v1/facilities/${ID}/reactivate`],
     // Admin portal stage PA.
     ['get', '/api/v1/areas'],
     ['get', `/api/v1/areas?parentId=${ID}`],

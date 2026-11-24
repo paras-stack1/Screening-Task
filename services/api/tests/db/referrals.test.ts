@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   childDetailResponseSchema,
+  facilityDetailResponseSchema,
   facilityListResponseSchema,
   referralResponseSchema,
   reviewDetailResponseSchema,
@@ -755,5 +756,125 @@ describe('facility selection', () => {
     const admin = facilityListResponseSchema.parse((await (await as('dadmin1')).get('/facilities')).body);
     expect(admin.items.map((f) => f.name)).toContain('Synthetic IN');
     expect(admin.items.map((f) => f.name)).not.toContain('Synthetic OTHER_DISTRICT');
+  });
+});
+
+// ===================================================================== facility administration (7G)
+
+describe('facility administration', () => {
+  const base = () => ({ name: `Synthetic Admin PHC ${seq++}`, type: 'PHC', areaId: fx.area.D1! });
+
+  it('a district administrator creates an unverified facility; field workers and other districts cannot', async () => {
+    const res = await (await as('dadmin1')).post('/facilities', { ...base(), officialCode: `SYN-${seq}` });
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(res.body.facility).toMatchObject({
+      verificationStatus: 'UNVERIFIED',
+      acceptsReferrals: false,
+      services: [],
+      canManage: true,
+      history: [{ action: 'CREATED' }],
+    });
+    expect((await (await as('asha1')).post('/facilities', base())).status).toBe(403);
+    expect((await (await as('dadmin1')).post('/facilities', { ...base(), areaId: fx.area.D2! })).status).toBe(
+      404,
+    );
+    const other = await (
+      await as('dadmin2')
+    ).patch(`/facilities/${res.body.facility.id}`, {
+      expectedVersion: 1,
+      name: 'Changed by another district',
+      reason: 'Synthetic attempt',
+    });
+    expect(other.status).toBe(404);
+    expect(
+      await prisma.auditLog.count({
+        where: { action: 'facility.access_denied', actorUserId: fx.user.dadmin2! },
+      }),
+    ).toBe(1);
+    // The server decides verification: the client cannot send it.
+    expect(
+      (await (await as('dadmin1')).post('/facilities', { ...base(), verificationStatus: 'VERIFIED' })).status,
+    ).toBe(400);
+  });
+
+  it('refuses duplicates by official code and by name + type in the same area', async () => {
+    const first = { ...base(), officialCode: `DUP-${seq}` };
+    expect((await (await as('dadmin1')).post('/facilities', first)).status).toBe(201);
+    const byCode = await (
+      await as('dadmin1')
+    ).post('/facilities', { ...base(), officialCode: first.officialCode });
+    expect([byCode.status, byCode.body.error.code]).toEqual([409, 'FACILITY_DUPLICATE']);
+    const byName = await (
+      await as('dadmin1')
+    ).post('/facilities', { name: first.name.toLowerCase(), type: 'PHC', areaId: fx.area.D1! });
+    expect(byName.body.error.code).toBe('FACILITY_DUPLICATE');
+  });
+
+  it('edit needs a reason and is versioned; verification enables referrals; deactivation keeps history', async () => {
+    const admin = await as('dadmin1');
+    const created = (await admin.post('/facilities', base())).body.facility as { id: string; name: string };
+    const noReason = await admin.patch(`/facilities/${created.id}`, {
+      expectedVersion: 1,
+      name: 'Synthetic Renamed PHC',
+    });
+    expect(noReason.status).toBe(400);
+    const renamed = await admin.patch(`/facilities/${created.id}`, {
+      expectedVersion: 1,
+      name: `Synthetic Renamed PHC ${seq}`,
+      reason: 'Synthetic: official name changed',
+    });
+    expect(facilityDetailResponseSchema.parse(renamed.body).facility.history.at(-1)).toMatchObject({
+      action: 'UPDATED',
+      changes: { name: { from: created.name } },
+    });
+    const stale = await admin.post(`/facilities/${created.id}/verify`, {
+      expectedVersion: 1,
+      verificationReference: 'SYN-LETTER-1',
+      services: ['PAEDIATRICS'],
+      acceptsReferrals: true,
+    });
+    expect([stale.status, stale.body.error.code]).toEqual([409, 'VERSION_CONFLICT']);
+    const verified = await admin.post(`/facilities/${created.id}/verify`, {
+      expectedVersion: 2,
+      verificationReference: 'SYN-LETTER-1',
+      services: ['PAEDIATRICS'],
+      acceptsReferrals: true,
+    });
+    expect(verified.body.facility).toMatchObject({
+      verificationStatus: 'VERIFIED',
+      acceptsReferrals: true,
+      verifiedByName: expect.any(String),
+    });
+
+    // The verified facility can now be chosen for a referral; then it is deactivated.
+    const { child, guardianId } = await newChildOnly();
+    await consent(child, guardianId, 'REFERRAL_DATA_SHARING');
+    const r = referral(await createReferral(child, { facilityId: created.id }), 201);
+    const off = await admin.post(`/facilities/${created.id}/deactivate`, {
+      expectedVersion: 3,
+      reason: 'Synthetic: closed for repairs',
+    });
+    expect(off.body.facility).toMatchObject({ isActive: false, acceptsReferrals: false });
+    expect((await prisma.referral.findUniqueOrThrow({ where: { id: r.id } })).facilityId).toBe(created.id);
+    const options = facilityListResponseSchema.parse(
+      (await (await as('asha1')).get(`/facilities?childId=${child}`)).body,
+    );
+    expect(options.items.some((f) => f.id === created.id)).toBe(false);
+    const back = await admin.post(`/facilities/${created.id}/reactivate`, {
+      expectedVersion: 4,
+      reason: 'Synthetic: reopened',
+    });
+    // Reactivation does not restore "accepts referrals": that needs a new verification decision.
+    expect(back.body.facility).toMatchObject({ isActive: true, acceptsReferrals: false });
+    expect(facilityDetailResponseSchema.parse(back.body).facility.history.map((h) => h.action)).toEqual([
+      'CREATED',
+      'UPDATED',
+      'VERIFIED',
+      'DEACTIVATED',
+      'REACTIVATED',
+    ]);
+    expect(
+      await prisma.auditLog.count({ where: { entityId: created.id, action: { startsWith: 'facility.' } } }),
+    ).toBe(5);
   });
 });

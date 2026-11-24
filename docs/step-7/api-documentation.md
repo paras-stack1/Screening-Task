@@ -21,6 +21,7 @@
 | `POST /referrals/:id/reassessments/:impactId` | referral.approve or screening.review | 7C | " |
 | `POST /referrals/:id/{tracking,close,corrections}` | referral.update or referral.approve | 7D | " |
 | `GET /facilities?childId=`, `GET /facilities/:id` | referral.* or facility.manage | 7C | facility-management.md |
+| `POST /facilities`, `PATCH /facilities/:id`, `POST /facilities/:id/{verify,unverify,deactivate,reactivate}` | facility.manage | 7G | facility-management.md |
 | `GET /follow-ups`, `POST /follow-ups`, `GET /:id`, `POST /:id/{assign,start,complete,reschedule,miss,cancel}` | see follow-up-management.md | 7D | follow-up-management.md |
 | `GET /notifications`, `POST /notifications/:id/read` | own notifications only | 7D | below |
 | `GET /dashboards/referrals`, `GET /dashboards/results` | child.read | 7D | below |

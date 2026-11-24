@@ -109,11 +109,5 @@ export function createFacilitiesService({ db }: FacilitiesServiceDependencies) {
         items: rows.map((f) => ({ ...toSummary(f), placement: 'IN_DISTRICT', selectable: isSelectable(f) })),
       };
     },
-
-    async get(id: string) {
-      const row = await db.facility.findUnique({ where: { id }, include: facilityInclude });
-      if (!row) throw AppError.notFound('Facility not found');
-      return { facility: toSummary(row) };
-    },
   };
 }

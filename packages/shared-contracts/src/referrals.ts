@@ -392,3 +392,87 @@ export const referralListResponseSchema = z.object({
   total: z.number(),
 });
 export type ReferralListResponse = z.infer<typeof referralListResponseSchema>;
+
+// =============================================================== facility administration (7G)
+
+const optionalText = (max: number) => z.string().trim().min(1).max(max).optional();
+const facilityCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9/_-]{1,39}$/, 'Letters, digits, / _ - (2-40)');
+const facilityPhoneSchema = z
+  .string()
+  .trim()
+  .regex(/^[0-9+\- ]{6,20}$/, 'Official phone: digits, spaces, + and -');
+
+/** New facility: always UNVERIFIED and not accepting referrals until verified (decision P). */
+export const createFacilityRequestSchema = z.strictObject({
+  name: z.string().trim().min(2).max(200),
+  nameHi: optionalText(200),
+  officialCode: facilityCodeSchema.optional(),
+  type: facilityTypeSchema,
+  areaId: z.uuid(),
+  address: optionalText(500),
+  contactPhone: facilityPhoneSchema.optional(),
+});
+export type CreateFacilityRequest = z.infer<typeof createFacilityRequestSchema>;
+
+/** Edit of descriptive fields only; verification and activity have their own actions. */
+export const updateFacilityRequestSchema = z.strictObject({
+  expectedVersion: z.number().int().min(1),
+  name: z.string().trim().min(2).max(200).optional(),
+  nameHi: z.string().trim().max(200).nullable().optional(),
+  officialCode: facilityCodeSchema.nullable().optional(),
+  type: facilityTypeSchema.optional(),
+  address: z.string().trim().max(500).nullable().optional(),
+  contactPhone: facilityPhoneSchema.nullable().optional(),
+  reason: z.string().trim().min(3).max(500),
+});
+export type UpdateFacilityRequest = z.infer<typeof updateFacilityRequestSchema>;
+
+/** Records that the facility's details, services and acceptance of referrals were verified. */
+export const verifyFacilityRequestSchema = z.strictObject({
+  expectedVersion: z.number().int().min(1),
+  /** Document / letter / call log number of the verification. No personal data. */
+  verificationReference: z.string().trim().min(3).max(200),
+  services: z
+    .array(
+      z
+        .string()
+        .trim()
+        .regex(/^[A-Z][A-Z0-9_]{1,39}$/),
+    )
+    .max(30),
+  acceptsReferrals: z.boolean(),
+});
+export type VerifyFacilityRequest = z.infer<typeof verifyFacilityRequestSchema>;
+
+export const facilityReasonRequestSchema = z.strictObject({
+  expectedVersion: z.number().int().min(1),
+  reason: z.string().trim().min(3).max(500),
+});
+export type FacilityReasonRequest = z.infer<typeof facilityReasonRequestSchema>;
+
+export const facilityDetailSchema = facilitySummarySchema.extend({
+  version: z.number(),
+  verifiedByName: z.string().nullable(),
+  verifiedAt: z.string().nullable(),
+  verificationReference: z.string().nullable(),
+  deactivatedAt: z.string().nullable(),
+  deactivationReason: z.string().nullable(),
+  history: z.array(
+    z.object({
+      action: z.string(),
+      changes: z.record(z.string(), z.unknown()),
+      reason: z.string().nullable(),
+      actorName: z.string(),
+      occurredAt: z.string(),
+    }),
+  ),
+  /** facility.manage over this facility's area (decided by the API). */
+  canManage: z.boolean(),
+});
+export type FacilityDetail = z.infer<typeof facilityDetailSchema>;
+
+export const facilityDetailResponseSchema = z.object({ facility: facilityDetailSchema });
+export type FacilityDetailResponse = z.infer<typeof facilityDetailResponseSchema>;

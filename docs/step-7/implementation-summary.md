@@ -12,8 +12,8 @@
 | 7C | Clinical review actions, referral create/approve/reject/issue/cancel/history, facility read API | Done (`f9bcc84`) |
 | 7D | Referral tracking, follow-ups, notifications + reminder job, dashboard/report APIs | Done (`986e676`) |
 | 7E | Worker app: results, review, notifications | Done (`cf62ab9`) |
-| **7F** | Worker app: referrals, follow-ups, dashboards | **Done - awaiting review** |
-| 7G | Admin portal facilities and reports; security and regression testing; all docs; final report | Not started |
+| 7F | Worker app: referrals, follow-ups, dashboards | Done (`d8fba0d`) |
+| **7G** | Admin portal facilities and reports; security and regression testing; all docs; final report | **Done - awaiting review** |
 
 ## Stage 7B
 
@@ -229,3 +229,164 @@ role check) and the start-up network test (one more dashboard call).
 
 Dates and times are typed (no date picker). No offline queue: referral actions need a connection.
 The district / state facility administration and aggregate reports come with the admin portal (7G).
+
+## Stage 7G
+
+Facility administration API (`facilityAdmin.service.ts`: create, edit with reason, verify, remove
+verification, deactivate, reactivate, detail with history) and admin portal pages (Facilities, Add
+facility, facility page, Reports with suppressed counts; menu entries by permission; PATCH added to
+the portal API client). Security review, database design, bug and test reports written. Tests: 3 DB
+tests, 6 route-inventory entries, 4 portal tests. No schema change.
+
+---
+
+# Step 7 - Final report
+
+Written for: the project owner and the engineering / clinical reviewers of BalSwasthya AI.
+
+## 1. Initial audit
+
+[initial-audit.md](initial-audit.md): the Step 7 tables existed but were empty and unused; consent,
+scope, audit, idempotency and the Step 6 content lifecycle were reusable; no rule engine, review,
+referral, facility, follow-up, notification or report logic existed. Decisions A-X
+([architecture.md](architecture.md)) and the schema proposal were approved on 2026-11-23.
+
+## 2. Existing modules reused
+
+Step 3 authentication and RBAC; area scope (`accessScope.ts`, extended with result runs and reviews);
+`assertConsentPermits` (REFERRAL_SHARING); `recordAudit`; `runIdempotent`; `enc1:` text encryption;
+the Step 6 protocol lifecycle pattern and amendment overlay; Step 6G reassessment flags; the worker
+app's API client, TanStack Query, localization and components; the admin portal shell, area picker
+and session.
+
+## 3-4. Files created / modified
+
+Listed per stage above (7B-7G). In short: one migration; `packages/shared-contracts/src/{clinicalRules,results,referrals,followUps}.ts`;
+API modules `clinical-rules`, `clinical-review`, `referrals`, `facilities`, `follow-ups`,
+`notifications`, `reports`; CLIs `db:rule-set-import`, `db:rule-set-status`, `jobs:reminders`;
+worker-app `features/results`, `features/referrals` and 9 screens; admin portal `features/facilities`
+(4 pages); tests and fakes; 13 documents in `docs/step-7` plus `docs/frontend/{results,referrals}.md`.
+
+## 5-6. Database
+
+Proposed: [schema-change-proposal.md](schema-change-proposal.md). Executed (approved): migration
+`20261124100000_step7_results_referrals` on the test and dev databases; `db:setup-roles` and seed
+re-run on dev. Design and deviations: [database-design.md](database-design.md) and stage 7B above.
+
+## 7-14. Functionality
+
+| Area | Summary | Document |
+|---|---|---|
+| Screening results | Automatic per completion / amendment, four category results + session outcome, versioned, evidence references, never reassuring on missing data | result-generation-architecture.md |
+| Rule engine | Versioned rule sets as data, DSL without negation, governed CLI lifecycle, demonstration sets only | clinical-rule-governance.md |
+| Clinical review | Queue, claim, decisions, history, encrypted notes | clinical-review-workflow.md |
+| Referrals | Create / approve / reject / facility / issue with consent / track / close / correct / cancel / reassess | referral-workflow.md |
+| Facilities | Verified directory, district rule, administration with history | facility-management.md |
+| Follow-ups | Tasks with assignment, history, reschedule, missed, overdue | follow-up-management.md |
+| Notifications | In-app, ids only, dedupe, after commit, reminder job | api-documentation.md |
+| Dashboards / reports | Scoped dashboards; suppressed aggregate reports | api-documentation.md |
+
+## 15-16. Security and APIs
+
+[security-review.md](security-review.md) and [api-documentation.md](api-documentation.md) (47 new
+routes, all authenticated, permission-filtered and scope-checked).
+
+## 17-21. Tests and bugs
+
+[test-report.md](test-report.md) (final numbers: API unit 482/482; worker app 3182 passed / 20
+skipped; admin portal 396 passed / 5 skipped; database 413/418 in the last full run with 5 timeouts,
+each file passing alone). [bug-report.md](bug-report.md): S7-001 to S7-003 fixed (Low); S7-004
+(test timeouts from slow disk sync) and S6-005 open (Low). No Critical or High bug.
+
+## 22. Clinical approvals required
+
+1. Approved rule sets (all thresholds with references) - none exist; production shows "not interpreted".
+2. Approved, non-demonstration Four-D protocols (from Step 6).
+3. The approver role for rules and protocols (assumed: `screening.review` holder).
+4. Meaning of ROUTINE / PRIORITY / URGENT and any escalation times.
+5. Which results need review, and a review time limit (`REVIEW_OVERDUE_HOURS` is off).
+6. Approved REFERRAL_DATA_SHARING consent wording (hi/en) and legal guidance on what may be recorded
+   after consent is withdrawn post-issue.
+7. Emergency notice wording (hi/en).
+8. Hindi review of all new text (worker app and portal).
+
+Programme / privacy decisions: facility list with official codes and verified services, the district
+rule for facility choice, who verifies facilities, self-review by medical officers, small-cell
+threshold (5 assumed), facility staff accounts (not built).
+
+## 23. Known limitations
+
+No approved clinical content (nothing operational in production). In-app notifications only. No
+facility staff accounts (manual updates with source). Online only (no offline queue). Dates typed
+(no picker). A correction does not revert an appointment time. Rate limits per process. Reports one
+level of sub-areas. Not done: device testing, load testing, external penetration test, live
+end-to-end run of the Step 7 screens. `npm audit`: 32 tooling advisories (security-review F1).
+
+## 24. Manual testing
+
+1. `npm run db:up`; in `services/api`: `npx prisma migrate deploy`; `npm run db:setup-roles`;
+   `npm run db:seed` (demonstration protocols and rule sets).
+2. Create a worker (ASHA, village), a medical officer (MHT_MEDICAL_OFFICER, same village) and a
+   district administrator through the admin portal.
+3. Portal (district admin): Facilities -> add a facility in the district -> record verification with
+   "accepts referrals".
+4. Worker app (ASHA): register a child, record SCREENING and REFERRAL_DATA_SHARING consent, screen
+   Diseases with question 1 = Yes, complete -> "View screening result" (demonstration warning,
+   urgent check recommended, no diagnosis) -> "Create referral" -> choose priority and facility.
+5. Worker app (medical officer): Screening -> Clinical reviews -> claim -> decide; Referrals ->
+   "Waiting for my approval" -> approve; ASHA issues it (try once without referral consent first).
+6. Medical officer: record "Facility acknowledged" (phone call) and "Visit recorded" (family report,
+   shown as not verified); undo the last update; add a follow-up; ASHA completes it; close the referral.
+7. Notifications tab on each phone; `npm run jobs:reminders`; portal Reports for the district.
+
+## 25. Commands
+
+```powershell
+npm install; npm run db:up
+cd services/api; npx prisma migrate deploy; cd ../..
+npm run db:setup-roles; npm run db:seed
+npm run dev:api; npm run dev:app            # API and worker app
+npm run dev:admin                            # admin portal
+npm run typecheck; npm run lint; npx prettier --check .
+npm test; npm run test:db                    # run the DB suite alone (slow disk: see test-report)
+npm run db:rule-set-import -- --file <set.json> --check
+npm run db:rule-set-status -- --code <C> --version <N> --to IN_REVIEW --actor <LOGIN-ID>
+npm run jobs:reminders
+```
+
+## 26. Acceptance checklist
+
+| Criterion | Status |
+|---|---|
+| Steps 1-6 audited | Yes |
+| Previous modules remain functional | Yes (regression suites; DB suite with the S7-004 timeout caveat) |
+| Results generated from valid completed sessions | Yes |
+| Unapproved rules cannot produce operational classifications | Yes (demonstration never approvable, never used in production; "not approved" shown) |
+| Rule versions preserved | Yes |
+| Four-D results displayed independently | Yes |
+| Incomplete and uncertain results handled safely | Yes |
+| Clinical review permissions enforced | Yes |
+| Review history preserved | Yes |
+| Referrals created securely | Yes |
+| Approval follows the authorised workflow | Yes |
+| Status transitions validated | Yes (service + database) |
+| Duplicate referrals prevented | Yes |
+| Facility information validated | Yes |
+| Facility assignment authorised | Yes |
+| Facility visit tracking works | Yes (manual, with source and verification) |
+| Follow-ups created and assigned | Yes |
+| Follow-up history preserved | Yes |
+| Notifications without sensitive information | Yes (in-app only) |
+| Dashboards use real data | Yes |
+| Geographic restrictions enforced | Yes |
+| Consent and data-sharing checks | Yes (at issue) |
+| Audit logging | Yes |
+| Critical security tests pass | Yes |
+| High-priority regression tests pass | Yes, except intermittent DB test timeouts (S7-004, environment) |
+| No unresolved Critical bugs | Yes |
+| High bugs fixed or documented | Yes (none) |
+| Documentation complete | Yes (13 documents) |
+| Clinical limitations and approvals documented | Yes (section 22) |
+
+**Stop condition:** Step 7 is complete. Step 8, AI models, image / voice / video analysis and parent
+activity plans have **not** been started. Waiting for explicit approval.

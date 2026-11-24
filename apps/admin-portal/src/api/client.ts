@@ -17,6 +17,8 @@ export interface RequestOptions {
 export interface ApiClient {
   get<T>(path: string, schema: ZodType<T>, options?: RequestOptions): Promise<T>;
   post<T>(path: string, body: unknown, schema?: ZodType<T>, options?: RequestOptions): Promise<T>;
+  /** Step 7G: facility edits. */
+  patch<T>(path: string, body: unknown, schema?: ZodType<T>, options?: RequestOptions): Promise<T>;
 }
 
 export function createApiClient(request: HttpRequestFn, session: AuthorizedCaller): ApiClient {
@@ -28,6 +30,10 @@ export function createApiClient(request: HttpRequestFn, session: AuthorizedCalle
     post: (path, body, schema, options) =>
       session.authorized((accessToken) =>
         request({ method: 'POST', path, body, schema, accessToken, signal: options?.signal }),
+      ),
+    patch: (path, body, schema, options) =>
+      session.authorized((accessToken) =>
+        request({ method: 'PATCH', path, body, schema, accessToken, signal: options?.signal }),
       ),
   };
 }

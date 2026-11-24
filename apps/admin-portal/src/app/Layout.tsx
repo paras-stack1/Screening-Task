@@ -6,7 +6,15 @@ import { useI18n } from '../i18n';
 import { useServices } from './services';
 
 /** Shell for signed-in administrators: header, navigation, main content. */
-export function Layout({ user }: { user: AuthUser }) {
+export function Layout({
+  user,
+  canManageFacilities = false,
+  canReport = false,
+}: {
+  user: AuthUser;
+  canManageFacilities?: boolean;
+  canReport?: boolean;
+}) {
   const { t } = useI18n();
   const { session } = useServices();
   return (
@@ -35,6 +43,8 @@ export function Layout({ user }: { user: AuthUser }) {
         </NavLink>
         <NavLink to="/users">{t('nav.users')}</NavLink>
         <NavLink to="/assignments">{t('nav.assignments')}</NavLink>
+        {canManageFacilities ? <NavLink to="/facilities">{t('nav.facilities')}</NavLink> : null}
+        {canReport ? <NavLink to="/reports">{t('nav.reports')}</NavLink> : null}
         <NavLink to="/account/password">{t('nav.password')}</NavLink>
       </nav>
       <main className="content" id="main" tabIndex={-1}>
