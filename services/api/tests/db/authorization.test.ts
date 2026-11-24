@@ -302,6 +302,7 @@ describe('IDOR / BOLA', () => {
       measurement: prisma.measurement,
       screeningResult: prisma.screeningResult,
       screeningResultRun: prisma.screeningResultRun,
+      clinicalReview: prisma.clinicalReview,
       aiAnalysis: prisma.aiAnalysis,
       referral: prisma.referral,
       followUp: prisma.followUp,

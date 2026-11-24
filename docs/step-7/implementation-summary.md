@@ -8,8 +8,8 @@
 | Stage | Content | Status |
 |---|---|---|
 | Phases 1-4 | Audit, architecture, schema proposal (`47b8b4c`) | Done |
-| **7B** | Migration (all Step 7 tables and rules), permissions, rule DSL + evaluator, rule-set CLIs, demonstration rule sets, result generation, results and rule-set read API, tests | **Done - awaiting review** |
-| 7C | Clinical review actions, referral create/approve/reject/issue/cancel/history, facility read API | Not started |
+| 7B | Migration (all Step 7 tables and rules), permissions, rule DSL + evaluator, rule-set CLIs, demonstration rule sets, result generation, results and rule-set read API, tests | Done (`01af3c6`) |
+| **7C** | Clinical review actions, referral create/approve/reject/issue/cancel/history, facility read API | **Done - awaiting review** |
 | 7D | Referral tracking, follow-ups, notifications + reminder job, dashboard/report APIs | Not started |
 | 7E | Worker app: results, review, notifications | Not started |
 | 7F | Worker app: referrals, follow-ups, dashboards | Not started |
@@ -83,3 +83,51 @@ was fixed before anything else ran (not shipped). Open from earlier steps: S6-00
 Review actions, referral and facility services/APIs (7C); tracking, follow-ups, notifications,
 dashboards (7D); all screens (7E-7G). The database rules for those tables are already in place and
 tested.
+
+## Stage 7C
+
+### Built
+
+- **Clinical review** (`modules/clinical-review/review.service.ts`): queue, detail with the full
+  result and history, claim / release / decide. RECOMMEND_REFERRAL creates an APPROVED referral;
+  REQUEST_ADDITIONAL_SCREENING creates a follow-up task. See
+  [clinical-review-workflow.md](clinical-review-workflow.md).
+- **Referrals** (`modules/referrals/referrals.service.ts`): create (retry-safe, duplicate guard),
+  list (scope, filters, "awaiting my approval"), detail with history, reassessment flags and the
+  actions the caller may take; approve, reject, change facility, issue (consent verified and
+  recorded), cancel, reassess after amendment. See [referral-workflow.md](referral-workflow.md).
+- **Facilities** (`modules/facilities/facilities.service.ts`): selection list for a child with
+  district placement and "selectable"; directory for facility managers; detail. See
+  [facility-management.md](facility-management.md).
+- Shared helpers (`referralCommon.ts`): record-bound encryption of all Step 7 free text, actor role
+  for history, the district rule, due dates.
+- Contracts `packages/shared-contracts/src/referrals.ts`; scope rule `clinicalReview` in
+  `accessScope.ts`; 17 routes added to the authentication inventory.
+
+No schema change was needed (all tables and database rules came with 7B).
+
+### Test results (actually run, 2026-11-24)
+
+| Suite | After 7B | After 7C | Result |
+|---|---|---|---|
+| API unit | 442 | 459 (+17 route inventory) | All pass |
+| Database / API | 380 | 402 (+20 review/referral/facility, +2 scope) | All pass |
+| Worker app, admin portal | 2297 / 20 skipped; 308 / 5 skipped | not re-run: 7C adds contract exports only, no app code | - |
+| Typecheck, lint, Prettier (whole repository) | clean | clean | - |
+| Mutation checks | - | 2 of 2 caught | consent check removed at issue; any reviewer allowed to decide |
+
+During one mutation run two unrelated tests timed out at 20 s (known slow Docker disk on this
+machine; they pass on the restored code and in the full run).
+
+### Assumptions to confirm (not invented clinical content)
+
+1. District rule for facilities (in district or above; out-of-district only by a medical officer
+   with a reason).
+2. A medical officer may review a screening they conducted (shown, not blocked).
+3. Workflow reason codes for referrals and follow-ups (`REFERRAL_REASON_CODES`,
+   `FOLLOW_UP_REASON_CODES`) - labels, not clinical classifications.
+4. Follow-up due dates from today up to one year ahead.
+
+### Bugs
+
+None found in existing code. Open from earlier steps: S6-005 (Low).

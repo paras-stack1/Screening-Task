@@ -34,7 +34,7 @@ export interface ResultsServiceDependencies {
 
 const TX_OPTIONS = { timeout: 15_000, maxWait: 5_000 } as const;
 
-const runInclude = {
+export const runInclude = {
   session: { select: { childId: true, child: { select: { fullName: true } } } },
   generatedBy: { select: { displayName: true } },
   review: { select: { id: true, status: true, decision: true, decidedAt: true } },
@@ -123,7 +123,7 @@ function toSummary(run: RunRow): ResultRunSummary {
   };
 }
 
-function toRun(run: RunRow): ResultRun {
+export function toRun(run: RunRow): ResultRun {
   const { categoryOutcomes: _omit, ...summary } = toSummary(run);
   return { ...summary, categories: run.results.map(toCategoryResult) };
 }

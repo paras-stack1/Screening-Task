@@ -11,6 +11,11 @@ import {
 import { createChildConsentsRouter, createConsentNoticesRouter } from '../modules/consent/consent.routes';
 import type { ConsentPolicySettings } from '../modules/consent/consentPolicy';
 import { createGuardiansRouter } from '../modules/guardians/guardians.routes';
+import {
+  createClinicalReviewsRouter,
+  createFacilitiesRouter,
+  createReferralsRouter,
+} from '../modules/referrals/referrals.routes';
 import type { ScreeningPolicySettings } from '../modules/screening/protocolSelection';
 import {
   createScreeningEligibilityRouter,
@@ -72,6 +77,9 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/screening-amendments', createAmendmentQueueRouter(childData));
   router.use('/screening-results', createScreeningResultsRouter(childData));
   router.use('/clinical-rule-sets', createClinicalRuleSetsRouter(childData));
+  router.use('/clinical-reviews', createClinicalReviewsRouter(childData));
+  router.use('/referrals', createReferralsRouter(childData));
+  router.use('/facilities', createFacilitiesRouter(childData));
   router.use('/children', createChildrenRouter(childData));
   router.use('/guardians', createGuardiansRouter(childData));
   router.use('/users', createUsersRouter(deps.auth));

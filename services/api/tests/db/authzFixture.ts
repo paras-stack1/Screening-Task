@@ -254,6 +254,7 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
     | 'measurement'
     | 'screeningResult'
     | 'screeningResultRun'
+    | 'clinicalReview'
     | 'aiAnalysis'
     | 'referral'
     | 'followUp'
@@ -392,6 +393,9 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
         },
       });
     });
+    const review = await prisma.clinicalReview.create({
+      data: { resultRunId: result.resultRunId, areaId: childArea },
+    });
     // A referral is written together with its first status event (database rule).
     const referral = await prisma.$transaction(async (tx) => {
       const created = await tx.referral.create({
@@ -452,6 +456,7 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
       measurement: measurement.id,
       screeningResult: result.id,
       screeningResultRun: result.resultRunId,
+      clinicalReview: review.id,
       aiAnalysis: ai.id,
       referral: referral.id,
       followUp: followUp.id,
