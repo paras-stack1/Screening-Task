@@ -3,8 +3,8 @@
 > Stages 1-2 of the Parent Portal brief (2026-11-24). Status: **APPROVED 2026-11-24** ("approve all
 > recommendations": PP1-PP18 and the schema in section 5).
 >
-> Progress: stage 3 (worker invitations, secure tokens, SMS adapter) implemented - see section 7 and
-> [../api/parent-portal.md](../api/parent-portal.md). Stages 4-7 not started.
+> Progress: stage 3 approved (2026-11-24). Stage 4 (invitation check, codes, activation; server side)
+> implemented - sections 7-8 and [../api/parent-portal.md](../api/parent-portal.md). Stages 5-7 not started.
 >
 > Context: the Parent Care decisions C1-C18 in [initial-audit.md](initial-audit.md) were approved on
 > 2026-11-24 ("approve all"), **except C3 (no parent accounts), which this brief replaces**: parents get
@@ -179,7 +179,7 @@ SMS provider and DLT-registered templates; approved privacy notice and terms (DP
 parent-portal domain with HTTPS; Hindi review of all parent-facing text; programme confirmation of
 what parents may see (PP12); decision on official worker contact numbers (PP16).
 
-## 7. Stage 3 - worker invitations (implemented, waiting for review)
+## 7. Stage 3 - worker invitations (approved 2026-11-24)
 
 - Migration `20261125100000_step8_parent_portal_accounts`: all section 5 tables, partial unique indexes,
   CHECKs and protection triggers; runtime role has no DELETE / TRUNCATE on them.
@@ -193,3 +193,18 @@ what parents may see (PP12); decision on official worker contact numbers (PP16).
   guardian agreement, send, cancel), English and Hindi.
 - Not yet: public invitation validation, OTP, activation, parent login (stages 4-5); the parent app
   (stage 6). `OTP_HMAC_KEY`, `PARENT_OTP_TTL_MINUTES` and `PARENT_JWT_AUDIENCE` arrive with stages 4-5.
+
+## 8. Stage 4 - invitation check, codes and activation (implemented, waiting for review)
+
+- Public routes under `/api/v1/parent`: `legal`, `invitations/validate`, `invitations/send-otp`,
+  `invitations/verify-otp`, `activate` ([API](../api/parent-portal.md)). Per-IP limits on each.
+- Codes per PP6 (HMAC only, 5 min, 5 attempts counted atomically, 60 s resend, 5 per phone per hour,
+  10 per invitation); `OTP_HMAC_KEY` and `PARENT_OTP_TTL_MINUTES` added (key required in production).
+- 15-minute activation ticket (HMAC-signed, bound to invitation + consumed code) instead of a new
+  table; the link alone never activates.
+- Activation: password policy + "not the mobile number", Argon2id; current privacy notice and terms
+  (placeholder text, refused in production); single-use invitation; worker-confirmed children become
+  ACTIVE; audit as the parent (`AuditLog.actorParentAccountId`); no consent granted; no auto sign-in.
+- Known limits: a DISABLED account cannot be re-activated yet (`409 ACCOUNT_EXISTS`, stage 5/6); when a
+  link ended before activation, the access row is revoked in the name of the worker who granted it
+  (no system user exists; reason text says why). Per-IP counters are per API process (as staff login).
