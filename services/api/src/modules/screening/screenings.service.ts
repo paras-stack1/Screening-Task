@@ -32,6 +32,9 @@ import {
 import { recordAudit, type AuditEntry } from '../audit/audit.service';
 import { fromDbDate } from '../children/birthDate';
 import { generateResultRun } from '../clinical-rules/resultGeneration';
+import { notifyAfterCommit } from '../notifications/notifications.service';
+import { reviewTaskNotifications } from '../notifications/reminders';
+
 import { assertConsentPermits, type ConsentPolicySettings } from '../consent/consentPolicy';
 import { validateMeasurement } from './measurementRules';
 import { protocolContentHash, protocolRowToDefinition } from './protocolContent';
@@ -771,7 +774,10 @@ export function createScreeningsService({
           };
         });
       try {
-        return { result: await completeOnce(), replayed: false };
+        const result = await completeOnce();
+        // Step 7: tell the medical officers about the new review task (after commit, best effort).
+        await notifyAfterCommit(db, () => reviewTaskNotifications(db, id, at(ctx)));
+        return { result, replayed: false };
       } catch (error) {
         // A concurrent completion won the row lock first: answer as a replay, not a failure.
         if (error instanceof AppError && error.code === 'SESSION_FINAL') {

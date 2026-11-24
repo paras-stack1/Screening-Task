@@ -15,19 +15,20 @@ Very thin handlers (validated input -> one service call -> JSON) may live inline
 `<module>.routes.ts` instead of a separate controller file (see auth/auth.routes.ts).
 
 Rules:
+
 - Controllers stay thin and contain no business logic; services hold no Express code.
 - Request/response shapes that the mobile app also uses go in `packages/shared-contracts`.
 - Only `src/integrations/ai-service` talks to the Python AI service; `screening` calls it
   through that adapter and must keep working when the AI service is unavailable.
 - Register each module router in `src/routes/index.ts`.
 
-| Module      | Responsibility (planned)                                         |
-|-------------|------------------------------------------------------------------|
-| auth        | Login, JWT, refresh rotation, sessions, password change (done)   |
-| users       | ASHA / Anganwadi worker and supervisor accounts, roles          |
-| facilities  | Anganwadi centres, schools, health facilities (referral targets)|
-| children    | Child registration, duplicates, profile, updates (Step 5)       |
-| guardians   | Guardians and child-guardian links (Step 5; docs/api/children.md)|
-| consent     | Purpose-specific consent, withdrawal, enforcement (Step 5)       |
-| screening   | Screening questionnaires and results (AI support optional)      |
-| referrals   | Referral creation and follow-up tracking                        |
+| Module     | Responsibility (planned)                                          |
+| ---------- | ----------------------------------------------------------------- |
+| auth       | Login, JWT, refresh rotation, sessions, password change (done)    |
+| users      | ASHA / Anganwadi worker and supervisor accounts, roles            |
+| facilities | Anganwadi centres, schools, health facilities (referral targets)  |
+| children   | Child registration, duplicates, profile, updates (Step 5)         |
+| guardians  | Guardians and child-guardian links (Step 5; docs/api/children.md) |
+| consent    | Purpose-specific consent, withdrawal, enforcement (Step 5)        |
+| screening  | Screening questionnaires and results (AI support optional)        |
+| referrals  | Referral creation and follow-up tracking                          |

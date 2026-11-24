@@ -1,4 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import {
+  TRACKING_STATUSES,
+  type ReferralCloseRequest,
+  type ReferralCorrectionRequest,
+  type ReferralTrackingRequest,
+} from '@balswasthya/shared-contracts';
 import type {
   ApproveReferralRequest,
   ChangeFacilityRequest,
@@ -11,7 +17,7 @@ import type {
   ReferralStatus,
   ReferralSummary,
 } from '@balswasthya/shared-contracts';
-import { Prisma, type PrismaClient } from '@prisma/client';
+import { Prisma, type NotificationType, type PrismaClient } from '@prisma/client';
 import type { Db } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { runIdempotent } from '../../utils/idempotency';
@@ -27,6 +33,7 @@ import { permissionsOverArea } from '../access-control/authorization.service';
 import type { PermissionCode } from '../access-control/permissions';
 import { recordAudit } from '../audit/audit.service';
 import { assertConsentPermits, type ConsentPolicySettings } from '../consent/consentPolicy';
+import { notifyAfterCommit } from '../notifications/notifications.service';
 import { actorRoleCode, assertFacilityChoice, isSelectable, recordText } from './referralCommon';
 
 export interface ReferralsServiceDependencies {
@@ -39,6 +46,29 @@ type Tx = Prisma.TransactionClient;
 const TX_OPTIONS = { timeout: 15_000, maxWait: 5_000 } as const;
 const FINAL: ReferralStatus[] = ['REJECTED', 'CLOSED', 'CANCELLED'];
 const BEFORE_ISSUE: ReferralStatus[] = ['PENDING_APPROVAL', 'APPROVED'];
+const CLOSABLE: ReferralStatus[] = [
+  'VISITED',
+  'UNDER_TREATMENT',
+  'FOLLOW_UP_REQUIRED',
+  'VISIT_NOT_COMPLETED',
+];
+/** Tracking moves after issue (architecture.md section 6; the database enforces the same). */
+const TRACKING_NEXT: Partial<Record<ReferralStatus, readonly ReferralStatus[]>> = {
+  ISSUED: ['ACKNOWLEDGED', 'APPOINTMENT_SCHEDULED', 'VISITED', 'VISIT_NOT_COMPLETED'],
+  ACKNOWLEDGED: ['APPOINTMENT_SCHEDULED', 'VISITED', 'VISIT_NOT_COMPLETED'],
+  APPOINTMENT_SCHEDULED: ['APPOINTMENT_SCHEDULED', 'VISITED', 'VISIT_NOT_COMPLETED'],
+  VISIT_NOT_COMPLETED: ['APPOINTMENT_SCHEDULED', 'VISITED', 'FOLLOW_UP_REQUIRED'],
+  VISITED: ['UNDER_TREATMENT', 'FOLLOW_UP_REQUIRED'],
+  UNDER_TREATMENT: ['FOLLOW_UP_REQUIRED'],
+  FOLLOW_UP_REQUIRED: ['APPOINTMENT_SCHEDULED', 'VISITED', 'UNDER_TREATMENT'],
+};
+/** Tracking, closure and corrections: medical officers or supervisors (decision O). */
+const trackingPermission = (perms: Set<PermissionCode>): PermissionCode | null =>
+  perms.has('referral.approve')
+    ? 'referral.approve'
+    : perms.has('referral.update')
+      ? 'referral.update'
+      : null;
 
 export const referralDetailInclude = {
   child: { select: { fullName: true, areaId: true } },
@@ -208,8 +238,14 @@ export function createReferralsService({ db, pii, consentPolicy }: ReferralsServ
       reason?: string;
       note?: string;
       facilityId?: string | null;
+      /** Tracking reports (decision O); default APP_USER_DIRECT / VERIFIED. */
+      source?: 'APP_USER_DIRECT' | 'FACILITY_PHONE_CALL' | 'FACILITY_DOCUMENT_SEEN' | 'GUARDIAN_REPORTED';
+      effectiveAt?: Date;
+      correctsEventId?: string;
     };
     audit: { action: string; details: Prisma.InputJsonObject };
+    /** In-app notification to the referral's creator after commit (not to themself). */
+    notify?: NotificationType;
   }
 
   /** The guarded change sequence shared by every referral action. */
@@ -225,6 +261,8 @@ export function createReferralsService({ db, pii, consentPolicy }: ReferralsServ
     ) => Promise<Change>,
   ): Promise<ReferralDetail> {
     await assertInScopeOrDeny(db, ctx, 'referral', id, 'child.read');
+    // Assigned inside the transaction callback (TypeScript cannot see that, hence the cast).
+    let notice = null as { type: NotificationType; userId: string } | null;
     await db
       .$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "Referral" WHERE id = ${id}::uuid FOR UPDATE`;
@@ -253,8 +291,12 @@ export function createReferralsService({ db, pii, consentPolicy }: ReferralsServ
               toStatus: c.event.toStatus,
               changedById: ctx.userId,
               actorRoleCode: await actorRoleCode(tx, ctx.userId, r.child.areaId, c.event.permission, at(ctx)),
-              source: 'APP_USER_DIRECT',
-              verificationStatus: 'VERIFIED',
+              source: c.event.source ?? 'APP_USER_DIRECT',
+              // Only the family's account is unverified; facility information and the user's own
+              // actions are recorded as verified (decision O).
+              verificationStatus: c.event.source === 'GUARDIAN_REPORTED' ? 'UNVERIFIED' : 'VERIFIED',
+              effectiveAt: c.event.effectiveAt ?? null,
+              correctsEventId: c.event.correctsEventId ?? null,
               facilityId: c.event.facilityId ?? null,
               reason: text.seal({ kind: 'referralEvent', id: eventId, field: 'reason' }, c.event.reason),
               note: text.seal({ kind: 'referralEvent', id: eventId, field: 'note' }, c.event.note),
@@ -272,6 +314,7 @@ export function createReferralsService({ db, pii, consentPolicy }: ReferralsServ
           requestId: ctx.requestId,
           details: { from: r.status, ...c.audit.details },
         });
+        if (c.notify && r.createdById !== ctx.userId) notice = { type: c.notify, userId: r.createdById };
       }, TX_OPTIONS)
       .catch(async (error: unknown) => {
         if (error instanceof DeniedAction) {
@@ -283,6 +326,20 @@ export function createReferralsService({ db, pii, consentPolicy }: ReferralsServ
         }
         throw error;
       });
+    if (notice) {
+      const { type, userId } = notice;
+      await notifyAfterCommit(db, () =>
+        Promise.resolve([
+          {
+            userId,
+            type,
+            entityType: 'referral',
+            entityId: id,
+            dedupeKey: `${type}:${id}:${expectedVersion + 1}`,
+          },
+        ]),
+      );
+    }
     return loadDetail(ctx, id);
   }
 
@@ -500,6 +557,7 @@ export function createReferralsService({ db, pii, consentPolicy }: ReferralsServ
           },
           event: { toStatus: 'APPROVED', permission: 'referral.approve', note: body.note, facilityId },
           audit: { action: 'referral.approved', details: { priority: body.priority, facilityId } },
+          notify: 'REFERRAL_APPROVED',
         };
       });
     },
@@ -512,6 +570,7 @@ export function createReferralsService({ db, pii, consentPolicy }: ReferralsServ
           data: { status: 'REJECTED' },
           event: { toStatus: 'REJECTED', permission: 'referral.approve', reason: body.reason },
           audit: { action: 'referral.rejected', details: {} },
+          notify: 'REFERRAL_REJECTED',
         });
       });
     },
@@ -602,6 +661,130 @@ export function createReferralsService({ db, pii, consentPolicy }: ReferralsServ
               consentVerified: true,
             },
           },
+          notify: 'REFERRAL_ISSUED',
+        };
+      });
+    },
+
+    /**
+     * Tracking after issue (decision O): acknowledgement, appointment, visit, treatment, follow-up
+     * needed. Entered by a medical officer or supervisor from a facility call or document
+     * (VERIFIED) or from the family's account (UNVERIFIED, shown as "reported, not verified").
+     * A recorded visit never implies treatment; nothing here closes the referral.
+     */
+    track(ctx: AccessContext, id: string, body: ReferralTrackingRequest) {
+      return change(ctx, id, body.expectedVersion, 'track', (_tx, r, perms) => {
+        const permission = trackingPermission(perms);
+        if (!permission) throw new DeniedAction('NOT_ALLOWED_TO_TRACK');
+        if (!(TRACKING_NEXT[r.status] ?? []).includes(body.toStatus)) throw wrongState(r.status);
+        const now = at(ctx);
+        const issuedAt = r.issuedAt!;
+        const effectiveAt = body.effectiveAt ? new Date(body.effectiveAt) : undefined;
+        if (effectiveAt && (effectiveAt.getTime() > now.getTime() + 5 * 60_000 || effectiveAt < issuedAt)) {
+          throw AppError.unprocessable(
+            'INVALID_EFFECTIVE_TIME',
+            'The time must be after the referral was issued and not in the future.',
+          );
+        }
+        const appointmentAt = body.appointmentAt ? new Date(body.appointmentAt) : undefined;
+        if (appointmentAt && appointmentAt < issuedAt) {
+          throw AppError.unprocessable(
+            'INVALID_APPOINTMENT_TIME',
+            'The appointment cannot be before the referral was issued.',
+          );
+        }
+        const notify: NotificationType =
+          body.toStatus === 'ACKNOWLEDGED'
+            ? 'REFERRAL_ACKNOWLEDGED'
+            : body.toStatus === 'APPOINTMENT_SCHEDULED'
+              ? 'REFERRAL_APPOINTMENT_SCHEDULED'
+              : 'REFERRAL_STATUS_CHANGED';
+        return Promise.resolve({
+          data: { status: body.toStatus, ...(appointmentAt && { appointmentAt }) },
+          event: {
+            toStatus: body.toStatus,
+            permission,
+            source: body.source,
+            effectiveAt,
+            note: body.note,
+            facilityId: r.facilityId,
+          },
+          audit: {
+            action: 'referral.status_tracked',
+            details: {
+              to: body.toStatus,
+              source: body.source,
+              verified: body.source !== 'GUARDIAN_REPORTED',
+            },
+          },
+          notify,
+        });
+      });
+    },
+
+    /** Decision R: closure needs a reason, a visit outcome state and no open follow-up of the referral. */
+    close(ctx: AccessContext, id: string, body: ReferralCloseRequest) {
+      return change(ctx, id, body.expectedVersion, 'close', async (tx, r, perms) => {
+        const permission = trackingPermission(perms);
+        if (!permission) throw new DeniedAction('NOT_ALLOWED_TO_CLOSE');
+        if (!CLOSABLE.includes(r.status)) throw wrongState(r.status);
+        const open = await tx.followUp.count({
+          where: { referralId: id, status: { in: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'MISSED'] } },
+        });
+        if (open > 0) {
+          throw AppError.conflict(
+            'OPEN_FOLLOW_UPS',
+            'Complete or cancel the open follow-ups of this referral before closing it.',
+            { openFollowUps: open },
+          );
+        }
+        const notify: NotificationType = 'REFERRAL_STATUS_CHANGED';
+        return {
+          data: { status: 'CLOSED', closedAt: at(ctx) },
+          event: { toStatus: 'CLOSED', permission, reason: body.reason },
+          audit: { action: 'referral.closed', details: {} },
+          notify,
+        };
+      });
+    },
+
+    /**
+     * Decision J: reverts ONLY the latest tracking update (entered by mistake), with a reason. The
+     * mistaken event stays in the history; a new correction event points to it.
+     */
+    correct(ctx: AccessContext, id: string, body: ReferralCorrectionRequest) {
+      return change(ctx, id, body.expectedVersion, 'correct', async (tx, r, perms) => {
+        const permission = trackingPermission(perms);
+        if (!permission) throw new DeniedAction('NOT_ALLOWED_TO_CORRECT');
+        const latest = await tx.referralStatusEvent.findFirst({
+          where: { referralId: id },
+          orderBy: [{ changedAt: 'desc' }, { id: 'desc' }],
+        });
+        const back = latest?.fromStatus ?? null;
+        const correctable =
+          latest !== null &&
+          back !== null &&
+          latest.id === body.eventId &&
+          latest.correctsEventId === null &&
+          !BEFORE_ISSUE.includes(back) &&
+          (TRACKING_STATUSES as readonly string[]).includes(latest.toStatus) &&
+          latest.toStatus === r.status;
+        if (!correctable) {
+          throw AppError.conflict(
+            'NOT_CORRECTABLE',
+            'Only the latest tracking update (after issue) can be corrected.',
+          );
+        }
+        return {
+          data: { status: back },
+          event: {
+            toStatus: back,
+            permission,
+            reason: body.reason,
+            correctsEventId: latest.id,
+            facilityId: r.facilityId,
+          },
+          audit: { action: 'referral.status_corrected', details: { correctedEventId: latest.id, to: back } },
         };
       });
     },

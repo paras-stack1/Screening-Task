@@ -25,6 +25,7 @@
     "db:protocol-import": "tsx --env-file=.env prisma/protocol-import.ts",
     "db:rule-set-import": "tsx --env-file=.env prisma/rule-set-import.ts",
     "db:rule-set-status": "tsx --env-file=.env prisma/rule-set-status.ts",
+    "jobs:reminders": "tsx --env-file=.env prisma/jobs-reminders.ts",
     "db:dev-live-worker": "tsx --env-file=.env prisma/dev-live-worker.ts",
     "db:dev-reset-password": "tsx --env-file=.env prisma/dev-reset-password.ts"
   },

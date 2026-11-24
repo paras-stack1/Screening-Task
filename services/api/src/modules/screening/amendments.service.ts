@@ -15,6 +15,9 @@ import type { PiiCrypto } from '../../utils/piiCrypto';
 import { denyAsNotFound, scopedWhere, type AccessContext } from '../access-control/accessScope';
 import { recordAudit } from '../audit/audit.service';
 import { generateResultRun } from '../clinical-rules/resultGeneration';
+import { notifyAfterCommit } from '../notifications/notifications.service';
+import { reviewTaskNotifications } from '../notifications/reminders';
+
 import { fromDbDate } from '../children/birthDate';
 import {
   currentState,
@@ -344,6 +347,9 @@ export function createAmendmentsService({ db, pii, screeningPolicy }: Amendments
           return amendmentId;
         },
       );
+      if (!outcome.replayed) {
+        await notifyAfterCommit(db, () => reviewTaskNotifications(db, sessionId, at(ctx)));
+      }
       return { result: await loadSessionDetail(db, pii, ctx, sessionId), replayed: outcome.replayed };
     },
 

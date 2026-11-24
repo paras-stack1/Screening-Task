@@ -9,8 +9,8 @@
 |---|---|---|
 | Phases 1-4 | Audit, architecture, schema proposal (`47b8b4c`) | Done |
 | 7B | Migration (all Step 7 tables and rules), permissions, rule DSL + evaluator, rule-set CLIs, demonstration rule sets, result generation, results and rule-set read API, tests | Done (`01af3c6`) |
-| **7C** | Clinical review actions, referral create/approve/reject/issue/cancel/history, facility read API | **Done - awaiting review** |
-| 7D | Referral tracking, follow-ups, notifications + reminder job, dashboard/report APIs | Not started |
+| 7C | Clinical review actions, referral create/approve/reject/issue/cancel/history, facility read API | Done (`f9bcc84`) |
+| **7D** | Referral tracking, follow-ups, notifications + reminder job, dashboard/report APIs | **Done - awaiting review** |
 | 7E | Worker app: results, review, notifications | Not started |
 | 7F | Worker app: referrals, follow-ups, dashboards | Not started |
 | 7G | Admin portal facilities and reports; security and regression testing; all docs; final report | Not started |
@@ -131,3 +131,46 @@ machine; they pass on the restored code and in the full run).
 ### Bugs
 
 None found in existing code. Open from earlier steps: S6-005 (Low).
+
+## Stage 7D
+
+### Built
+
+- **Referral tracking** after issue with source-derived verification, closure rules, and
+  corrections of the latest update (`referrals.service.ts`: track, close, correct). See
+  [referral-workflow.md](referral-workflow.md) section 2a.
+- **Follow-ups** (`modules/follow-ups/followUps.service.ts`): create (retry-safe, one open task per
+  child + referral + reason), assign/reassign with eligibility check, start, complete, reschedule,
+  miss, cancel; history; computed overdue. See [follow-up-management.md](follow-up-management.md).
+- **Notifications** (`modules/notifications`): ids-only in-app notifications with dedupe keys, sent
+  after commit (failures logged, never undo the change); a user lists and marks only their own;
+  reminder job `npm run jobs:reminders` (`prisma/jobs-reminders.ts`).
+- **Dashboards and reports** (`modules/reports/reports.service.ts`): referral and result dashboards
+  over the caller's scope; aggregate report by area and date range with small-cell suppression,
+  per-category and per-sub-area counts. Metric definitions in
+  [api-documentation.md](api-documentation.md).
+- 18 routes added to the authentication inventory. No schema change.
+
+### Test results (actually run, 2026-11-24)
+
+| Suite | After 7C | After 7D | Result |
+|---|---|---|---|
+| API unit | 459 | 476 (+17 route inventory) | All pass |
+| Database / API | 402 | 415 (+13 tracking, follow-ups, notifications, reminders, dashboards, reports) | All pass |
+| Typecheck, lint, Prettier | clean | clean | - |
+| Mutation checks | - | 2 of 2 caught | closing with open follow-ups; family reports recorded as verified |
+| Reminder command on dev | - | ran, sent 0 (nothing due) | - |
+
+Worker app and admin portal suites not re-run (no app code changed in 7D).
+
+### Assumptions to confirm
+
+1. Small-cell suppression threshold 5 for reports.
+2. "Due soon" = due today or tomorrow; reminder run every ~30 minutes.
+3. Facility phone calls and documents count as verified; family reports never do.
+4. Review-overdue reminders stay off until a time limit is agreed (`REVIEW_OVERDUE_HOURS`).
+
+### Known limitations
+
+A correction does not revert an appointment time. Notifications are in-app only (no push).
+Reports list sub-areas one level down only.

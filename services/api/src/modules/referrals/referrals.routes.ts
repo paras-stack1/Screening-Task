@@ -1,4 +1,10 @@
 import {
+  referralCloseRequestSchema,
+  referralCorrectionRequestSchema,
+  referralTrackingRequestSchema,
+  type ReferralCloseRequest,
+  type ReferralCorrectionRequest,
+  type ReferralTrackingRequest,
   approveReferralRequestSchema,
   changeFacilityRequestSchema,
   createReferralRequestSchema,
@@ -190,6 +196,41 @@ export function createReferralsRouter(deps: ScreeningRouterDependencies): Router
       const { id } = getValidated<Id>(res, 'params');
       res.json({
         referral: await service.cancel(ctx(res), id, getValidated<ReferralReasonRequest>(res, 'body')),
+      });
+    },
+  );
+  // Stage 7D: tracking after issue, closure and corrections (medical officers / supervisors).
+  const track = requirePermission(['referral.update', 'referral.approve']);
+  router.post(
+    '/:id/tracking',
+    track,
+    validate({ params: idParams, body: referralTrackingRequestSchema }),
+    async (_req, res) => {
+      const { id } = getValidated<Id>(res, 'params');
+      res.json({
+        referral: await service.track(ctx(res), id, getValidated<ReferralTrackingRequest>(res, 'body')),
+      });
+    },
+  );
+  router.post(
+    '/:id/close',
+    track,
+    validate({ params: idParams, body: referralCloseRequestSchema }),
+    async (_req, res) => {
+      const { id } = getValidated<Id>(res, 'params');
+      res.json({
+        referral: await service.close(ctx(res), id, getValidated<ReferralCloseRequest>(res, 'body')),
+      });
+    },
+  );
+  router.post(
+    '/:id/corrections',
+    track,
+    validate({ params: idParams, body: referralCorrectionRequestSchema }),
+    async (_req, res) => {
+      const { id } = getValidated<Id>(res, 'params');
+      res.json({
+        referral: await service.correct(ctx(res), id, getValidated<ReferralCorrectionRequest>(res, 'body')),
       });
     },
   );

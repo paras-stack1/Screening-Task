@@ -13,3 +13,4 @@ export * from './areas.js';
 export * from './clinicalRules.js';
 export * from './results.js';
 export * from './referrals.js';
+export * from './followUps.js';

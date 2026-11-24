@@ -24,6 +24,8 @@ import {
   type AccessContext,
 } from '../access-control/accessScope';
 import type { ScreeningPolicySettings } from '../screening/protocolSelection';
+import { notifyAfterCommit } from '../notifications/notifications.service';
+import { reviewTaskNotifications } from '../notifications/reminders';
 import { generateResultRun } from './resultGeneration';
 
 export interface ResultsServiceDependencies {
@@ -242,6 +244,9 @@ export function createResultsService({ db, pii, screeningPolicy }: ResultsServic
           { sessionId, generatedById: ctx.userId, now: at(ctx), requestId: ctx.requestId },
         );
       }, TX_OPTIONS);
+      if (outcome.created) {
+        await notifyAfterCommit(db, () => reviewTaskNotifications(db, sessionId, at(ctx)));
+      }
       return { result: await loadRun(outcome.runId), replayed: !outcome.created };
     },
 

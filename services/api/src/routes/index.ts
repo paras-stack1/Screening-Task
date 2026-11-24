@@ -10,6 +10,12 @@ import {
 } from '../modules/clinical-rules/results.routes';
 import { createChildConsentsRouter, createConsentNoticesRouter } from '../modules/consent/consent.routes';
 import type { ConsentPolicySettings } from '../modules/consent/consentPolicy';
+import {
+  createDashboardsRouter,
+  createFollowUpsRouter,
+  createNotificationsRouter,
+  createReportsRouter,
+} from '../modules/follow-ups/followUps.routes';
 import { createGuardiansRouter } from '../modules/guardians/guardians.routes';
 import {
   createClinicalReviewsRouter,
@@ -80,6 +86,10 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/clinical-reviews', createClinicalReviewsRouter(childData));
   router.use('/referrals', createReferralsRouter(childData));
   router.use('/facilities', createFacilitiesRouter(childData));
+  router.use('/follow-ups', createFollowUpsRouter(childData));
+  router.use('/notifications', createNotificationsRouter(childData));
+  router.use('/dashboards', createDashboardsRouter(childData));
+  router.use('/reports', createReportsRouter(childData));
   router.use('/children', createChildrenRouter(childData));
   router.use('/guardians', createGuardiansRouter(childData));
   router.use('/users', createUsersRouter(deps.auth));

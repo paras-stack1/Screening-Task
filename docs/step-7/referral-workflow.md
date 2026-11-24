@@ -41,6 +41,32 @@ Every action: 404 + audit outside scope; 403 + audit `referral.action_denied` wh
 The API answers `actions: { approve, reject, changeFacility, issue, cancel, reassess }` with each
 referral, decided by the server; the app shows only those.
 
+## 2a. Tracking after issue (stage 7D)
+
+No facility staff accounts exist (decision O). Medical officers and supervisors enter what they
+learn, with its source:
+
+| Source | Recorded as |
+|---|---|
+| `FACILITY_PHONE_CALL`, `FACILITY_DOCUMENT_SEEN` | VERIFIED (information from the facility) |
+| `GUARDIAN_REPORTED` | UNVERIFIED - shown as "reported by the family, not verified" |
+
+The server decides the verification from the source; the client cannot send it.
+`POST /referrals/:id/tracking` `{ expectedVersion, toStatus, source, effectiveAt?, appointmentAt?, note? }`
+moves along the state machine only (ACKNOWLEDGED; APPOINTMENT_SCHEDULED with the appointment time,
+repeatable to reschedule; VISITED; VISIT_NOT_COMPLETED; UNDER_TREATMENT; FOLLOW_UP_REQUIRED).
+`effectiveAt` = when it happened per the source; not in the future, not before the issue. A
+recorded visit never implies treatment.
+
+**Close** (`POST /:id/close`, reason required): only from VISITED, UNDER_TREATMENT,
+FOLLOW_UP_REQUIRED or VISIT_NOT_COMPLETED, and only when no follow-up of the referral is open
+(409 `OPEN_FOLLOW_UPS`). Completing a follow-up never closes a referral.
+
+**Correction** (`POST /:id/corrections` `{ expectedVersion, eventId, reason }`): reverts only the
+latest tracking update after issue; the mistaken event stays in the history and the new correction
+event points to it; a correction cannot be corrected. Corrected events are not counted in
+dashboards. Limitation: the appointment time is not reverted by a correction.
+
 ## 3. Consent and data sharing (decision M)
 
 At issue, `assertConsentPermits(..., 'REFERRAL_SHARING')` requires a granted, not withdrawn

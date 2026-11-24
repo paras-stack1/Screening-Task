@@ -15,6 +15,7 @@ import { assertInScopeOrDeny, scopedWhere, type AccessContext } from '../access-
 import { permissionsOverArea } from '../access-control/authorization.service';
 import { recordAudit } from '../audit/audit.service';
 import { runInclude, toRun } from '../clinical-rules/results.service';
+import { notifyAfterCommit } from '../notifications/notifications.service';
 import { actorRoleCode, assertFacilityChoice, dueDateFrom, recordText } from '../referrals/referralCommon';
 
 export interface ReviewServiceDependencies {
@@ -286,8 +287,8 @@ export function createReviewService({ db, pii }: ReviewServiceDependencies) {
       });
     },
 
-    decide(ctx: AccessContext, id: string, body: ReviewDecisionRequest) {
-      return act(ctx, id, body.expectedVersion, async (tx, r) => {
+    async decide(ctx: AccessContext, id: string, body: ReviewDecisionRequest) {
+      const detail = await act(ctx, id, body.expectedVersion, async (tx, r) => {
         if (r.status !== 'UNDER_REVIEW' || r.claimedById !== ctx.userId) {
           throw AppError.conflict('NOT_YOUR_REVIEW', 'Claim the review before recording a decision.');
         }
@@ -424,6 +425,25 @@ export function createReviewService({ db, pii }: ReviewServiceDependencies) {
           audit: { action: 'clinical_review.decided', details },
         };
       });
+      if (body.decision === 'REQUEST_ADDITIONAL_SCREENING') {
+        // The worker who conducted the screening is told that more screening was requested.
+        await notifyAfterCommit(db, async () => {
+          const s = await db.screeningSession.findUniqueOrThrow({
+            where: { id: detail.sessionId },
+            select: { conductedById: true },
+          });
+          return [
+            {
+              userId: s.conductedById,
+              type: 'ADDITIONAL_ASSESSMENT_REQUESTED',
+              entityType: 'clinicalReview',
+              entityId: id,
+              dedupeKey: `ADDITIONAL_ASSESSMENT_REQUESTED:${id}:${detail.version}`,
+            },
+          ];
+        });
+      }
+      return detail;
     },
   };
 }
