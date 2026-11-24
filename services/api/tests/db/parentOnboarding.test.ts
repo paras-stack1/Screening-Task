@@ -397,7 +397,7 @@ describe('activation', () => {
   it('enforces the password rules: common, contains the phone number, too short, mismatch', async () => {
     const h = await invited();
     const ticket = await verified(h.token);
-    const cases: Array<[Record<string, unknown>, number, string]> = [
+    const cases: Array<[{ password?: string; confirmPassword: string }, number, string]> = [
       [{ password: 'password123', confirmPassword: 'password123' }, 422, 'WEAK_PASSWORD'],
       [{ password: `x${h.phone}y`, confirmPassword: `x${h.phone}y` }, 422, 'WEAK_PASSWORD'],
       [{ password: 'Ab1!', confirmPassword: 'Ab1!' }, 422, 'WEAK_PASSWORD'],
@@ -407,7 +407,7 @@ describe('activation', () => {
       const res = await pub('/activate', activation(h.token, ticket, overrides));
       expect(res.status).toBe(status);
       expect(res.body.error.code).toBe(code);
-      expect(JSON.stringify(res.body)).not.toContain(String(overrides.password ?? GOOD_PASSWORD));
+      expect(JSON.stringify(res.body)).not.toContain(overrides.password ?? GOOD_PASSWORD);
     }
     expect(await prisma.parentAccount.count({ where: { guardianId: h.guardianId } })).toBe(0);
   });
