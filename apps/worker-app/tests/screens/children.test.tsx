@@ -287,6 +287,65 @@ describe('child registration', () => {
     expect(context.backend.children.guardians.size).toBe(1); // shared, not duplicated
   });
 
+  it('numbered sections and steps follow what is filled in; a single area is shown read-only', async () => {
+    await seedSavedSession(context, FIELD_WORKER);
+    await openRegister();
+    expect(screen.getByTestId('registration-step-1-current')).toBeOnTheScreen();
+    expect(screen.getByTestId('registration-step-4-upcoming')).toBeOnTheScreen();
+    expect(screen.getByText('Step 1 of 5: Child details')).toBeOnTheScreen();
+    expect(screen.getByText('1. Child details')).toBeOnTheScreen();
+    expect(screen.getByText('3. Area')).toBeOnTheScreen();
+    // One area: facts, not a chooser - and it is already the selected area.
+    expect(
+      within(screen.getByTestId('area-facts')).getByLabelText(`Village: ${FAKE_AREA.nameEn}`),
+    ).toBeOnTheScreen();
+    expect(screen.getByText('Pre-filled from your assignment')).toBeOnTheScreen();
+    expect(screen.queryByTestId('area')).toBeNull();
+    expect(screen.getByTestId('registration-step-3-done')).toBeOnTheScreen();
+
+    await fireEvent.changeText(screen.getByTestId('child-name'), 'Synthetic Asha Kumari');
+    await fireEvent.press(screen.getByTestId('dob-mode-exact'));
+    await fireEvent.changeText(screen.getByTestId('dob-day'), '17');
+    await fireEvent.changeText(screen.getByTestId('dob-month'), '5');
+    await fireEvent.changeText(screen.getByTestId('dob-year'), '2022');
+    expect(await screen.findByTestId('registration-step-1-done')).toBeOnTheScreen();
+    expect(screen.getByTestId('registration-step-2-current')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('register-section-child')).getByText('Complete')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('register-section-guardian')).queryByText('Complete')).toBeNull();
+
+    await fillValid();
+    expect(await screen.findByTestId('registration-step-2-done')).toBeOnTheScreen();
+    // Child and guardian show "Complete"; the pre-filled area shows its note instead.
+    expect(screen.getAllByText('Complete')).toHaveLength(2);
+    expect(screen.getByTestId('registration-step-4-upcoming')).toBeOnTheScreen(); // not before saving
+  });
+
+  it('with several areas the worker still chooses one', async () => {
+    context.backend.children.setAreas([
+      FAKE_AREA,
+      { id: '0a0a0a0a-0000-4000-8000-00000000a002', nameEn: 'Sitapur (synthetic)', nameHi: null as never },
+    ]);
+    await seedSavedSession(context, FIELD_WORKER);
+    await openRegister();
+    expect(screen.getByTestId('area')).toBeOnTheScreen();
+    expect(screen.queryByTestId('area-facts')).toBeNull();
+    expect(screen.getByTestId('registration-step-3-upcoming')).toBeOnTheScreen();
+  });
+
+  it('after registering, the next step offered is recording the guardian consent', async () => {
+    await seedSavedSession(context, FIELD_WORKER);
+    await openRegister();
+    await fillValid();
+    await review();
+    expect(screen.getByTestId('registration-step-3-done')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('register-confirm'));
+    await screen.findByTestId('register-success');
+    expect(screen.getByTestId('registration-step-4-current')).toBeOnTheScreen();
+    expect(screen.getByText("Next step: record the guardian's consent before screening.")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('register-record-consent'));
+    expect(await screen.findByTestId('record-consent-screen')).toBeOnTheScreen();
+  });
+
   it('a worker without a registration area is told so', async () => {
     context.backend.children.setAreas([]);
     await seedSavedSession(context, FIELD_WORKER);

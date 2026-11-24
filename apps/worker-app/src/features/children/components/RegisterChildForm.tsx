@@ -8,9 +8,9 @@ import {
 } from '@balswasthya/shared-contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import {
   AppButton,
   AppCard,
@@ -27,7 +27,7 @@ import {
 import { useTranslation, type TranslationKey } from '../../../localization';
 import { apiErrorMessageKey } from '../../../services/api/errorMessages';
 import { isApiError } from '../../../services/api/errors';
-import { spacing } from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { newSubmissionId } from '../../../utils/submissionId';
 import { validationMessageKey } from '../../auth/authErrors';
 import { useChild, useChildrenApi, useInvalidateChildData, useRegistrationAreas } from '../hooks';
@@ -42,6 +42,33 @@ import {
   type RegistrationFormValues,
 } from '../validation';
 import { ChildFields, GuardianFields, LinkFields } from './FormSections';
+import {
+  AreaFacts,
+  FormSectionCard,
+  PrefilledNote,
+  RegistrationSteps,
+  type StepState,
+} from './RegistrationLayout';
+
+/** Content cap of the registration screen: room for the side steps on wide screens. */
+export const REGISTRATION_MAX_WIDTH = 1080;
+/** From this window width the steps sit beside the form instead of above it. */
+const WIDE_LAYOUT_MIN_WIDTH = 900;
+
+/** Which page section a validation issue belongs to (for the "Complete" badges and the steps). */
+const GUARDIAN_FIELDS = new Set<string>([
+  'guardianSource',
+  'existingGuardianId',
+  'guardianName',
+  'guardianPhone',
+  'guardianLanguage',
+  'relationship',
+  'canGiveConsent',
+  'isPrimaryContact',
+]);
+type Section = 'child' | 'guardian' | 'area';
+const sectionOf = (field: string): Section =>
+  field === 'areaId' ? 'area' : GUARDIAN_FIELDS.has(field) ? 'guardian' : 'child';
 
 const SERVER_DATE_ERRORS: Record<string, TranslationKey> = {
   DATE_OF_BIRTH_IN_FUTURE: 'children.form.errors.dobFuture',
@@ -97,6 +124,22 @@ export function RegisterChildForm({ siblingOf, now = () => new Date() }: Props) 
   const { control, handleSubmit, setValue, getValues, setError, reset, formState } = form;
   const guardianSource = useWatch({ control, name: 'guardianSource' });
   const areaId = useWatch({ control, name: 'areaId' });
+  const allValues = useWatch({ control }) as RegistrationFormValues;
+  const wide = useWindowDimensions().width >= WIDE_LAYOUT_MIN_WIDTH;
+
+  // A section is complete when the same rules the form submits with report nothing for it.
+  const complete = useMemo(() => {
+    const incomplete = new Set<Section>();
+    const result = schema.safeParse(allValues);
+    if (!result.success) {
+      for (const issue of result.error.issues) incomplete.add(sectionOf(String(issue.path[0] ?? '')));
+    }
+    return {
+      child: !incomplete.has('child'),
+      guardian: !incomplete.has('guardian'),
+      area: !incomplete.has('area'),
+    };
+  }, [schema, allValues]);
 
   const areaItems = useMemo(() => areas.data?.items ?? [], [areas.data]);
   useEffect(() => {
@@ -177,9 +220,25 @@ export function RegisterChildForm({ siblingOf, now = () => new Date() }: Props) 
     setPhase('form');
   };
 
+  /** Steps beside (wide) or above (phone) the page content. */
+  const shell = (states: StepState[], content: ReactNode) => (
+    <View style={wide ? styles.wideRow : styles.stack}>
+      <RegistrationSteps states={states} vertical={wide} />
+      <View style={wide ? styles.wideContent : styles.stack}>{content}</View>
+    </View>
+  );
+  const formFlags = [complete.child, complete.guardian, complete.area];
+  const firstOpen = formFlags.findIndex((f) => !f);
+  const formStates: StepState[] = [
+    ...formFlags.map((f, i): StepState => (f ? 'done' : i === firstOpen ? 'current' : 'upcoming')),
+    'upcoming',
+    'upcoming',
+  ];
+
   // ------------------------------------------------------------------ done
   if (done) {
-    return (
+    return shell(
+      ['done', 'done', 'done', 'current', 'upcoming'],
       <View style={styles.stack} testID="register-success">
         <InlineAlert tone="info" message={t('children.register.success')} />
         <AppCard>
@@ -189,13 +248,20 @@ export function RegisterChildForm({ siblingOf, now = () => new Date() }: Props) 
           <AppText>{birthText(t, done, now())}</AppText>
           <AppText color="textSecondary">{areaLabel(language, done)}</AppText>
         </AppCard>
+        <AppText>{t('children.register.consentNext')}</AppText>
         <PrimaryButton
+          label={t('children.register.recordConsent')}
+          onPress={() => router.replace(childRoutes.recordConsent(done.id))}
+          testID="register-record-consent"
+        />
+        <AppButton
+          variant="secondary"
           label={t('children.register.openProfile')}
           onPress={() => router.replace(childRoutes.profile(done.id))}
           testID="register-open-profile"
         />
-        <AppButton variant="secondary" label={t('children.register.another')} onPress={startOver} />
-      </View>
+        <AppButton variant="ghost" label={t('children.register.another')} onPress={startOver} />
+      </View>,
     );
   }
 
@@ -229,8 +295,51 @@ export function RegisterChildForm({ siblingOf, now = () => new Date() }: Props) 
         : values.guardianName;
     const phone = values.guardianSource === 'new' ? normalizeIndianMobile(values.guardianPhone) : null;
 
-    return (
+    return shell(
+      ['done', 'done', 'done', 'upcoming', 'upcoming'],
       <View style={styles.stack} testID="register-review">
+        {duplicates ? (
+          <DuplicateChildren
+            candidates={duplicates}
+            onOpen={(id) => router.push(childRoutes.profile(id))}
+            onRegisterAnyway={() => setConfirmDifferent(true)}
+          />
+        ) : null}
+        {guardianDuplicates ? (
+          <AppCard testID="guardian-duplicates" accentColor={colors.warning} style={styles.warningCard}>
+            <AppText variant="bodyStrong">{t('children.register.guardianDuplicateTitle')}</AppText>
+            <AppText variant="bodySmall">{t('children.register.guardianDuplicateMessage')}</AppText>
+            {guardianDuplicates.map((candidate) => (
+              <View key={candidate.guardianId} style={styles.candidate}>
+                <AppText variant="bodyStrong">{candidate.fullName}</AppText>
+                <AppText variant="bodySmall" color="textSecondary">
+                  {candidate.phoneMasked}
+                </AppText>
+                <AppButton
+                  variant="secondary"
+                  label={t('children.register.useThisGuardian')}
+                  onPress={() => {
+                    setValue('guardianSource', 'existing');
+                    setValue('existingGuardianId', candidate.guardianId);
+                    setChosenExisting({ id: candidate.guardianId, name: candidate.fullName });
+                    setGuardianDuplicates(null);
+                  }}
+                  testID={`use-guardian-${candidate.guardianId}`}
+                />
+              </View>
+            ))}
+            <AppButton
+              variant="ghost"
+              label={t('children.register.differentGuardian')}
+              onPress={() => {
+                confirmations.current = { ...confirmations.current, confirmNewGuardian: true };
+                setGuardianDuplicates(null);
+                void submit();
+              }}
+              testID="guardian-different-person"
+            />
+          </AppCard>
+        ) : null}
         <SectionHeader
           title={t('children.register.reviewTitle')}
           subtitle={t('children.register.reviewSubtitle')}
@@ -288,50 +397,6 @@ export function RegisterChildForm({ siblingOf, now = () => new Date() }: Props) 
 
         {serverError ? <InlineAlert message={t(serverError)} testID="register-error" /> : null}
 
-        {duplicates ? (
-          <DuplicateChildren
-            candidates={duplicates}
-            onOpen={(id) => router.push(childRoutes.profile(id))}
-            onRegisterAnyway={() => setConfirmDifferent(true)}
-          />
-        ) : null}
-
-        {guardianDuplicates ? (
-          <AppCard testID="guardian-duplicates">
-            <AppText variant="bodyStrong">{t('children.register.guardianDuplicateTitle')}</AppText>
-            <AppText variant="bodySmall">{t('children.register.guardianDuplicateMessage')}</AppText>
-            {guardianDuplicates.map((candidate) => (
-              <View key={candidate.guardianId} style={styles.candidate}>
-                <AppText variant="bodyStrong">{candidate.fullName}</AppText>
-                <AppText variant="bodySmall" color="textSecondary">
-                  {candidate.phoneMasked}
-                </AppText>
-                <AppButton
-                  variant="secondary"
-                  label={t('children.register.useThisGuardian')}
-                  onPress={() => {
-                    setValue('guardianSource', 'existing');
-                    setValue('existingGuardianId', candidate.guardianId);
-                    setChosenExisting({ id: candidate.guardianId, name: candidate.fullName });
-                    setGuardianDuplicates(null);
-                  }}
-                  testID={`use-guardian-${candidate.guardianId}`}
-                />
-              </View>
-            ))}
-            <AppButton
-              variant="ghost"
-              label={t('children.register.differentGuardian')}
-              onPress={() => {
-                confirmations.current = { ...confirmations.current, confirmNewGuardian: true };
-                setGuardianDuplicates(null);
-                void submit();
-              }}
-              testID="guardian-different-person"
-            />
-          </AppCard>
-        ) : null}
-
         {!duplicates && !guardianDuplicates ? (
           <PrimaryButton
             label={t('children.register.confirm')}
@@ -366,82 +431,107 @@ export function RegisterChildForm({ siblingOf, now = () => new Date() }: Props) 
           }}
           onCancel={() => setConfirmDifferent(false)}
         />
-      </View>
+      </View>,
     );
   }
 
   // ------------------------------------------------------------------ form
-  return (
+  const onlyArea = areaItems.length === 1 ? areaItems[0]! : null;
+  return shell(
+    formStates,
     <View style={styles.stack} testID="register-form">
       <AppText variant="bodySmall" color="textSecondary">
         {t('children.register.requiredNote')}
       </AppText>
 
-      <SectionHeader title={t('children.register.childSection')} />
-      <ChildFields control={control} errors={formState.errors} />
+      <FormSectionCard
+        number={1}
+        title={t('children.register.childSection')}
+        complete={complete.child}
+        testID="register-section-child"
+      >
+        <ChildFields control={control} errors={formState.errors} />
+      </FormSectionCard>
 
-      <SectionHeader title={t('children.form.area')} />
-      <Controller
-        control={control}
-        name="areaId"
-        render={({ field }) => (
-          <ChoiceGroup
-            label={`${t('children.form.areaQuestion')} *`}
-            options={areaItems.map((area) => ({
-              value: area.id,
-              label: areaLabel(language, { areaName: area.nameEn, areaNameHi: area.nameHi }),
-            }))}
-            value={field.value}
-            onChange={field.onChange}
-            error={fieldError(formState.errors.areaId?.message)}
-            testID="area"
-          />
-        )}
-      />
-      {areas.data?.truncated ? (
-        <AppText variant="caption" color="textSecondary">
-          {t('children.register.areasTruncated')}
-        </AppText>
-      ) : null}
-
-      <SectionHeader
+      <FormSectionCard
+        number={2}
         title={t('children.register.guardianSection')}
         subtitle={t('children.register.guardianSubtitle')}
-      />
-      {siblingGuardians.length > 0 || chosenExisting ? (
-        <Controller
-          control={control}
-          name="guardianSource"
-          render={({ field }) => (
-            <ChoiceGroup
-              label={t('children.register.guardianSourceQuestion')}
-              options={[
-                ...siblingGuardians.map((g) => ({
-                  value: `existing:${g.guardianId}`,
-                  label: `${g.fullName} (${relationshipLabel(t, g.relationship)})`,
-                })),
-                ...(chosenExisting && !siblingGuardians.some((g) => g.guardianId === chosenExisting.id)
-                  ? [{ value: `existing:${chosenExisting.id}`, label: chosenExisting.name }]
-                  : []),
-                { value: 'new', label: t('children.register.newGuardian') },
-              ]}
-              value={field.value === 'existing' ? `existing:${getValues('existingGuardianId')}` : field.value}
-              onChange={(choice) => {
-                if (choice === 'new') {
-                  field.onChange('new');
-                  setValue('existingGuardianId', '');
-                } else {
-                  setValue('existingGuardianId', choice.slice('existing:'.length));
-                  field.onChange('existing');
+        complete={complete.guardian}
+        testID="register-section-guardian"
+      >
+        {siblingGuardians.length > 0 || chosenExisting ? (
+          <Controller
+            control={control}
+            name="guardianSource"
+            render={({ field }) => (
+              <ChoiceGroup
+                label={t('children.register.guardianSourceQuestion')}
+                options={[
+                  ...siblingGuardians.map((g) => ({
+                    value: `existing:${g.guardianId}`,
+                    label: `${g.fullName} (${relationshipLabel(t, g.relationship)})`,
+                  })),
+                  ...(chosenExisting && !siblingGuardians.some((g) => g.guardianId === chosenExisting.id)
+                    ? [{ value: `existing:${chosenExisting.id}`, label: chosenExisting.name }]
+                    : []),
+                  { value: 'new', label: t('children.register.newGuardian') },
+                ]}
+                value={
+                  field.value === 'existing' ? `existing:${getValues('existingGuardianId')}` : field.value
                 }
-              }}
-              testID="guardian-source"
-            />
-          )}
-        />
-      ) : null}
-      {guardianSource === 'new' ? <GuardianFields control={control} errors={formState.errors} /> : null}
-      <LinkFields control={control} errors={formState.errors} />
+                onChange={(choice) => {
+                  if (choice === 'new') {
+                    field.onChange('new');
+                    setValue('existingGuardianId', '');
+                  } else {
+                    setValue('existingGuardianId', choice.slice('existing:'.length));
+                    field.onChange('existing');
+                  }
+                }}
+                testID="guardian-source"
+              />
+            )}
+          />
+        ) : null}
+        {guardianSource === 'new' ? <GuardianFields control={control} errors={formState.errors} /> : null}
+        <LinkFields control={control} errors={formState.errors} />
+      </FormSectionCard>
+
+      <FormSectionCard
+        number={3}
+        title={t('children.form.area')}
+        complete={complete.area}
+        aside={onlyArea ? <PrefilledNote /> : undefined}
+        testID="register-section-area"
+      >
+        {onlyArea ? (
+          <AreaFacts area={onlyArea} language={language} />
+        ) : (
+          <Controller
+            control={control}
+            name="areaId"
+            render={({ field }) => (
+              <ChoiceGroup
+                label={`${t('children.form.areaQuestion')} *`}
+                options={areaItems.map((area) => ({
+                  value: area.id,
+                  label: areaLabel(language, { areaName: area.nameEn, areaNameHi: area.nameHi }),
+                }))}
+                value={field.value}
+                onChange={field.onChange}
+                error={fieldError(formState.errors.areaId?.message)}
+                testID="area"
+              />
+            )}
+          />
+        )}
+        {areas.data?.truncated ? (
+          <AppText variant="caption" color="textSecondary">
+            {t('children.register.areasTruncated')}
+          </AppText>
+        ) : null}
+      </FormSectionCard>
 
       {serverError ? <InlineAlert message={t(serverError)} testID="register-error" /> : null}
       <PrimaryButton
@@ -449,7 +539,7 @@ export function RegisterChildForm({ siblingOf, now = () => new Date() }: Props) 
         onPress={goToReview}
         testID="register-review-button"
       />
-    </View>
+    </View>,
   );
 }
 
@@ -475,7 +565,7 @@ function DuplicateChildren({
 }) {
   const { t, language } = useTranslation();
   return (
-    <AppCard testID="duplicate-children">
+    <AppCard testID="duplicate-children" accentColor={colors.warning} style={styles.warningCard}>
       <AppText variant="bodyStrong" accessibilityRole="header">
         {t('children.register.duplicateTitle')}
       </AppText>
@@ -509,4 +599,7 @@ const styles = StyleSheet.create({
   stack: { gap: spacing.md },
   reviewRow: { gap: spacing.xxs, paddingVertical: spacing.xs },
   candidate: { gap: spacing.xs, paddingVertical: spacing.sm },
+  warningCard: { backgroundColor: colors.warningSurface },
+  wideRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.lg },
+  wideContent: { flex: 1, gap: spacing.md },
 });

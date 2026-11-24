@@ -15,6 +15,8 @@ interface ScreenContainerProps {
   edges?: Edge[];
   /** Fixed content below the scroll area, e.g. a banner. */
   footer?: ReactNode;
+  /** Wider content cap for screens with a side column on large screens (default: form width). */
+  maxContentWidth?: number;
   testID?: string;
 }
 
@@ -24,20 +26,22 @@ export function ScreenContainer({
   keyboardAware = false,
   edges = ['top', 'bottom', 'left', 'right'],
   footer,
+  maxContentWidth,
   testID,
 }: ScreenContainerProps) {
   // Every screen shows the offline banner at the top (below any navigation header).
   const offline = useConnectivityStatus() === 'offline';
+  const width = maxContentWidth ? { maxWidth: maxContentWidth } : null;
   const content = scroll ? (
     <ScrollView
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.inner}>{children}</View>
+      <View style={[styles.inner, width]}>{children}</View>
     </ScrollView>
   ) : (
-    <View style={[styles.inner, styles.fill]}>{children}</View>
+    <View style={[styles.inner, width, styles.fill]}>{children}</View>
   );
 
   return (

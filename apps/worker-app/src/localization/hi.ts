@@ -257,6 +257,18 @@ export const hi: Record<TranslationKey, string> = {
   'children.register.success': 'बच्चे का पंजीकरण हो गया है।',
   'children.register.openProfile': 'बच्चे की प्रोफ़ाइल खोलें',
   'children.register.another': 'दूसरे बच्चे का पंजीकरण करें',
+  'children.register.recordConsent': 'अभिभावक की सहमति दर्ज करें',
+  'children.register.consentNext': 'अगला कदम: जाँच से पहले अभिभावक की सहमति दर्ज करें।',
+  'children.register.sectionComplete': 'पूरा',
+  'children.register.areaPrefilled': 'आपके कार्य-क्षेत्र से पहले से भरा गया',
+  'children.register.areaParent': 'इसके अंतर्गत',
+  'children.register.steps.label': 'पंजीकरण के चरण',
+  'children.register.steps.consent': 'अभिभावक की सहमति',
+  'children.register.steps.screening': 'जाँच शुरू करें',
+  'children.register.steps.position': 'चरण {{current}} / {{total}}: {{name}}',
+  'children.register.steps.done': 'पूरा',
+  'children.register.steps.current': 'अभी का चरण',
+  'children.register.steps.upcoming': 'शुरू नहीं हुआ',
   'children.register.noAreas':
     'आपको ऐसा कोई क्षेत्र नहीं सौंपा गया है जहाँ बच्चों का पंजीकरण हो सके। कृपया अपने पर्यवेक्षक से संपर्क करें।',
   'children.register.areasTruncated':
