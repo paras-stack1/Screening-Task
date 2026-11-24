@@ -17,11 +17,16 @@ import { formatIndiaDate } from '../../children/labels';
 import { childRoutes } from '../../children/routes';
 import { useScreeningPermissions, useScreeningSummary } from '../../screening/hooks';
 import { screeningRoutes } from '../../screening/routes';
+import type { ReferralDashboard } from '@balswasthya/shared-contracts';
+import { useReferralDashboard, useReferralPermissions } from '../../referrals/hooks';
+import { referralRoutes } from '../../referrals/routes';
 import { useRegisteredChildren } from '../hooks/useDashboardMetrics';
 
 /**
- * Metrics. "Registered children" and (Step 6) "Screened today" come from the API; follow-ups and
- * referrals are shown as "Not available yet" (decision C) - never as 0 and never invented.
+ * Metrics. "Registered children" and (Step 6) "Screened today" come from the API. Step 7F: open
+ * follow-ups and pending referrals (waiting for approval or for issue) come from
+ * GET /dashboards/referrals over the user's areas - never invented; "not for your role" without
+ * child.read.
  */
 export function MetricsSection() {
   const { t } = useTranslation();
@@ -37,9 +42,31 @@ export function MetricsSection() {
         : summary.isPending
           ? { status: 'loading' }
           : { status: 'ready', value: summary.data.completedToday };
-  const unavailable: { label: TranslationKey; icon: IconName }[] = [
-    { label: 'dashboard.metrics.pendingFollowUps', icon: 'calendar-check-outline' },
-    { label: 'dashboard.metrics.pendingReferrals', icon: 'hospital-building' },
+  const referralPermissions = useReferralPermissions();
+  const referralDashboard = useReferralDashboard(referralPermissions.canRead);
+  const referralMetric = (pick: (d: ReferralDashboard) => number): MetricState =>
+    !referralPermissions.loaded
+      ? { status: 'loading' }
+      : !referralPermissions.canRead
+        ? { status: 'unavailable' }
+        : referralDashboard.isError
+          ? { status: 'error' }
+          : referralDashboard.isPending
+            ? { status: 'loading' }
+            : { status: 'ready', value: pick(referralDashboard.data.dashboard) };
+  const referralMetrics: { label: TranslationKey; icon: IconName; state: MetricState; testID: string }[] = [
+    {
+      label: 'dashboard.metrics.pendingFollowUps',
+      icon: 'calendar-check-outline',
+      state: referralMetric((d) => d.followUps.open),
+      testID: 'metric-pending-follow-ups',
+    },
+    {
+      label: 'dashboard.metrics.pendingReferrals',
+      icon: 'hospital-building',
+      state: referralMetric((d) => d.referrals.byStatus.PENDING_APPROVAL + d.referrals.byStatus.APPROVED),
+      testID: 'metric-pending-referrals',
+    },
   ];
 
   return (
@@ -62,12 +89,18 @@ export function MetricsSection() {
           }
           testID="metric-screened-today"
         />
-        {unavailable.map((metric) => (
+        {referralMetrics.map((metric) => (
           <MetricCard
             key={metric.label}
             label={t(metric.label)}
             icon={metric.icon}
-            state={{ status: 'unavailable' }}
+            state={metric.state}
+            unavailableLabel={
+              referralPermissions.loaded && !referralPermissions.canRead
+                ? t('dashboard.metrics.notForRole')
+                : undefined
+            }
+            testID={metric.testID}
           />
         ))}
       </View>
@@ -88,17 +121,20 @@ export function MetricsSection() {
 
 /**
  * Main tasks. Register is available to workers with child.create (from /auth/me - a display
- * decision only; the API checks again). Screening (Step 6) needs screening.conduct. Follow-ups stay
- * "Coming soon" (decision D).
+ * decision only; the API checks again). Screening (Step 6) needs screening.conduct. Step 7F:
+ * referrals need child.read; follow-ups need follow_up.update or referral.update.
  */
 export function ActionsSection() {
   const { t } = useTranslation();
   const router = useRouter();
   const permissions = useChildPermissions();
   const screening = useScreeningPermissions();
+  const referrals = useReferralPermissions();
   const handlers: Record<string, (() => void) | undefined> = {
     register: permissions.canCreate ? () => router.push(childRoutes.register()) : undefined,
     screening: screening.canConduct ? () => router.push(screeningRoutes.home) : undefined,
+    referrals: referrals.canRead ? () => router.push(referralRoutes.home) : undefined,
+    followUps: referrals.canWorkFollowUps ? () => router.push(referralRoutes.followUps) : undefined,
   };
   const actions: { key: string; icon: IconName; title: TranslationKey; description: TranslationKey }[] = [
     {
@@ -112,6 +148,12 @@ export function ActionsSection() {
       icon: 'stethoscope',
       title: 'dashboard.actions.startScreening.title',
       description: 'dashboard.actions.startScreening.description',
+    },
+    {
+      key: 'referrals',
+      icon: 'hospital-building',
+      title: 'dashboard.actions.referrals.title',
+      description: 'dashboard.actions.referrals.description',
     },
     {
       key: 'followUps',
@@ -131,13 +173,7 @@ export function ActionsSection() {
           title={t(action.title)}
           description={t(action.description)}
           onPress={handlers[action.key]}
-          unavailableLabel={
-            action.key === 'followUps'
-              ? undefined
-              : permissions.loaded
-                ? t('dashboard.metrics.notForRole')
-                : t('common.loading')
-          }
+          unavailableLabel={permissions.loaded ? t('dashboard.metrics.notForRole') : t('common.loading')}
           testID={`action-${action.key}`}
         />
       ))}

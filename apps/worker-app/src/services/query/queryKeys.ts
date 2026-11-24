@@ -35,6 +35,14 @@ export const queryKeys = {
   reviewQueue: (userId: string) => [userId, 'reviews', 'queue'] as const,
   review: (userId: string, reviewId: string) => [userId, 'reviews', 'detail', reviewId] as const,
   notifications: (userId: string) => [userId, 'notifications'] as const,
+  // Step 7F: referrals and follow-ups (prefixes [userId, 'referrals'] / [userId, 'follow-ups']).
+  referralDashboard: (userId: string) => [userId, 'referrals', 'dashboard'] as const,
+  referralList: (userId: string, filter: string) => [userId, 'referrals', 'list', filter] as const,
+  referral: (userId: string, referralId: string) => [userId, 'referrals', 'detail', referralId] as const,
+  facilityOptions: (userId: string, childId: string, outOfDistrict: boolean) =>
+    [userId, 'referrals', 'facilities', childId, outOfDistrict] as const,
+  followUpList: (userId: string, filter: string) => [userId, 'follow-ups', 'list', filter] as const,
+  followUp: (userId: string, followUpId: string) => [userId, 'follow-ups', 'detail', followUpId] as const,
   /** Protocol versions are immutable once used, so they may be cached for the app session. */
   screeningProtocol: (userId: string, protocolId: string) =>
     [userId, 'screening-protocol', protocolId] as const,

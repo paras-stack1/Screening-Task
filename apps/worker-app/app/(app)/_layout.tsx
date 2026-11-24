@@ -65,6 +65,11 @@ export default function AppTabsLayout() {
         name="screening"
         options={{ headerShown: false, title: t('screening.home.title'), tabBarButton: () => null }}
       />
+      {/* Step 7F: referrals and follow-ups - own stack, no tab button (same pattern as screening). */}
+      <Tabs.Screen
+        name="referrals"
+        options={{ headerShown: false, title: t('referrals.title'), tabBarButton: () => null }}
+      />
     </Tabs>
   );
 }

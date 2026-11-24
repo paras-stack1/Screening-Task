@@ -62,7 +62,7 @@ describe('dashboard', () => {
     await waitFor(() => expect(within(metric()).getByText('0')).toBeOnTheScreen());
   });
 
-  it('shows the real screened-today count and never invents follow-ups or referrals (decision C)', async () => {
+  it('shows real screened-today, follow-up and referral counts - never invented (decision C, Step 7F)', async () => {
     context.backend.setChildrenTotal(5);
     await seedSavedSession(context);
     await renderApp('/');
@@ -71,8 +71,9 @@ describe('dashboard', () => {
     await waitFor(() =>
       expect(within(screen.getByTestId('metric-screened-today')).getByText('0')).toBeOnTheScreen(),
     );
-    for (const label of ['Pending follow-ups', 'Pending referrals']) {
-      expect(screen.getByLabelText(`${label}: not available yet`)).toBeOnTheScreen();
+    // Step 7F: GET /dashboards/referrals (0 is a real value here: nothing is seeded).
+    for (const id of ['metric-pending-follow-ups', 'metric-pending-referrals']) {
+      await waitFor(() => expect(within(screen.getByTestId(id)).getByText('0')).toBeOnTheScreen());
     }
   });
 
@@ -99,11 +100,14 @@ describe('dashboard', () => {
     await waitFor(() => expect(within(metric()).getByText('12')).toBeOnTheScreen());
   });
 
-  it('Register and Start screening follow the permissions; follow-ups are not available yet', async () => {
+  it('Register, Start screening and Follow-ups follow the permissions', async () => {
     await seedSavedSession(context);
     const app = await renderApp('/');
     expect(await screen.findByRole('button', { name: 'Register a child' })).toBeEnabled();
-    expect(await screen.findByRole('button', { name: 'Manage follow-ups. Coming soon' })).toBeDisabled();
+    // The default test worker has no follow-up rights (Step 7F).
+    expect(
+      await screen.findByRole('button', { name: 'Manage follow-ups. Not available for your role' }),
+    ).toBeDisabled();
     await fireEvent.press(await screen.findByRole('button', { name: 'Start screening' }));
     expect(await screen.findByTestId('screening-home')).toBeOnTheScreen();
     expect(app.getPathname()).toBe('/screening');
@@ -267,6 +271,8 @@ describe('performance: no unnecessary network calls', () => {
         'GET /auth/me',
         'GET /children?page=1&pageSize=5&sort=-createdAt',
         'GET /children?pageSize=1',
+        // Step 7F: real follow-up and referral counts on the dashboard.
+        'GET /dashboards/referrals',
         'GET /screenings/summary',
         'POST /auth/refresh',
       ]),

@@ -13,6 +13,7 @@ import {
 } from '../../src/components';
 import { formatIndiaDateTime } from '../../src/features/children/labels';
 import { useMarkNotificationRead, useNotifications } from '../../src/features/results/hooks';
+import { referralRoutes } from '../../src/features/referrals/routes';
 import { resultRoutes } from '../../src/features/results/routes';
 import { useTranslation, type TranslationKey } from '../../src/localization';
 import { apiErrorMessageKey } from '../../src/services/api/errorMessages';
@@ -33,6 +34,8 @@ export default function NotificationsScreen() {
   const open = (n: AppNotification) => {
     if (!n.readAt) markRead.mutate(n.id);
     if (n.entityType === 'clinicalReview') router.push(resultRoutes.review(n.entityId));
+    if (n.entityType === 'referral') router.push(referralRoutes.referral(n.entityId));
+    if (n.entityType === 'followUp') router.push(referralRoutes.followUp(n.entityId));
   };
 
   if (list.isPending) {

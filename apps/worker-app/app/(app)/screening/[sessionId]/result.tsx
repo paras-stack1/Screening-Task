@@ -13,7 +13,10 @@ import {
 } from '../../../../src/components';
 import { formatIndiaDateTime } from '../../../../src/features/children/labels';
 import { OUTCOME_TONE, outcomeKey, ResultView } from '../../../../src/features/results/components/ResultView';
+import { useReferralPermissions } from '../../../../src/features/referrals/hooks';
+import { referralRoutes } from '../../../../src/features/referrals/routes';
 import { useSessionResults } from '../../../../src/features/results/hooks';
+import { categoryTitleKey } from '../../../../src/features/screening/labels';
 import { screeningRoutes } from '../../../../src/features/screening/routes';
 import { useTranslation } from '../../../../src/localization';
 import { apiErrorMessageKey } from '../../../../src/services/api/errorMessages';
@@ -29,6 +32,7 @@ export default function SessionResultScreen() {
   const router = useRouter();
   const { sessionId = '' } = useLocalSearchParams<{ sessionId: string }>();
   const results = useSessionResults(sessionId);
+  const referrals = useReferralPermissions();
 
   if (results.isPending) {
     return (
@@ -56,6 +60,36 @@ export default function SessionResultScreen() {
           message={t('results.none.message')}
         />
       )}
+      {current && current.isCurrent && referrals.canCreate ? (
+        <View style={styles.list} testID="result-referral-actions">
+          {current.categories
+            .filter((c) => c.referralRecommended)
+            .map((c) => (
+              <AppButton
+                key={c.category}
+                icon="hospital-building"
+                label={t('referrals.fromResult', { category: t(categoryTitleKey(c.category)) })}
+                onPress={() =>
+                  router.push(
+                    referralRoutes.create(current.childId, {
+                      sessionId,
+                      category: c.category,
+                      recommended: true,
+                    }),
+                  )
+                }
+                testID={`result-refer-${c.category}`}
+              />
+            ))}
+          <AppButton
+            variant="secondary"
+            icon="hospital-building"
+            label={t('referrals.otherConcern')}
+            onPress={() => router.push(referralRoutes.create(current.childId))}
+            testID="result-refer-other"
+          />
+        </View>
+      ) : null}
       <AppButton
         variant="secondary"
         icon="clipboard-text-outline"

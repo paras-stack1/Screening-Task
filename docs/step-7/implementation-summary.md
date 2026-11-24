@@ -11,8 +11,8 @@
 | 7B | Migration (all Step 7 tables and rules), permissions, rule DSL + evaluator, rule-set CLIs, demonstration rule sets, result generation, results and rule-set read API, tests | Done (`01af3c6`) |
 | 7C | Clinical review actions, referral create/approve/reject/issue/cancel/history, facility read API | Done (`f9bcc84`) |
 | 7D | Referral tracking, follow-ups, notifications + reminder job, dashboard/report APIs | Done (`986e676`) |
-| **7E** | Worker app: results, review, notifications | **Done - awaiting review** |
-| 7F | Worker app: referrals, follow-ups, dashboards | Not started |
+| 7E | Worker app: results, review, notifications | Done (`cf62ab9`) |
+| **7F** | Worker app: referrals, follow-ups, dashboards | **Done - awaiting review** |
 | 7G | Admin portal facilities and reports; security and regression testing; all docs; final report | Not started |
 
 ## Stage 7B
@@ -199,5 +199,33 @@ machine); they pass alone, with the other screen tests, and in the next full run
 
 ### Limitations
 
-Referral and follow-up notifications do not open a screen yet (those screens come in 7F). The
+Referral and follow-up notifications open their screens since 7F. The
 repeat-screening date is typed as YYYY-MM-DD (no date picker).
+
+## Stage 7F
+
+### Built (worker app)
+
+Referral dashboard and list with real counts, new referral (from a screening result or for another
+concern), referral detail with timeline and every action the API allows (approve, reject, facility,
+issue with consent message, tracking updates with source, close, undo last update, cancel,
+reassessment), facility choice with verified details, follow-up list and detail (start, complete,
+reschedule, miss, cancel). Home dashboard: real pending follow-up and referral counts and working
+Referrals / Follow-ups cards (replacing Step 4 placeholders). Referral and follow-up notifications
+open their screens. Details: [docs/frontend/referrals.md](../frontend/referrals.md). en/hi text added
+(Hindi drafted, needs translator review). No API or schema change.
+
+### Test results (actually run, 2026-11-24)
+
+| Suite | After 7E | After 7F | Result |
+|---|---|---|---|
+| Worker app (Jest) | 2684 passed / 20 skipped | 3182 passed / 20 skipped | All pass (+13 referral screen tests, + per-key translation checks) |
+| App typecheck, expo lint | clean | clean | - |
+
+Changed expectations: the Step 4 dashboard tests (placeholders replaced by real counts and a
+role check) and the start-up network test (one more dashboard call).
+
+### Limitations
+
+Dates and times are typed (no date picker). No offline queue: referral actions need a connection.
+The district / state facility administration and aggregate reports come with the admin portal (7G).
