@@ -99,6 +99,7 @@ describe('RBAC: authentication is not authorization', () => {
         'child.update',
         'consent.record',
         'follow_up.update',
+        'guardian.invite',
         'referral.create',
         'screening.conduct',
       ].sort(),

@@ -17,6 +17,8 @@ import {
   createReportsRouter,
 } from '../modules/follow-ups/followUps.routes';
 import { createGuardiansRouter } from '../modules/guardians/guardians.routes';
+import { createGuardianInvitationsRouter } from '../modules/parent-portal/invitations.routes';
+import type { ParentPortalSettings } from '../modules/parent-portal/invitations.service';
 import {
   createClinicalReviewsRouter,
   createFacilitiesRouter,
@@ -48,6 +50,8 @@ export interface ApiRouterDependencies {
   screeningPolicy: ScreeningPolicySettings;
   /** Admin portal browser sessions (refresh token in an httpOnly cookie; secure in production). */
   webSession: WebSessionSettings;
+  /** Parent Portal onboarding (Step 8): trusted portal address, invitation lifetime, SMS sender. */
+  parentPortal: ParentPortalSettings;
 }
 
 /**
@@ -91,6 +95,11 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/dashboards', createDashboardsRouter(childData));
   router.use('/reports', createReportsRouter(childData));
   router.use('/children', createChildrenRouter(childData));
+  // Before '/guardians' so the nested invitation routes are matched first.
+  router.use(
+    '/guardians/:guardianId/invitations',
+    createGuardianInvitationsRouter({ ...childData, parentPortal: deps.parentPortal }),
+  );
   router.use('/guardians', createGuardiansRouter(childData));
   router.use('/users', createUsersRouter(deps.auth));
   router.use('/assignments', createAssignmentsRouter(deps.auth));

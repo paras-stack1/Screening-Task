@@ -5,6 +5,7 @@ import { isDatabaseReachable, prisma } from './config/database';
 import { env, isProduction } from './config/env';
 import { authConfig, piiCrypto } from './config/security';
 import { aiServiceClient } from './integrations/ai-service/aiServiceClient';
+import { createMockSmsSender, createNoSmsSender } from './integrations/sms/smsSender';
 import { noStore, requireJsonBody } from './middleware/apiHeaders';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requestId } from './middleware/requestId';
@@ -30,6 +31,16 @@ function defaultDependencies(): AppDependencies {
     screeningPolicy: { allowDraftProtocols: !isProduction },
     // Admin portal: refresh cookie is Secure (HTTPS-only) in production (decision P4).
     webSession: { secureCookie: isProduction, allowedOrigins: env.CORS_ORIGINS },
+    // Parent Portal (PP5, PP7): no SMS provider exists yet. The mock (local outbox file) is for
+    // development only and refused in production by the configuration check.
+    parentPortal: {
+      portalUrl: env.PARENT_PORTAL_URL,
+      inviteTtlHours: env.PARENT_INVITE_TTL_HOURS,
+      sms:
+        !isProduction && (env.SMS_PROVIDER ?? (env.NODE_ENV === 'development' ? 'mock' : 'none')) === 'mock'
+          ? createMockSmsSender()
+          : createNoSmsSender(),
+    },
   };
 }
 

@@ -402,47 +402,50 @@ model User {
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
-  assignmentsHeld         WorkerAreaAssignment[]             @relation("AssignmentHolder")
-  assignmentsCreated      WorkerAreaAssignment[]             @relation("AssignmentCreatedBy")
-  assignmentStatusChanges WorkerAreaAssignment[]             @relation("AssignmentStatusChangedBy")
-  childrenRegistered      Child[]
-  childTransfers          ChildAreaTransfer[]
-  guardianLinksCreated    ChildGuardian[]                    @relation("GuardianLinkCreatedBy")
-  guardianLinksEnded      ChildGuardian[]                    @relation("GuardianLinkEndedBy")
-  consentsRecorded        Consent[]                          @relation("ConsentRecordedBy")
-  consentsWithdrawn       Consent[]                          @relation("ConsentWithdrawnBy")
-  protocolsApproved       ScreeningProtocol[]
-  sessionsConducted       ScreeningSession[]                 @relation("SessionConductedBy")
-  sessionsCancelled       ScreeningSession[]                 @relation("SessionCancelledBy")
-  amendmentsMade          ScreeningAmendment[]               @relation("AmendmentAuthor")
-  amendmentsReviewed      ScreeningAmendment[]               @relation("AmendmentReviewer")
-  reassessmentsDone       ScreeningAmendmentReferralImpact[]
-  observationsRecorded    ScreeningObservation[]
-  measurementsRecorded    Measurement[]
-  ruleSetsCreated         ClinicalRuleSet[]                  @relation("RuleSetCreatedBy")
-  ruleSetsApproved        ClinicalRuleSet[]                  @relation("RuleSetApprovedBy")
-  ruleSetEvents           ClinicalRuleSetEvent[]
-  resultRunsGenerated     ScreeningResultRun[]
-  reviewsClaimed          ClinicalReview[]                   @relation("ReviewClaimedBy")
-  reviewsDecided          ClinicalReview[]                   @relation("ReviewDecidedBy")
-  reviewEvents            ClinicalReviewEvent[]
-  facilitiesCreated       Facility[]                         @relation("FacilityCreatedBy")
-  facilitiesUpdated       Facility[]                         @relation("FacilityUpdatedBy")
-  facilitiesVerified      Facility[]                         @relation("FacilityVerifiedBy")
-  facilityHistory         FacilityHistory[]
-  referralsCreated        Referral[]                         @relation("ReferralCreatedBy")
-  referralsApproved       Referral[]                         @relation("ReferralApprovedBy")
-  referralStatusEvents    ReferralStatusEvent[]
-  followUpsAssigned       FollowUp[]                         @relation("FollowUpAssignee")
-  followUpsAssignedBy     FollowUp[]                         @relation("FollowUpAssignedBy")
-  followUpsCreated        FollowUp[]                         @relation("FollowUpCreatedBy")
-  followUpsCompleted      FollowUp[]                         @relation("FollowUpCompletedBy")
-  followUpEvents          FollowUpEvent[]                    @relation("FollowUpEventActor")
-  followUpEventsAssigned  FollowUpEvent[]                    @relation("FollowUpEventAssignee")
-  mediaCaptured           MediaMetadata[]
-  notifications           Notification[]
-  refreshSessions         RefreshSession[]
-  syncOperations          SyncOperation[]
+  assignmentsHeld          WorkerAreaAssignment[]             @relation("AssignmentHolder")
+  assignmentsCreated       WorkerAreaAssignment[]             @relation("AssignmentCreatedBy")
+  assignmentStatusChanges  WorkerAreaAssignment[]             @relation("AssignmentStatusChangedBy")
+  childrenRegistered       Child[]
+  childTransfers           ChildAreaTransfer[]
+  guardianLinksCreated     ChildGuardian[]                    @relation("GuardianLinkCreatedBy")
+  guardianLinksEnded       ChildGuardian[]                    @relation("GuardianLinkEndedBy")
+  consentsRecorded         Consent[]                          @relation("ConsentRecordedBy")
+  consentsWithdrawn        Consent[]                          @relation("ConsentWithdrawnBy")
+  protocolsApproved        ScreeningProtocol[]
+  sessionsConducted        ScreeningSession[]                 @relation("SessionConductedBy")
+  sessionsCancelled        ScreeningSession[]                 @relation("SessionCancelledBy")
+  amendmentsMade           ScreeningAmendment[]               @relation("AmendmentAuthor")
+  amendmentsReviewed       ScreeningAmendment[]               @relation("AmendmentReviewer")
+  reassessmentsDone        ScreeningAmendmentReferralImpact[]
+  observationsRecorded     ScreeningObservation[]
+  measurementsRecorded     Measurement[]
+  ruleSetsCreated          ClinicalRuleSet[]                  @relation("RuleSetCreatedBy")
+  ruleSetsApproved         ClinicalRuleSet[]                  @relation("RuleSetApprovedBy")
+  ruleSetEvents            ClinicalRuleSetEvent[]
+  resultRunsGenerated      ScreeningResultRun[]
+  reviewsClaimed           ClinicalReview[]                   @relation("ReviewClaimedBy")
+  reviewsDecided           ClinicalReview[]                   @relation("ReviewDecidedBy")
+  reviewEvents             ClinicalReviewEvent[]
+  facilitiesCreated        Facility[]                         @relation("FacilityCreatedBy")
+  facilitiesUpdated        Facility[]                         @relation("FacilityUpdatedBy")
+  facilitiesVerified       Facility[]                         @relation("FacilityVerifiedBy")
+  facilityHistory          FacilityHistory[]
+  referralsCreated         Referral[]                         @relation("ReferralCreatedBy")
+  referralsApproved        Referral[]                         @relation("ReferralApprovedBy")
+  referralStatusEvents     ReferralStatusEvent[]
+  followUpsAssigned        FollowUp[]                         @relation("FollowUpAssignee")
+  followUpsAssignedBy      FollowUp[]                         @relation("FollowUpAssignedBy")
+  followUpsCreated         FollowUp[]                         @relation("FollowUpCreatedBy")
+  followUpsCompleted       FollowUp[]                         @relation("FollowUpCompletedBy")
+  followUpEvents           FollowUpEvent[]                    @relation("FollowUpEventActor")
+  followUpEventsAssigned   FollowUpEvent[]                    @relation("FollowUpEventAssignee")
+  parentInvitationsCreated ParentInvitation[]                 @relation("ParentInvitationCreatedBy")
+  guardianAccessGranted    GuardianChildAccess[]              @relation("GuardianAccessGrantedBy")
+  guardianAccessRevoked    GuardianChildAccess[]              @relation("GuardianAccessRevokedBy")
+  mediaCaptured            MediaMetadata[]
+  notifications            Notification[]
+  refreshSessions          RefreshSession[]
+  syncOperations           SyncOperation[]
 
   @@index([status])
   @@index([organizationId])
@@ -608,6 +611,7 @@ model Child {
   referrals         Referral[]
   followUps         FollowUp[]
   media             MediaMetadata[]
+  parentAccess      GuardianChildAccess[]
 
   @@index([areaId, deletedAt])
   @@index([areaId, dateOfBirth])
@@ -642,8 +646,13 @@ model Guardian {
   updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
   deletedAt         DateTime? @db.Timestamptz(3)
 
-  children ChildGuardian[]
-  consents Consent[]
+  children          ChildGuardian[]
+  consents          Consent[]
+  // Step 8 Parent Portal
+  parentAccount     ParentAccount?
+  parentInvitations ParentInvitation[]
+  childAccess       GuardianChildAccess[]
+  smsMessages       SmsMessage[]
 
   @@index([phoneLookupHash])
 }
@@ -669,10 +678,11 @@ model ChildGuardian {
   /// Short reason. Must not contain personal data.
   endReason        String?
 
-  child     Child    @relation(fields: [childId], references: [id], onDelete: Restrict)
-  guardian  Guardian @relation(fields: [guardianId], references: [id], onDelete: Restrict)
-  createdBy User?    @relation("GuardianLinkCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  endedBy   User?    @relation("GuardianLinkEndedBy", fields: [endedById], references: [id], onDelete: Restrict)
+  child        Child                 @relation(fields: [childId], references: [id], onDelete: Restrict)
+  guardian     Guardian              @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  createdBy    User?                 @relation("GuardianLinkCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  endedBy      User?                 @relation("GuardianLinkEndedBy", fields: [endedById], references: [id], onDelete: Restrict)
+  parentAccess GuardianChildAccess[]
 
   @@index([childId, endedAt])
   @@index([guardianId])
@@ -1577,19 +1587,204 @@ model Notification {
 
 /// Insert-only (see SQL additions). No foreign keys, so it is independent of operational tables.
 model AuditLog {
-  id          String       @id @default(uuid()) @db.Uuid
-  occurredAt  DateTime     @default(now()) @db.Timestamptz(3)
-  actorUserId String?      @db.Uuid
-  action      String
-  entityType  String
-  entityId    String?      @db.Uuid
-  areaId      String?      @db.Uuid
-  outcome     AuditOutcome
-  requestId   String?
+  id                   String       @id @default(uuid()) @db.Uuid
+  occurredAt           DateTime     @default(now()) @db.Timestamptz(3)
+  actorUserId          String?      @db.Uuid
+  action               String
+  entityType           String
+  entityId             String?      @db.Uuid
+  areaId               String?      @db.Uuid
+  outcome              AuditOutcome
+  requestId            String?
   /// Field names and non-personal values only (e.g. assignment before/after).
-  details     Json?
+  details              Json?
+  /// Step 8: set when the actor is a parent (Parent Portal), not a staff user.
+  actorParentAccountId String?      @db.Uuid
 
   @@index([entityType, entityId, occurredAt])
   @@index([actorUserId, occurredAt])
   @@index([action, occurredAt])
+}
+
+// ======================================================== Step 8: Parent Portal accounts
+// docs/step-8/parent-portal-plan.md (decisions PP1-PP18, approved 2026-11-24). Parents are a
+// SEPARATE identity from staff users: own accounts, own refresh sessions, own token audience.
+
+enum ParentAccountStatus {
+  ACTIVE
+  LOCKED
+  DISABLED
+}
+
+/// Stored invitation states. EXPIRED is computed from expiresAt; NOT_INVITED means no row.
+enum ParentInvitationStatus {
+  PENDING
+  SENT
+  USED
+  REVOKED
+}
+
+enum OtpPurpose {
+  INVITATION
+  PASSWORD_RESET
+  PHONE_CHANGE
+}
+
+enum GuardianAccessStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+enum SmsPurpose {
+  INVITATION
+  OTP
+  REMINDER
+}
+
+enum SmsStatus {
+  QUEUED
+  SENT
+  FAILED
+  NOT_CONFIGURED
+}
+
+/// One parent account per guardian. The role PARENT_GUARDIAN is implied and fixed by the server.
+model ParentAccount {
+  id                   String              @id @default(uuid()) @db.Uuid
+  guardianId           String              @unique @db.Uuid
+  /// HMAC lookup hash of the VERIFIED mobile number (same key as Guardian.phoneLookupHash).
+  phoneLookupHash      String
+  passwordHash         String
+  status               ParentAccountStatus @default(ACTIVE)
+  failedLoginCount     Int                 @default(0)
+  lockedUntil          DateTime?           @db.Timestamptz(3)
+  passwordChangedAt    DateTime            @db.Timestamptz(3)
+  privacyNoticeVersion String
+  termsVersion         String
+  acceptedAt           DateTime            @db.Timestamptz(3)
+  activatedAt          DateTime            @db.Timestamptz(3)
+  lastLoginAt          DateTime?           @db.Timestamptz(3)
+  createdAt            DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime            @updatedAt @db.Timestamptz(3)
+
+  guardian      Guardian               @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  sessions      ParentRefreshSession[]
+  otpChallenges OtpChallenge[]
+
+  @@index([phoneLookupHash])
+}
+
+/// Single-use invitation. Only the SHA-256 of the token is stored; the token is never logged.
+model ParentInvitation {
+  id              String                 @id @default(uuid()) @db.Uuid
+  guardianId      String                 @db.Uuid
+  tokenHash       String                 @unique
+  status          ParentInvitationStatus @default(PENDING)
+  expiresAt       DateTime               @db.Timestamptz(3)
+  /// Phone lookup hash the invitation was sent to (binds the invitation to that number).
+  phoneLookupHash String
+  createdById     String                 @db.Uuid
+  sentAt          DateTime?              @db.Timestamptz(3)
+  phoneVerifiedAt DateTime?              @db.Timestamptz(3)
+  usedAt          DateTime?              @db.Timestamptz(3)
+  revokedAt       DateTime?              @db.Timestamptz(3)
+  revokedReason   String?
+  createdAt       DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime               @updatedAt @db.Timestamptz(3)
+
+  guardian      Guardian       @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  createdBy     User           @relation("ParentInvitationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  otpChallenges OtpChallenge[]
+
+  @@index([guardianId, createdAt])
+  @@index([createdById, createdAt])
+}
+
+/// A one-time code. Only an HMAC of the code is stored.
+model OtpChallenge {
+  id              String     @id @default(uuid()) @db.Uuid
+  purpose         OtpPurpose
+  invitationId    String?    @db.Uuid
+  parentAccountId String?    @db.Uuid
+  phoneLookupHash String
+  codeHash        String
+  expiresAt       DateTime   @db.Timestamptz(3)
+  attempts        Int        @default(0)
+  maxAttempts     Int
+  consumedAt      DateTime?  @db.Timestamptz(3)
+  createdAt       DateTime   @default(now()) @db.Timestamptz(3)
+
+  invitation    ParentInvitation? @relation(fields: [invitationId], references: [id], onDelete: Restrict)
+  parentAccount ParentAccount?    @relation(fields: [parentAccountId], references: [id], onDelete: Restrict)
+
+  @@index([phoneLookupHash, createdAt])
+  @@index([invitationId, createdAt])
+}
+
+/// Parent refresh tokens (same rotation and reuse-detection design as RefreshSession).
+model ParentRefreshSession {
+  id              String    @id @default(uuid()) @db.Uuid
+  parentAccountId String    @db.Uuid
+  tokenHash       String    @unique
+  familyId        String    @db.Uuid
+  deviceLabel     String?
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt       DateTime  @db.Timestamptz(3)
+  lastUsedAt      DateTime? @db.Timestamptz(3)
+  revokedAt       DateTime? @db.Timestamptz(3)
+  revokedReason   String?
+  replacedById    String?   @unique @db.Uuid
+
+  parentAccount ParentAccount         @relation(fields: [parentAccountId], references: [id], onDelete: Restrict)
+  replacedBy    ParentRefreshSession? @relation("ParentTokenRotation", fields: [replacedById], references: [id], onDelete: Restrict)
+  replaces      ParentRefreshSession? @relation("ParentTokenRotation")
+
+  @@index([parentAccountId, revokedAt])
+  @@index([familyId])
+}
+
+/// Which child a guardian may see in the Parent Portal, per guardian-child link (PP11).
+model GuardianChildAccess {
+  id              String               @id @default(uuid()) @db.Uuid
+  childGuardianId String               @db.Uuid
+  guardianId      String               @db.Uuid
+  childId         String               @db.Uuid
+  status          GuardianAccessStatus @default(PENDING)
+  grantedById     String               @db.Uuid
+  grantedAt       DateTime             @db.Timestamptz(3)
+  activatedAt     DateTime?            @db.Timestamptz(3)
+  revokedById     String?              @db.Uuid
+  revokedAt       DateTime?            @db.Timestamptz(3)
+  revokeReason    String?
+  createdAt       DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime             @updatedAt @db.Timestamptz(3)
+
+  childGuardian ChildGuardian @relation(fields: [childGuardianId], references: [id], onDelete: Restrict)
+  guardian      Guardian      @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  child         Child         @relation(fields: [childId], references: [id], onDelete: Restrict)
+  grantedBy     User          @relation("GuardianAccessGrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
+  revokedBy     User?         @relation("GuardianAccessRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([guardianId, status])
+  @@index([childId])
+}
+
+/// SMS outbox and log. Never stores an OTP or an invitation token - only the template and a masked number.
+model SmsMessage {
+  id                String     @id @default(uuid()) @db.Uuid
+  guardianId        String?    @db.Uuid
+  purpose           SmsPurpose
+  templateId        String
+  maskedTo          String
+  status            SmsStatus
+  provider          String
+  providerMessageId String?
+  error             String?
+  createdAt         DateTime   @default(now()) @db.Timestamptz(3)
+  sentAt            DateTime?  @db.Timestamptz(3)
+
+  guardian Guardian? @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+
+  @@index([guardianId, createdAt])
 }

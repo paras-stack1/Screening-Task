@@ -15,6 +15,8 @@ export const PERMISSIONS = {
   'referral.approve': 'Approve or reject referrals (clinical approval; Step 7 decision K)',
   'follow_up.update':
     'Work on follow-up tasks: own tasks only, unless referral.update is also held (decision Q)',
+  'guardian.invite':
+    'Invite a guardian to the Parent Portal and confirm which children they may see (Step 8, PP4)',
   'report.aggregate': 'View aggregate counts and summaries (no individual records)',
   'assignment.manage': 'Create, end or suspend worker area assignments within own scope',
   'user.manage':
@@ -50,6 +52,7 @@ export const PERMISSION_DELEGATION: Record<PermissionCode, 'management' | 'field
   'referral.update': 'fieldwork',
   'referral.approve': 'fieldwork',
   'follow_up.update': 'fieldwork',
+  'guardian.invite': 'fieldwork',
   'report.aggregate': 'management',
   'assignment.manage': 'management',
   'user.manage': 'management',

@@ -5,6 +5,8 @@ import {
   guardianLinkListResponseSchema,
   guardianLinkResponseSchema,
   registrationAreasResponseSchema,
+  parentPortalStatusResponseSchema,
+  type CreateParentInvitationRequest,
   childConsentsResponseSchema,
   consentNoticesResponseSchema,
   consentRecordResponseSchema,
@@ -79,6 +81,17 @@ export function createChildrenApi(api: ApiClient) {
       ),
     updateGuardian: (guardianId: string, body: UpdateGuardianRequest) =>
       api.patch(`/guardians/${id(guardianId)}`, body, guardianDetailResponseSchema),
+    // --------------------------------------- Parent Portal invitations (Step 8, docs/api/parent-portal.md)
+    parentPortal: (guardianId: string, options?: RequestOptions) =>
+      api.get(`/guardians/${id(guardianId)}/invitations`, parentPortalStatusResponseSchema, options),
+    inviteParent: (guardianId: string, body: CreateParentInvitationRequest) =>
+      api.post(`/guardians/${id(guardianId)}/invitations`, body, parentPortalStatusResponseSchema),
+    revokeParentInvitation: (guardianId: string, invitationId: string, reason: string) =>
+      api.post(
+        `/guardians/${id(guardianId)}/invitations/${id(invitationId)}/revoke`,
+        { reason },
+        parentPortalStatusResponseSchema,
+      ),
   };
 }
 

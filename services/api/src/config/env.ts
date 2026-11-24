@@ -75,6 +75,17 @@ const envSchema = z
      */
     PII_ENCRYPTION_KEY: base64Key(32, 32).optional(),
     PII_LOOKUP_KEY: base64Key(32, 128).optional(),
+    /**
+     * Step 8 Parent Portal (PP5, PP7). PARENT_PORTAL_URL: the trusted address invitation links point
+     * to (https in production; empty = invitations cannot be created). SMS_PROVIDER: "none" (default
+     * in production - nothing is sent) or "mock" (development and tests only; refused in production).
+     */
+    PARENT_PORTAL_URL: z
+      .union([z.literal(''), z.url()])
+      .default('')
+      .transform((value) => value.replace(/\/+$/, '')),
+    PARENT_INVITE_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+    SMS_PROVIDER: z.enum(['none', 'mock']).optional(),
     /** Defaults: "silent" under NODE_ENV=test, otherwise "info". */
     LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
     /** Owner credentials for Prisma Migrate. Only checked here so production can refuse them. */
@@ -107,6 +118,10 @@ const envSchema = z
     }
     if (!SECURE_DB_SSL_MODES.has(readSslMode(env.DATABASE_URL) ?? '')) {
       fail('DATABASE_URL', 'must set sslmode=require, verify-ca or verify-full in production');
+    }
+    if (env.SMS_PROVIDER === 'mock') fail('SMS_PROVIDER', 'the mock SMS adapter is for development only');
+    if (env.PARENT_PORTAL_URL && !env.PARENT_PORTAL_URL.startsWith('https://')) {
+      fail('PARENT_PORTAL_URL', 'must use https:// in production');
     }
     if (!env.PII_ENCRYPTION_KEY) fail('PII_ENCRYPTION_KEY', 'is required in production');
     if (!env.PII_LOOKUP_KEY) fail('PII_LOOKUP_KEY', 'is required in production');

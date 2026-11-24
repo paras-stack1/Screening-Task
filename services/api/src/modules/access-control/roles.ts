@@ -17,6 +17,8 @@ const WORKER: PermissionCode[] = [
   'screening.conduct',
   'referral.create',
   'follow_up.update',
+  // Step 8 (PP4): invite guardians to the Parent Portal.
+  'guardian.invite',
 ];
 
 export const ROLES: Array<{ code: string; nameEn: string; nameHi: string; permissions: PermissionCode[] }> = [

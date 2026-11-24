@@ -56,7 +56,10 @@ SELECT format('REVOKE DELETE, TRUNCATE ON public.%I FROM %I', t, :'app_user')
                     'ClinicalRuleSet', 'ClinicalRuleSetEvent', 'ScreeningResultRun',
                     'ScreeningResult', 'ClinicalReview', 'ClinicalReviewEvent',
                     'Facility', 'FacilityHistory', 'Referral', 'ReferralStatusEvent',
-                    'FollowUp', 'FollowUpEvent']) AS t
+                    'FollowUp', 'FollowUpEvent',
+                    -- Step 8 Parent Portal: accounts, invitations, codes, access, SMS log.
+                    'ParentAccount', 'ParentInvitation', 'OtpChallenge', 'GuardianChildAccess',
+                    'SmsMessage']) AS t
  WHERE to_regclass(format('public.%I', t)) IS NOT NULL \gexec
 SELECT format('REVOKE TRUNCATE ON public.%I FROM %I', t, :'app_user')
   FROM unnest(ARRAY['ScreeningProtocol', 'ScreeningQuestion', 'ScreeningObservation',

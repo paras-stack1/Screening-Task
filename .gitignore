@@ -59,3 +59,6 @@ desktop.ini
 *.sql.gz
 *.dump
 data/private/
+
+# Step 8: development-only simulated SMS (may contain invitation links and codes)
+.dev-sms/

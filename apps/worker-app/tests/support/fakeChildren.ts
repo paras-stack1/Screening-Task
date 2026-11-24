@@ -3,6 +3,8 @@ import {
   recordConsentRequestSchema,
   withdrawConsentRequestSchema,
   addGuardianLinkRequestSchema,
+  createParentInvitationRequestSchema,
+  revokeParentInvitationRequestSchema,
   compareCalendarDates,
   maskIndianMobile,
   parseCalendarDate,
@@ -389,11 +391,128 @@ export function createFakeChildren() {
     return null;
   }
 
+  // ------------------------------------------------ Parent Portal invitations (Step 8, stage 3)
+  interface FakeInvitation {
+    id: string;
+    status: 'PENDING' | 'SENT' | 'REVOKED';
+    createdAt: string;
+    expiresAt: string;
+    sentAt: string | null;
+    smsStatus: 'SENT' | 'NOT_CONFIGURED';
+    revokedReason: string | null;
+  }
+  const invitations = new Map<string, FakeInvitation[]>();
+  const portalAccess = new Map<string, Map<string, 'PENDING' | 'REVOKED'>>();
+  const portal = { smsConfigured: true };
+
+  function portalDto(guardian: Guardian, permissions: string[]) {
+    const latest = invitations.get(guardian.id)?.at(-1) ?? null;
+    const state = !latest
+      ? 'NOT_INVITED'
+      : latest.status === 'REVOKED'
+        ? 'REVOKED'
+        : latest.status === 'SENT'
+          ? 'INVITATION_SENT'
+          : 'INVITATION_PENDING';
+    const blockedReason = !permissions.includes('guardian.invite')
+      ? 'NOT_ALLOWED'
+      : !guardian.phone
+        ? 'NO_PHONE'
+        : null;
+    const access = portalAccess.get(guardian.id) ?? new Map();
+    return {
+      portal: {
+        guardianId: guardian.id,
+        guardianName: guardian.fullName,
+        status: state,
+        maskedPhone: guardian.phone ? maskIndianMobile(guardian.phone) : null,
+        latestInvitation: latest && {
+          id: latest.id,
+          createdAt: latest.createdAt,
+          expiresAt: latest.expiresAt,
+          sentAt: latest.sentAt,
+          createdByName: 'Synthetic Worker',
+          smsStatus: latest.smsStatus,
+          revokedReason: latest.revokedReason,
+        },
+        children: [...links.values()]
+          .filter((l) => l.guardianId === guardian.id && !l.endedAt)
+          .map((l) => ({
+            childId: l.childId,
+            childName: children.get(l.childId)!.fullName,
+            relationship: l.relationship,
+            access: access.get(l.childId) ?? 'NONE',
+          })),
+        canInvite: blockedReason === null,
+        blockedReason,
+      },
+    };
+  }
+
+  function invitationRoute(method: string, parts: string[], rawBody: unknown, permissions: string[]): Result {
+    const guardian = guardians.get(parts[1]!);
+    const visible = guardian && [...links.values()].some((l) => l.guardianId === guardian.id && !l.endedAt);
+    if (method === 'GET' && parts.length === 3) {
+      if (!permissions.includes('child.read')) return err(403, 'FORBIDDEN');
+      if (!guardian || !visible) return err(404, 'NOT_FOUND');
+      return { status: 200, body: portalDto(guardian, permissions) };
+    }
+    if (method !== 'POST') return err(404, 'NOT_FOUND');
+    if (!permissions.includes('guardian.invite')) return err(403, 'FORBIDDEN');
+    if (!guardian || !visible) return err(404, 'NOT_FOUND');
+    const list = invitations.get(guardian.id) ?? [];
+    const access = portalAccess.get(guardian.id) ?? new Map<string, 'PENDING' | 'REVOKED'>();
+    if (parts.length === 3) {
+      const parsed = createParentInvitationRequestSchema.safeParse(rawBody);
+      if (!parsed.success) return err(400, 'VALIDATION_ERROR');
+      if (!guardian.phone) return err(422, 'GUARDIAN_PHONE_MISSING');
+      const linked = new Set(
+        [...links.values()].filter((l) => l.guardianId === guardian.id && !l.endedAt).map((l) => l.childId),
+      );
+      if (!parsed.data.childIds.every((id) => linked.has(id))) return err(422, 'CHILD_NOT_LINKED');
+      for (const old of list) {
+        if (old.status !== 'REVOKED') {
+          old.status = 'REVOKED';
+          old.revokedReason = 'Replaced by a new invitation';
+        }
+      }
+      for (const [childId, s] of access) if (s === 'PENDING') access.set(childId, 'REVOKED');
+      for (const childId of parsed.data.childIds) access.set(childId, 'PENDING');
+      const now = tick();
+      list.push({
+        id: uuid(),
+        status: portal.smsConfigured ? 'SENT' : 'PENDING',
+        createdAt: now,
+        expiresAt: new Date(Date.parse(now) + 24 * 3_600_000).toISOString(),
+        sentAt: portal.smsConfigured ? now : null,
+        smsStatus: portal.smsConfigured ? 'SENT' : 'NOT_CONFIGURED',
+        revokedReason: null,
+      });
+      invitations.set(guardian.id, list);
+      portalAccess.set(guardian.id, access);
+      return { status: 201, body: portalDto(guardian, permissions) };
+    }
+    if (parts.length === 5 && parts[4] === 'revoke') {
+      const parsed = revokeParentInvitationRequestSchema.safeParse(rawBody);
+      if (!parsed.success) return err(400, 'VALIDATION_ERROR');
+      const target = list.find((i) => i.id === parts[3]);
+      if (!target || target.status === 'REVOKED') return err(409, 'INVITATION_NOT_OPEN');
+      target.status = 'REVOKED';
+      target.revokedReason = parsed.data.reason;
+      for (const [childId, s] of access) if (s === 'PENDING') access.set(childId, 'REVOKED');
+      return { status: 200, body: portalDto(guardian, permissions) };
+    }
+    return err(404, 'NOT_FOUND');
+  }
+
   function route(method: string, fullPath: string, rawBody: unknown, permissions: string[]): Result | null {
     const [path, queryString = ''] = fullPath.split('?');
     const query = new URLSearchParams(queryString);
     const parts = path!.split('/').filter(Boolean);
     const can = (p: string) => permissions.includes(p);
+
+    if (parts[0] === 'guardians' && parts[2] === 'invitations')
+      return invitationRoute(method, parts, rawBody, permissions);
 
     if (parts[0] === 'guardians' && parts.length === 2) {
       const guardian = guardians.get(parts[1]!);
@@ -670,6 +789,10 @@ export function createFakeChildren() {
     children,
     guardians,
     links,
+    invitations,
+    portalAccess,
+    /** Set smsConfigured=false to mimic a server without an SMS provider. */
+    portal,
   };
 }
 

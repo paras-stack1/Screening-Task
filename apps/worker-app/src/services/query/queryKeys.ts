@@ -17,6 +17,9 @@ export const queryKeys = {
   consentNotices: (userId: string, language: string) => [userId, 'consent-notices', language] as const,
   recentChildren: (userId: string) => [userId, 'children', 'recent'] as const,
   guardian: (userId: string, guardianId: string) => [userId, 'children', 'guardian', guardianId] as const,
+  /** Parent Portal invitation status of a guardian (Step 8). Under the child-data prefix. */
+  parentPortal: (userId: string, guardianId: string) =>
+    [userId, 'children', 'parent-portal', guardianId] as const,
   /** Prefix of every screening query: invalidated after any screening change. In memory only. */
   screeningData: (userId: string) => [userId, 'screening'] as const,
   screeningSummary: (userId: string) => [userId, 'screening', 'summary'] as const,

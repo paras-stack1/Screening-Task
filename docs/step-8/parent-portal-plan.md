@@ -1,7 +1,10 @@
 # Step 8 - Parent Portal: architecture, plan and schema proposal
 
-> Stages 1-2 of the Parent Portal brief (2026-11-24). Documents only: no code, schema or database was
-> changed. Status: **PROPOSED - waiting for approval of decisions PP1-PP18 and the schema (section 5).**
+> Stages 1-2 of the Parent Portal brief (2026-11-24). Status: **APPROVED 2026-11-24** ("approve all
+> recommendations": PP1-PP18 and the schema in section 5).
+>
+> Progress: stage 3 (worker invitations, secure tokens, SMS adapter) implemented - see section 7 and
+> [../api/parent-portal.md](../api/parent-portal.md). Stages 4-7 not started.
 >
 > Context: the Parent Care decisions C1-C18 in [initial-audit.md](initial-audit.md) were approved on
 > 2026-11-24 ("approve all"), **except C3 (no parent accounts), which this brief replaces**: parents get
@@ -175,3 +178,18 @@ Grants: no DELETE / TRUNCATE for the runtime account on the new tables (as Step 
 SMS provider and DLT-registered templates; approved privacy notice and terms (DPDP); the trusted
 parent-portal domain with HTTPS; Hindi review of all parent-facing text; programme confirmation of
 what parents may see (PP12); decision on official worker contact numbers (PP16).
+
+## 7. Stage 3 - worker invitations (implemented, waiting for review)
+
+- Migration `20261125100000_step8_parent_portal_accounts`: all section 5 tables, partial unique indexes,
+  CHECKs and protection triggers; runtime role has no DELETE / TRUNCATE on them.
+- Permission `guardian.invite` (ASHA, AWW, MO). API: `GET/POST /guardians/:id/invitations`,
+  `POST /guardians/:id/invitations/:invitationId/revoke` ([API](../api/parent-portal.md)).
+- Token: 32 random bytes (base64url), SHA-256 stored, link fragment, 24 h, newest revokes older,
+  limits 3 / guardian / day and 30 / worker / hour. Never returned, logged or audited.
+- SMS: `SmsSender` interface; `none` (production default, `NOT_CONFIGURED`, nothing claimed as sent)
+  and a development-only `mock` (local outbox file; refused by the production configuration check).
+- Worker app: Parent Portal card on the guardian page (status, masked number, child choice,
+  guardian agreement, send, cancel), English and Hindi.
+- Not yet: public invitation validation, OTP, activation, parent login (stages 4-5); the parent app
+  (stage 6). `OTP_HMAC_KEY`, `PARENT_OTP_TTL_MINUTES` and `PARENT_JWT_AUDIENCE` arrive with stages 4-5.

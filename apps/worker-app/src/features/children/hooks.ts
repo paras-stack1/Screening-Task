@@ -28,6 +28,7 @@ export function useChildPermissions() {
     canCreate: permissions.includes('child.create'),
     canUpdate: permissions.includes('child.update'),
     canRecordConsent: permissions.includes('consent.record'),
+    canInviteGuardian: permissions.includes('guardian.invite'),
   };
 }
 
@@ -86,6 +87,17 @@ export function useGuardian(guardianId: string) {
     // The guardian view reveals the full phone number: never keep it around longer than needed.
     gcTime: 0,
     staleTime: 0,
+  });
+}
+
+/** Parent Portal status of a guardian (no token, masked phone only). The API decides canInvite. */
+export function useParentPortalStatus(guardianId: string) {
+  const children = useChildrenApi();
+  const userId = useUserId();
+  return useQuery({
+    queryKey: queryKeys.parentPortal(userId, guardianId),
+    queryFn: ({ signal }) => children.parentPortal(guardianId, { signal }).then((r) => r.portal),
+    enabled: userId !== 'none' && Boolean(guardianId),
   });
 }
 

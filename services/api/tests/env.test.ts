@@ -100,8 +100,36 @@ describe('environment configuration', () => {
     ['AI_SERVICE_API_KEY', { AI_SERVICE_API_KEY: '' }],
     ['DATABASE_URL', { DATABASE_URL: 'postgresql://app:pw@db.internal:5432/balswasthya' }],
     ['DATABASE_URL', { DATABASE_URL: 'postgresql://app:pw@db.internal:5432/balswasthya?sslmode=prefer' }],
+    // Step 8: the development SMS mock and a non-HTTPS Parent Portal address are refused.
+    ['SMS_PROVIDER', { SMS_PROVIDER: 'mock' }],
+    ['PARENT_PORTAL_URL', { PARENT_PORTAL_URL: 'http://parent.example.in' }],
   ])('production rejects an insecure %s', (path, override) => {
     expect(failingPaths({ ...validProduction, ...override })).toContain(path);
+  });
+});
+
+describe('Parent Portal configuration (Step 8)', () => {
+  it('defaults: no portal address (invitations off), 24 h invitations, provider unset', () => {
+    const result = parseEnv(minimalDevelopment);
+    expect(result.data).toMatchObject({ PARENT_PORTAL_URL: '', PARENT_INVITE_TTL_HOURS: 24 });
+    expect(result.data?.SMS_PROVIDER).toBeUndefined();
+  });
+
+  it('accepts an https portal with no SMS provider in production and strips a trailing slash', () => {
+    const result = parseEnv({
+      ...validProduction,
+      PARENT_PORTAL_URL: 'https://parent.example.in/',
+      SMS_PROVIDER: 'none',
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.PARENT_PORTAL_URL).toBe('https://parent.example.in');
+  });
+
+  it('rejects an unknown SMS provider and an out-of-range invitation lifetime', () => {
+    expect(failingPaths({ ...minimalDevelopment, SMS_PROVIDER: 'twilio' })).toContain('SMS_PROVIDER');
+    expect(failingPaths({ ...minimalDevelopment, PARENT_INVITE_TTL_HOURS: '0' })).toContain(
+      'PARENT_INVITE_TTL_HOURS',
+    );
   });
 });
 
