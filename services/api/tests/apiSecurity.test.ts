@@ -159,6 +159,13 @@ describe('protected routes without a valid access token', () => {
     ['post', `/api/v1/screenings/${ID}/amendments`],
     ['post', `/api/v1/screenings/${ID}/amendments/${ID}/review`],
     ['get', '/api/v1/screening-amendments'],
+    // Step 7 results and rule-set catalogue.
+    ['get', `/api/v1/screenings/${ID}/results`],
+    ['post', `/api/v1/screenings/${ID}/generate-result`],
+    ['get', '/api/v1/screening-results'],
+    ['get', `/api/v1/screening-results/${ID}`],
+    ['get', '/api/v1/clinical-rule-sets'],
+    ['get', `/api/v1/clinical-rule-sets/${ID}`],
     // Admin portal stage PA.
     ['get', '/api/v1/areas'],
     ['get', `/api/v1/areas?parentId=${ID}`],

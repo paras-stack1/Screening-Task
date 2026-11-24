@@ -33,6 +33,7 @@ import { createRequirePermission } from '../../middleware/authorize';
 import { getRequestId } from '../../middleware/requestId';
 import { getValidated, validate } from '../../middleware/validate';
 import type { AccessContext } from '../access-control/accessScope';
+import { addSessionResultRoutes } from '../clinical-rules/results.routes';
 import type { ScreeningRouterDependencies } from './protocols.routes';
 import { createAmendmentsService } from './amendments.service';
 import { createScreeningsService } from './screenings.service';
@@ -174,6 +175,9 @@ export function createScreeningsRouter(deps: ScreeningRouterDependencies): Route
       res.json(await service.cancel(ctx(res), id, getValidated<CancelSessionRequest>(res, 'body')));
     },
   );
+
+  // --------------------------------------------- results of completed screenings (Step 7)
+  addSessionResultRoutes(router, deps);
 
   // --------------------------------------------- amendments of completed screenings (Step 6G)
   const amendments = createAmendmentsService(deps);

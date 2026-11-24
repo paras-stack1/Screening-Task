@@ -31,6 +31,7 @@ import {
 } from '../access-control/accessScope';
 import { recordAudit, type AuditEntry } from '../audit/audit.service';
 import { fromDbDate } from '../children/birthDate';
+import { generateResultRun } from '../clinical-rules/resultGeneration';
 import { assertConsentPermits, type ConsentPolicySettings } from '../consent/consentPolicy';
 import { validateMeasurement } from './measurementRules';
 import { protocolContentHash, protocolRowToDefinition } from './protocolContent';
@@ -60,6 +61,8 @@ interface SessionChange {
   patch?: Prisma.ScreeningSessionUncheckedUpdateInput;
   /** Audit events (identifiers and counts only - never answers, values or notes). */
   audit: Array<Omit<AuditEntry, 'actorUserId' | 'requestId' | 'entityType' | 'entityId' | 'outcome'>>;
+  /** Runs after the session row was updated, in the same transaction (Step 7: result generation). */
+  after?: (tx: Tx) => Promise<void>;
 }
 
 interface WriteOptions {
@@ -156,6 +159,7 @@ export function createScreeningsService({
         where: { id: sessionId },
         data: { ...result.patch, version: { increment: 1 } },
       });
+      if (result.after) await result.after(tx);
       for (const entry of result.audit) {
         await recordAudit(tx, {
           ...entry,
@@ -745,6 +749,15 @@ export function createScreeningsService({
           const started = new Set(categories.map((c) => c.category));
           return {
             patch: { status: 'COMPLETED', completedAt: at(ctx) },
+            // Step 7 decision F: the result of version 1 is generated in the completing transaction,
+            // so a completed screening never exists without its (possibly "not interpreted") result.
+            after: async (tx) => {
+              await generateResultRun(
+                tx,
+                { pii, screeningPolicy },
+                { sessionId: id, generatedById: null, now: at(ctx), requestId: ctx.requestId },
+              );
+            },
             audit: [
               {
                 action: 'screening.completed',

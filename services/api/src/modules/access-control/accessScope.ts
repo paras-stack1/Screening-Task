@@ -146,6 +146,12 @@ export const scopedWhere = {
     permission: PermissionCode,
     at = new Date(),
   ): Prisma.ScreeningResultWhereInput => ({ session: { child: childScopeWhere(userId, permission, at) } }),
+  /** Step 7: a result run (session-level result) is reachable through its screening's child. */
+  screeningResultRun: (
+    userId: string,
+    permission: PermissionCode,
+    at = new Date(),
+  ): Prisma.ScreeningResultRunWhereInput => ({ session: { child: childScopeWhere(userId, permission, at) } }),
   aiAnalysis: (userId: string, permission: PermissionCode, at = new Date()): Prisma.AiAnalysisWhereInput => ({
     session: { child: childScopeWhere(userId, permission, at) },
   }),
@@ -284,6 +290,13 @@ async function scopedCount(
           where: { id, ...scopedWhere.screeningResult(userId, permission, at) },
         }),
         exists: await db.screeningResult.count({ where: { id } }),
+      };
+    case 'screeningResultRun':
+      return {
+        inScope: await db.screeningResultRun.count({
+          where: { id, ...scopedWhere.screeningResultRun(userId, permission, at) },
+        }),
+        exists: await db.screeningResultRun.count({ where: { id } }),
       };
     case 'aiAnalysis':
       return {

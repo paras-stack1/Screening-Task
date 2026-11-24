@@ -13,6 +13,7 @@ import { PERMISSIONS } from '../src/modules/access-control/permissions';
 import { ROLES } from '../src/modules/access-control/roles';
 import { createArea } from '../src/modules/areas/areaTree';
 import { ensureConsentTemplates } from '../src/modules/consent/consentNotices';
+import { ensureDemoRuleSets } from '../src/modules/clinical-rules/demoRuleSets';
 import { ensureDemoProtocols } from '../src/modules/screening/demoProtocols';
 
 const prisma = new PrismaClient();
@@ -115,6 +116,10 @@ async function main() {
     );
   }
 
+  // Step 7: DEMONSTRATION rule sets for the demo protocols, as DRAFT (no clinical meaning, never
+  // approvable, unusable where draft content is not allowed). An existing set is never changed.
+  await ensureDemoRuleSets(prisma);
+
   const counts = {
     levels: await prisma.areaLevel.count(),
     permissions: await prisma.permission.count(),
@@ -123,6 +128,7 @@ async function main() {
     closureLinks: await prisma.areaClosure.count(),
     consentTemplates: await prisma.consentTemplate.count(),
     screeningProtocols: await prisma.screeningProtocol.count(),
+    clinicalRuleSets: await prisma.clinicalRuleSet.count(),
   };
   // eslint-disable-next-line no-console
   console.log('Seed complete (synthetic data):', counts);

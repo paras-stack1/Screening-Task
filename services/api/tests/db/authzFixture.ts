@@ -243,7 +243,7 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
     },
   });
   const facility = await prisma.facility.create({
-    data: { name: 'Synthetic PHC', type: 'PHC', areaId: area.D1! },
+    data: { name: 'Synthetic PHC', type: 'PHC', areaId: area.D1!, createdById: user.stateadmin! },
   });
 
   type Linked = Record<
@@ -253,6 +253,7 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
     | 'screeningObservation'
     | 'measurement'
     | 'screeningResult'
+    | 'screeningResultRun'
     | 'aiAnalysis'
     | 'referral'
     | 'followUp'
@@ -351,20 +352,79 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
         requestedAt: new Date(now),
       },
     });
-    const result = await prisma.screeningResult.create({
-      data: {
-        sessionId: session.id,
-        category: 'DEFICIENCIES',
-        outcome: 'INSUFFICIENT_DATA',
-        source: 'RULE_ENGINE',
-        reasons: [],
-      },
+    // Step 7: results exist only for COMPLETED screenings, written together with their run.
+    await prisma.screeningSessionCategory.update({
+      where: { id: sessionCategory.id },
+      data: { status: 'COMPLETED', completedAt: new Date(now) },
     });
-    const referral = await prisma.referral.create({
-      data: { childId, facilityId: facility.id, areaId: childArea, urgency: 'ROUTINE', createdById: by },
+    for (const status of ['IN_PROGRESS', 'COMPLETED'] as const) {
+      await prisma.screeningSession.update({
+        where: { id: session.id },
+        data: {
+          status,
+          ...(status === 'COMPLETED' ? { completedAt: new Date(now) } : {}),
+          version: { increment: 1 },
+        },
+      });
+    }
+    const result = await prisma.$transaction(async (tx) => {
+      const run = await tx.screeningResultRun.create({
+        data: {
+          sessionId: session.id,
+          screeningVersion: 1,
+          overallOutcome: 'NOT_INTERPRETED',
+          usesUnapprovedContent: true,
+          engineVersion: 'synthetic',
+          generatedAt: new Date(now),
+        },
+      });
+      return tx.screeningResult.create({
+        data: {
+          resultRunId: run.id,
+          sessionId: session.id,
+          category: 'DEFICIENCIES',
+          sessionCategoryId: sessionCategory.id,
+          protocolId: protocol.id,
+          outcome: 'NOT_INTERPRETED',
+          source: 'RULE_ENGINE',
+          evidence: [],
+          limitations: [],
+        },
+      });
+    });
+    // A referral is written together with its first status event (database rule).
+    const referral = await prisma.$transaction(async (tx) => {
+      const created = await tx.referral.create({
+        data: {
+          childId,
+          origin: 'WORKER_CONCERN',
+          reasonCode: 'SYNTHETIC',
+          facilityId: facility.id,
+          areaId: childArea,
+          urgency: 'ROUTINE',
+          createdById: by,
+        },
+      });
+      await tx.referralStatusEvent.create({
+        data: {
+          referralId: created.id,
+          toStatus: 'PENDING_APPROVAL',
+          changedById: by,
+          actorRoleCode: 'SYNTHETIC',
+          source: 'APP_USER_DIRECT',
+          verificationStatus: 'VERIFIED',
+        },
+      });
+      return created;
     });
     const followUp = await prisma.followUp.create({
-      data: { childId, referralId: referral.id, dueDate: new Date('2027-01-01') },
+      data: {
+        childId,
+        referralId: referral.id,
+        reasonCode: 'SYNTHETIC',
+        dueDate: new Date('2027-01-01'),
+        createdById: by,
+      },
     });
     const media = await prisma.mediaMetadata.create({
       data: {
@@ -391,6 +451,7 @@ export async function buildAuthzFixture(prisma: PrismaClient, clock: TestClock) 
       screeningObservation: observation.id,
       measurement: measurement.id,
       screeningResult: result.id,
+      screeningResultRun: result.resultRunId,
       aiAnalysis: ai.id,
       referral: referral.id,
       followUp: followUp.id,

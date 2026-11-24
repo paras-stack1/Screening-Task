@@ -697,24 +697,42 @@ describe('audit, encryption and referral flags', () => {
   it('flags referrals made from the earlier version for reassessment without changing them', async () => {
     const { s } = await completedSession();
     const facility = await prisma.facility.create({
-      data: { name: 'Synthetic CHC', type: 'CHC', areaId: fx.area.D1! },
+      data: { name: 'Synthetic CHC', type: 'CHC', areaId: fx.area.D1!, createdById: fx.user.asha1! },
     });
-    const referral = await prisma.referral.create({
-      data: {
-        childId: s.childId,
-        sessionId: s.id,
-        facilityId: facility.id,
-        areaId: fx.area.V1!,
-        urgency: 'ROUTINE',
-        createdById: fx.user.asha1!,
-      },
+    const referral = await prisma.$transaction(async (tx) => {
+      const created = await tx.referral.create({
+        data: {
+          childId: s.childId,
+          sessionId: s.id,
+          origin: 'WORKER_CONCERN',
+          reasonCode: 'SYNTHETIC',
+          facilityId: facility.id,
+          areaId: fx.area.V1!,
+          urgency: 'ROUTINE',
+          createdById: fx.user.asha1!,
+        },
+      });
+      await tx.referralStatusEvent.create({
+        data: {
+          referralId: created.id,
+          toStatus: 'PENDING_APPROVAL',
+          changedById: fx.user.asha1!,
+          actorRoleCode: 'ASHA',
+          source: 'APP_USER_DIRECT',
+          verificationStatus: 'VERIFIED',
+        },
+      });
+      return created;
     });
     const v2 = session(await amend('asha1', s, [{ ...yesToNo, questionId: q('DISEASES', 'DEMO_Q1') }]));
     expect(v2.amendments[0]!.referralsFlagged).toBe(1);
     const flag = await prisma.screeningAmendmentReferralImpact.findFirstOrThrow({
       where: { referralId: referral.id },
     });
-    expect(flag).toMatchObject({ reassessmentStatus: 'PENDING', referralStatusAtAmendment: 'CREATED' });
+    expect(flag).toMatchObject({
+      reassessmentStatus: 'PENDING',
+      referralStatusAtAmendment: 'PENDING_APPROVAL',
+    });
     expect(await prisma.referral.findUniqueOrThrow({ where: { id: referral.id } })).toEqual(referral);
   });
 });

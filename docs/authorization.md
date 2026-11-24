@@ -38,6 +38,8 @@ An assignment is **effective** at time *t* when: status `ACTIVE`, `effectiveFrom
 | `screening.review` | fieldwork | | | ✓ | | | |
 | `referral.create` | fieldwork | ✓ | ✓ | ✓ | | | |
 | `referral.update` | fieldwork | | | ✓ | ✓ | | |
+| `referral.approve` (Step 7, decision K) | fieldwork | | | ✓ | | | |
+| `follow_up.update` (Step 7, decision Q; workers: own tasks only) | fieldwork | ✓ | ✓ | ✓ | ✓ | | |
 | `report.aggregate` | management | | | | ✓ | ✓ | ✓ |
 | `assignment.manage` | management | | | | ✓ | ✓ | ✓ |
 | `user.manage` (new, decision G) | management | | | | | ✓ | ✓ |

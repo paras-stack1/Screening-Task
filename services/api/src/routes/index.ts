@@ -4,6 +4,10 @@ import { createAreasRouter } from '../modules/areas/areas.routes';
 import { createAuthRouter, type AuthRouterDependencies } from '../modules/auth/auth.routes';
 import { createWebAuthRouter, type WebSessionSettings } from '../modules/auth/webAuth.routes';
 import { createChildrenRouter } from '../modules/children/children.routes';
+import {
+  createClinicalRuleSetsRouter,
+  createScreeningResultsRouter,
+} from '../modules/clinical-rules/results.routes';
 import { createChildConsentsRouter, createConsentNoticesRouter } from '../modules/consent/consent.routes';
 import type { ConsentPolicySettings } from '../modules/consent/consentPolicy';
 import { createGuardiansRouter } from '../modules/guardians/guardians.routes';
@@ -66,6 +70,8 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/screening-protocols', createScreeningProtocolsRouter(childData));
   router.use('/screenings', createScreeningsRouter(childData));
   router.use('/screening-amendments', createAmendmentQueueRouter(childData));
+  router.use('/screening-results', createScreeningResultsRouter(childData));
+  router.use('/clinical-rule-sets', createClinicalRuleSetsRouter(childData));
   router.use('/children', createChildrenRouter(childData));
   router.use('/guardians', createGuardiansRouter(childData));
   router.use('/users', createUsersRouter(deps.auth));

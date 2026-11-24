@@ -50,10 +50,18 @@ SELECT format('REVOKE DELETE, TRUNCATE ON public.%I FROM %I', t, :'app_user')
   FROM unnest(ARRAY['ScreeningSession', 'ScreeningSessionCategory', 'Measurement',
                     -- Step 6G: amendment history is append-only.
                     'ScreeningAmendment', 'ScreeningAmendmentChange',
-                    'ScreeningAmendmentReferralImpact']) AS t
+                    'ScreeningAmendmentReferralImpact',
+                    -- Step 7: rule sets, results, reviews, facilities, referrals and follow-ups
+                    -- keep their history; nothing is ever deleted (triggers block it as well).
+                    'ClinicalRuleSet', 'ClinicalRuleSetEvent', 'ScreeningResultRun',
+                    'ScreeningResult', 'ClinicalReview', 'ClinicalReviewEvent',
+                    'Facility', 'FacilityHistory', 'Referral', 'ReferralStatusEvent',
+                    'FollowUp', 'FollowUpEvent']) AS t
  WHERE to_regclass(format('public.%I', t)) IS NOT NULL \gexec
 SELECT format('REVOKE TRUNCATE ON public.%I FROM %I', t, :'app_user')
-  FROM unnest(ARRAY['ScreeningProtocol', 'ScreeningQuestion', 'ScreeningObservation']) AS t
+  FROM unnest(ARRAY['ScreeningProtocol', 'ScreeningQuestion', 'ScreeningObservation',
+                    -- Step 7: notifications may be purged by a later retention job, never truncated.
+                    'Notification']) AS t
  WHERE to_regclass(format('public.%I', t)) IS NOT NULL \gexec
 --    The migration history table is the owner's business only.
 SELECT format('REVOKE ALL ON public.%I FROM %I', '_prisma_migrations', :'app_user')

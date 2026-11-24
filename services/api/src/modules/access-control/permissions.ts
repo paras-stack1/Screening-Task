@@ -12,6 +12,9 @@ export const PERMISSIONS = {
   'screening.review': 'Clinically review screening results',
   'referral.create': 'Create referrals and follow-ups',
   'referral.update': 'Update referral and follow-up status',
+  'referral.approve': 'Approve or reject referrals (clinical approval; Step 7 decision K)',
+  'follow_up.update':
+    'Work on follow-up tasks: own tasks only, unless referral.update is also held (decision Q)',
   'report.aggregate': 'View aggregate counts and summaries (no individual records)',
   'assignment.manage': 'Create, end or suspend worker area assignments within own scope',
   'user.manage':
@@ -45,6 +48,8 @@ export const PERMISSION_DELEGATION: Record<PermissionCode, 'management' | 'field
   'screening.review': 'fieldwork',
   'referral.create': 'fieldwork',
   'referral.update': 'fieldwork',
+  'referral.approve': 'fieldwork',
+  'follow_up.update': 'fieldwork',
   'report.aggregate': 'management',
   'assignment.manage': 'management',
   'user.manage': 'management',

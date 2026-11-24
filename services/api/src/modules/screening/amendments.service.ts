@@ -14,6 +14,7 @@ import { runIdempotent } from '../../utils/idempotency';
 import type { PiiCrypto } from '../../utils/piiCrypto';
 import { denyAsNotFound, scopedWhere, type AccessContext } from '../access-control/accessScope';
 import { recordAudit } from '../audit/audit.service';
+import { generateResultRun } from '../clinical-rules/resultGeneration';
 import { fromDbDate } from '../children/birthDate';
 import {
   currentState,
@@ -25,6 +26,7 @@ import {
 } from './amendmentOverlay';
 import { formatDecimal, parseDecimal, validateMeasurement } from './measurementRules';
 import { responseColumns } from './responseRules';
+import type { ScreeningPolicySettings } from './protocolSelection';
 import { amendmentAccess, loadSessionDetail } from './sessionDetail';
 import { detailInclude } from './sessionDto';
 import { sessionTextSealer } from './sensitiveText';
@@ -32,6 +34,8 @@ import { sessionTextSealer } from './sensitiveText';
 export interface AmendmentsServiceDependencies {
   db: PrismaClient;
   pii: PiiCrypto;
+  /** Step 7: which rule sets result generation may use (drafts only outside production). */
+  screeningPolicy: ScreeningPolicySettings;
 }
 
 const TX_OPTIONS = { timeout: 15_000, maxWait: 5_000 } as const;
@@ -54,7 +58,7 @@ const normalDecimal = (value: string) => formatDecimal(parseDecimal(value)!);
  *  6. amendment, changes, referral reassessment flags and the audit row are written together.
  * Consent is not re-checked (decision G8): an amendment corrects an existing record.
  */
-export function createAmendmentsService({ db, pii }: AmendmentsServiceDependencies) {
+export function createAmendmentsService({ db, pii, screeningPolicy }: AmendmentsServiceDependencies) {
   const at = (ctx: AccessContext) => ctx.at ?? new Date();
 
   async function assertInScope(
@@ -330,6 +334,13 @@ export function createAmendmentsService({ db, pii }: AmendmentsServiceDependenci
               referralsFlagged: referrals.length,
             },
           });
+          // Step 7 decision F: the new screening version gets its own result run (the previous
+          // run is marked superseded, never changed).
+          await generateResultRun(
+            tx,
+            { pii, screeningPolicy },
+            { sessionId, generatedById: null, now, requestId: ctx.requestId },
+          );
           return amendmentId;
         },
       );

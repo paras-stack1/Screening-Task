@@ -23,6 +23,8 @@
     "db:bootstrap-admin": "tsx --env-file=.env prisma/bootstrap-admin.ts",
     "db:protocol-status": "tsx --env-file=.env prisma/protocol-status.ts",
     "db:protocol-import": "tsx --env-file=.env prisma/protocol-import.ts",
+    "db:rule-set-import": "tsx --env-file=.env prisma/rule-set-import.ts",
+    "db:rule-set-status": "tsx --env-file=.env prisma/rule-set-status.ts",
     "db:dev-live-worker": "tsx --env-file=.env prisma/dev-live-worker.ts",
     "db:dev-reset-password": "tsx --env-file=.env prisma/dev-reset-password.ts"
   },

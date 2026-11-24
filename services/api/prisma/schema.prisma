@@ -186,11 +186,21 @@ enum MeasurementQuality {
   NOT_RELIABLE
 }
 
+/// Outcome of ONE Four-D category in one screening version (Step 7 decision E). A workflow label,
+/// never a diagnosis. Missing data never leads to NO_CONCERN_IN_COMPLETED_ITEMS.
 enum ResultOutcome {
-  REFERRAL_RECOMMENDED
-  FOLLOW_UP_RECOMMENDED
+  /// Every rule of the applied rule set evaluated to "not met" on complete data.
   NO_CONCERN_IN_COMPLETED_ITEMS
-  INSUFFICIENT_DATA
+  FURTHER_EVALUATION_RECOMMENDED
+  URGENT_EVALUATION_RECOMMENDED
+  /// The category was started but not finished, and no rule was met.
+  INCOMPLETE
+  /// The category was never started in this screening.
+  NOT_ASSESSED
+  /// A rule could not be evaluated (missing, unknown, unreliable or conflicting input).
+  UNABLE_TO_DETERMINE
+  /// No usable rule set exists: observations are shown without interpretation.
+  NOT_INTERPRETED
 }
 
 enum ResultSource {
@@ -200,10 +210,27 @@ enum ResultSource {
   CLINICIAN
 }
 
-enum ReviewStatus {
-  NOT_REQUIRED
-  PENDING
+/// Clinical review of a result run (Step 7 decisions G-I). Workflow states, not diagnoses.
+enum ClinicalReviewStatus {
+  PENDING_REVIEW
+  UNDER_REVIEW
+  ADDITIONAL_INFORMATION_REQUIRED
+  ESCALATED
   REVIEWED
+  REJECTED
+}
+
+enum ClinicalReviewDecision {
+  ACCEPT_RESULT
+  REQUEST_ADDITIONAL_SCREENING
+  RECOMMEND_REFERRAL
+  ESCALATE_FOR_SPECIALIST_REVIEW
+  REJECT_WITH_REASON
+}
+
+enum RuleSetEventType {
+  CREATED
+  STATUS_CHANGED
 }
 
 enum AiAnalysisType {
@@ -229,6 +256,7 @@ enum FacilityType {
   CHC
   DISTRICT_HOSPITAL
   MEDICAL_COLLEGE
+  DESIGNATED_SPECIALIST_CENTRE
   OTHER
 }
 
@@ -239,18 +267,61 @@ enum ReferralUrgency {
   URGENT
 }
 
+/// Referral lifecycle (Step 7 decision J; state machine in docs/step-7/architecture.md section 6).
+/// REJECTED, CLOSED and CANCELLED are final.
 enum ReferralStatus {
-  CREATED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  ISSUED
+  ACKNOWLEDGED
   APPOINTMENT_SCHEDULED
-  ATTENDED
-  COMPLETED
-  NOT_ATTENDED
+  VISITED
+  VISIT_NOT_COMPLETED
+  UNDER_TREATMENT
+  FOLLOW_UP_REQUIRED
+  CLOSED
   CANCELLED
 }
 
+enum ReferralOrigin {
+  CLINICAL_REVIEW
+  RULE_RECOMMENDATION
+  WORKER_CONCERN
+}
+
+/// Where a referral status update came from (decision O). Only SYSTEM / APP_USER_DIRECT are
+/// first-hand; the others are reports and carry a verification status.
+enum ReferralUpdateSource {
+  SYSTEM
+  APP_USER_DIRECT
+  FACILITY_PHONE_CALL
+  FACILITY_DOCUMENT_SEEN
+  GUARDIAN_REPORTED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+}
+
+/// Rescheduling is an event, not a status (decision Q).
 enum FollowUpStatus {
   PENDING
-  DONE
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+enum FollowUpEventType {
+  CREATED
+  ASSIGNED
+  REASSIGNED
+  STARTED
+  RESCHEDULED
+  COMPLETED
   MISSED
   CANCELLED
 }
@@ -275,9 +346,21 @@ enum SyncStatus {
   CONFLICT
 }
 
+/// In-app notifications only (decision S). The app shows generic text per type - no names or
+/// health details are stored or shown.
 enum NotificationType {
-  FOLLOW_UP_DUE
-  REFERRAL_UPDATE
+  REVIEW_TASK_NEW
+  REVIEW_OVERDUE
+  ADDITIONAL_ASSESSMENT_REQUESTED
+  REFERRAL_APPROVED
+  REFERRAL_REJECTED
+  REFERRAL_ISSUED
+  REFERRAL_ACKNOWLEDGED
+  REFERRAL_APPOINTMENT_SCHEDULED
+  REFERRAL_STATUS_CHANGED
+  FOLLOW_UP_ASSIGNED
+  FOLLOW_UP_DUE_SOON
+  FOLLOW_UP_OVERDUE
   SYSTEM
 }
 
@@ -336,11 +419,26 @@ model User {
   reassessmentsDone       ScreeningAmendmentReferralImpact[]
   observationsRecorded    ScreeningObservation[]
   measurementsRecorded    Measurement[]
-  resultsReviewed         ScreeningResult[]
-  referralsCreated        Referral[]
+  ruleSetsCreated         ClinicalRuleSet[]                  @relation("RuleSetCreatedBy")
+  ruleSetsApproved        ClinicalRuleSet[]                  @relation("RuleSetApprovedBy")
+  ruleSetEvents           ClinicalRuleSetEvent[]
+  resultRunsGenerated     ScreeningResultRun[]
+  reviewsClaimed          ClinicalReview[]                   @relation("ReviewClaimedBy")
+  reviewsDecided          ClinicalReview[]                   @relation("ReviewDecidedBy")
+  reviewEvents            ClinicalReviewEvent[]
+  facilitiesCreated       Facility[]                         @relation("FacilityCreatedBy")
+  facilitiesUpdated       Facility[]                         @relation("FacilityUpdatedBy")
+  facilitiesVerified      Facility[]                         @relation("FacilityVerifiedBy")
+  facilityHistory         FacilityHistory[]
+  referralsCreated        Referral[]                         @relation("ReferralCreatedBy")
+  referralsApproved       Referral[]                         @relation("ReferralApprovedBy")
   referralStatusEvents    ReferralStatusEvent[]
   followUpsAssigned       FollowUp[]                         @relation("FollowUpAssignee")
+  followUpsAssignedBy     FollowUp[]                         @relation("FollowUpAssignedBy")
+  followUpsCreated        FollowUp[]                         @relation("FollowUpCreatedBy")
   followUpsCompleted      FollowUp[]                         @relation("FollowUpCompletedBy")
+  followUpEvents          FollowUpEvent[]                    @relation("FollowUpEventActor")
+  followUpEventsAssigned  FollowUpEvent[]                    @relation("FollowUpEventAssignee")
   mediaCaptured           MediaMetadata[]
   notifications           Notification[]
   refreshSessions         RefreshSession[]
@@ -433,6 +531,7 @@ model Area {
   screeningSessions  ScreeningSession[]
   referrals          Referral[]
   facilities         Facility[]
+  clinicalReviews    ClinicalReview[]
 
   @@unique([parentId, code])
   @@unique([levelId, externalCode])
@@ -628,6 +727,8 @@ model Consent {
   media             MediaMetadata[]
   aiAnalyses        AiAnalysis[]
   screeningSessions ScreeningSession[]
+  /// Referrals issued under this REFERRAL_DATA_SHARING consent (Step 7 decision M).
+  referralsShared   Referral[]
 
   @@index([childId, purpose, recordedAt])
   @@index([guardianId])
@@ -676,6 +777,7 @@ model ScreeningProtocol {
   /// Pre-Step-6 link (one protocol per session). Deprecated, always null since Step 6.
   sessions          ScreeningSession[]
   sessionCategories ScreeningSessionCategory[]
+  results           ScreeningResult[]
 
   @@unique([code, version])
   @@index([status, ageMinDays, ageMaxDays])
@@ -752,14 +854,16 @@ model ScreeningSession {
   area             Area               @relation(fields: [areaId], references: [id], onDelete: Restrict)
   screeningConsent Consent            @relation(fields: [screeningConsentId], references: [id], onDelete: Restrict)
 
-  categories   ScreeningSessionCategory[]
-  amendments   ScreeningAmendment[]
-  observations ScreeningObservation[]
-  measurements Measurement[]
-  results      ScreeningResult[]
-  aiAnalyses   AiAnalysis[]
-  referrals    Referral[]
-  media        MediaMetadata[]
+  categories       ScreeningSessionCategory[]
+  amendments       ScreeningAmendment[]
+  observations     ScreeningObservation[]
+  measurements     Measurement[]
+  resultRuns       ScreeningResultRun[]
+  aiAnalyses       AiAnalysis[]
+  referrals        Referral[]
+  followUps        FollowUp[]
+  media            MediaMetadata[]
+  screeningResults ScreeningResult[]
 
   @@index([childId, startedAt])
   @@index([areaId, status, startedAt])
@@ -788,6 +892,7 @@ model ScreeningSessionCategory {
   protocol         ScreeningProtocol          @relation(fields: [protocolId], references: [id], onDelete: Restrict)
   observations     ScreeningObservation[]
   amendmentChanges ScreeningAmendmentChange[]
+  results          ScreeningResult[]
 
   @@unique([sessionId, category])
   @@index([protocolId])
@@ -860,29 +965,192 @@ model Measurement {
   @@index([sessionId])
 }
 
+// ============================================== Step 7: clinical rules, results, review
+
+/// A versioned clinical rule set for ONE Four-D category, protocol code and age band (Step 7
+/// decision B). The rules are DATA in `definition` (validated by the rule DSL in
+/// shared-contracts/clinicalRules.ts). SQL additions (migration 20261124100000_step7_...):
+///   - clinical_rule_set_protect: content frozen once it leaves DRAFT or is used by a result;
+///     status moves only DRAFT -> IN_REVIEW -> APPROVED -> ACTIVE -> RETIRED (IN_REVIEW -> DRAFT)
+///   - CHECKs: approval fields + hash from APPROVED on; demonstration sets can never be approved
+///   - clinical_rule_set_one_active_per_band: ACTIVE sets of one category + protocol code never
+///     overlap in age
+/// There is NO HTTP endpoint that changes rule sets: CLI scripts only (decision B).
+model ClinicalRuleSet {
+  id                String         @id @default(uuid()) @db.Uuid
+  code              String
+  version           Int
+  category          FourDCategory
+  /// Rules refer to question codes of this protocol code, in the listed protocol versions only.
+  protocolCode      String
+  protocolVersions  Int[]
+  nameEn            String
+  nameHi            String
+  /// Inclusive age band in completed days.
+  ageMinDays        Int
+  ageMaxDays        Int
+  /// Required: guideline document, edition and section behind EVERY threshold in the set.
+  sourceReference   String
+  definition        Json
+  status            ProtocolStatus @default(DRAFT)
+  /// Engineering placeholder rules: never operational, can never be approved.
+  isDemonstration   Boolean        @default(false)
+  /// SHA-256 of the canonical definition, fixed when the set leaves DRAFT.
+  contentSha256     String?
+  approvedById      String?        @db.Uuid
+  approvedAt        DateTime?      @db.Timestamptz(3)
+  approvalReference String?
+  effectiveFrom     DateTime?      @db.Timestamptz(3)
+  retiredAt         DateTime?      @db.Timestamptz(3)
+  /// null only for demonstration rule sets created by the development seed (CHECK).
+  createdById       String?        @db.Uuid
+  createdAt         DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime       @updatedAt @db.Timestamptz(3)
+
+  createdBy  User?                  @relation("RuleSetCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy User?                  @relation("RuleSetApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  events     ClinicalRuleSetEvent[]
+  results    ScreeningResult[]
+
+  @@unique([code, version])
+  @@index([category, status, ageMinDays, ageMaxDays])
+}
+
+/// Change history of a rule set (append-only).
+model ClinicalRuleSetEvent {
+  id            String           @id @default(uuid()) @db.Uuid
+  ruleSetId     String           @db.Uuid
+  type          RuleSetEventType
+  fromStatus    ProtocolStatus?
+  toStatus      ProtocolStatus
+  /// null only for the development seed creating demonstration rule sets.
+  actorId       String?          @db.Uuid
+  /// Approval document / committee minute reference (no personal data).
+  reference     String?
+  /// SHA-256 of the definition at the time of the event.
+  contentSha256 String?
+  occurredAt    DateTime         @default(now()) @db.Timestamptz(3)
+
+  ruleSet ClinicalRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+  actor   User?           @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([ruleSetId, occurredAt])
+}
+
+/// Session-level result of ONE screening version (Step 7 decision F). Generated in the same
+/// transaction as completion (version 1) and each amendment (version n + 1). Immutable except a
+/// one-time `supersededAt` when the next version's run is created.
+model ScreeningResultRun {
+  id                    String        @id @default(uuid()) @db.Uuid
+  sessionId             String        @db.Uuid
+  /// 1 = as completed; n + 1 after amendment n.
+  screeningVersion      Int
+  /// Most cautious category outcome.
+  overallOutcome        ResultOutcome
+  /// True when any category used content or rules that are not ACTIVE and clinically approved.
+  usesUnapprovedContent Boolean
+  /// Evaluator code version, e.g. "rule-engine/1".
+  engineVersion         String
+  /// null = generated automatically on completion / amendment.
+  generatedById         String?       @db.Uuid
+  generatedAt           DateTime      @db.Timestamptz(3)
+  supersededAt          DateTime?     @db.Timestamptz(3)
+
+  session     ScreeningSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  generatedBy User?             @relation(fields: [generatedById], references: [id], onDelete: Restrict)
+  results     ScreeningResult[]
+  review      ClinicalReview?
+
+  @@unique([sessionId, screeningVersion])
+  @@index([generatedAt])
+}
+
+/// Result of ONE Four-D category in one result run. Insert-only. Evidence holds REFERENCES to the
+/// recorded data (observation / measurement / amendment change ids), never copied values.
 model ScreeningResult {
-  id             String        @id @default(uuid()) @db.Uuid
-  sessionId      String        @db.Uuid
-  category       FourDCategory
-  outcome        ResultOutcome
-  source         ResultSource
-  ruleSetVersion String?
-  aiAnalysisId   String?       @db.Uuid
-  /// Structured reasons (rule/question codes), never free-text diagnosis.
-  reasons        Json
-  limitations    Json?
-  reviewStatus   ReviewStatus  @default(PENDING)
-  reviewedById   String?       @db.Uuid
-  reviewedAt     DateTime?     @db.Timestamptz(3)
-  reviewNotes    String?
-  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  id                  String           @id @default(uuid()) @db.Uuid
+  resultRunId         String           @db.Uuid
+  sessionId           String           @db.Uuid
+  category            FourDCategory
+  /// null when the category was not assessed.
+  sessionCategoryId   String?          @db.Uuid
+  protocolId          String?          @db.Uuid
+  /// null = no rule set applied (NOT_ASSESSED / NOT_INTERPRETED).
+  ruleSetId           String?          @db.Uuid
+  outcome             ResultOutcome
+  source              ResultSource
+  aiAnalysisId        String?          @db.Uuid
+  /// [{ ruleId, result: "MET" | "NOT_MET" | "UNKNOWN", evidence: [{ kind, id }] }]
+  evidence            Json
+  /// [{ code, ... }] - why the result is limited (incomplete, unknown answers, ...).
+  limitations         Json
+  referralRecommended Boolean          @default(false)
+  suggestedPriority   ReferralUrgency?
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
 
-  session    ScreeningSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  aiAnalysis AiAnalysis?      @relation(fields: [aiAnalysisId], references: [id], onDelete: Restrict)
-  reviewedBy User?            @relation(fields: [reviewedById], references: [id], onDelete: Restrict)
+  resultRun       ScreeningResultRun        @relation(fields: [resultRunId], references: [id], onDelete: Restrict)
+  session         ScreeningSession          @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  sessionCategory ScreeningSessionCategory? @relation(fields: [sessionCategoryId], references: [id], onDelete: Restrict)
+  protocol        ScreeningProtocol?        @relation(fields: [protocolId], references: [id], onDelete: Restrict)
+  ruleSet         ClinicalRuleSet?          @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+  aiAnalysis      AiAnalysis?               @relation(fields: [aiAnalysisId], references: [id], onDelete: Restrict)
+  referrals       Referral[]
 
+  @@unique([resultRunId, category])
   @@index([sessionId])
-  @@index([reviewStatus, createdAt])
+  @@index([ruleSetId])
+}
+
+/// One clinical review per result run (Step 7 decision H). Claimed by one reviewer at a time.
+model ClinicalReview {
+  id                String                  @id @default(uuid()) @db.Uuid
+  resultRunId       String                  @unique @db.Uuid
+  /// Snapshot of the child's area when the task was created (reporting only; access follows the child).
+  areaId            String                  @db.Uuid
+  status            ClinicalReviewStatus    @default(PENDING_REVIEW)
+  claimedById       String?                 @db.Uuid
+  claimedAt         DateTime?               @db.Timestamptz(3)
+  decision          ClinicalReviewDecision?
+  decidedById       String?                 @db.Uuid
+  /// Role code of the decider at decision time.
+  decidedByRoleCode String?
+  decidedAt         DateTime?               @db.Timestamptz(3)
+  /// Encrypted (enc1:). Required for every decision except ACCEPT_RESULT.
+  notes             String?
+  version           Int                     @default(1)
+  createdAt         DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                @updatedAt @db.Timestamptz(3)
+
+  resultRun ScreeningResultRun    @relation(fields: [resultRunId], references: [id], onDelete: Restrict)
+  area      Area                  @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  claimedBy User?                 @relation("ReviewClaimedBy", fields: [claimedById], references: [id], onDelete: Restrict)
+  decidedBy User?                 @relation("ReviewDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  events    ClinicalReviewEvent[]
+  referrals Referral[]
+  followUps FollowUp[]
+
+  @@index([status, createdAt])
+  @@index([areaId, status])
+}
+
+/// Append-only history of a review (created, claimed, released, decided).
+model ClinicalReviewEvent {
+  id            String                  @id @default(uuid()) @db.Uuid
+  reviewId      String                  @db.Uuid
+  fromStatus    ClinicalReviewStatus?
+  toStatus      ClinicalReviewStatus
+  decision      ClinicalReviewDecision?
+  /// null = created by the system together with the result run.
+  actorId       String?                 @db.Uuid
+  actorRoleCode String?
+  /// Encrypted (enc1:).
+  notes         String?
+  occurredAt    DateTime                @default(now()) @db.Timestamptz(3)
+
+  review ClinicalReview @relation(fields: [reviewId], references: [id], onDelete: Restrict)
+  actor  User?          @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([reviewId, occurredAt])
 }
 
 model AiAnalysis {
@@ -991,49 +1259,116 @@ model ScreeningAmendmentReferralImpact {
 
 // ===================================================== Facilities, referrals, follow-up
 
+/// Referral destination (Step 7 decision P). State / district / block come from the area tree.
+/// SQL additions: unique official code; unique (area, type, lower(name)); acceptsReferrals and
+/// services only when VERIFIED; no DELETE; version +1 on every update.
 model Facility {
-  id        String       @id @default(uuid()) @db.Uuid
-  name      String
-  type      FacilityType
-  areaId    String       @db.Uuid
-  address   String?
+  id                    String             @id @default(uuid()) @db.Uuid
+  name                  String
+  nameHi                String?
+  /// Official facility code (e.g. a national facility registry id) - source to be confirmed.
+  officialCode          String?            @unique
+  type                  FacilityType
+  areaId                String             @db.Uuid
+  address               String?
   /// Facility's official phone - not personal data.
-  phone     String?
-  isActive  Boolean      @default(true)
-  createdAt DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
+  contactPhone          String?
+  /// Service codes, only as verified with the facility (never assumed).
+  services              String[]           @default([])
+  /// May be offered as a referral destination: only for a VERIFIED facility.
+  acceptsReferrals      Boolean            @default(false)
+  verificationStatus    VerificationStatus @default(UNVERIFIED)
+  verifiedById          String?            @db.Uuid
+  verifiedAt            DateTime?          @db.Timestamptz(3)
+  verificationReference String?
+  isActive              Boolean            @default(true)
+  deactivatedAt         DateTime?          @db.Timestamptz(3)
+  deactivationReason    String?
+  version               Int                @default(1)
+  createdById           String             @db.Uuid
+  updatedById           String?            @db.Uuid
+  createdAt             DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
 
-  area      Area       @relation(fields: [areaId], references: [id], onDelete: Restrict)
-  referrals Referral[]
+  area         Area                  @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  createdBy    User                  @relation("FacilityCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User?                 @relation("FacilityUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  verifiedBy   User?                 @relation("FacilityVerifiedBy", fields: [verifiedById], references: [id], onDelete: Restrict)
+  history      FacilityHistory[]
+  referrals    Referral[]
+  statusEvents ReferralStatusEvent[]
 
   @@index([areaId, type, isActive])
+  @@index([verificationStatus, acceptsReferrals, isActive])
 }
 
-model Referral {
-  id                String          @id @default(uuid()) @db.Uuid
-  childId           String          @db.Uuid
-  sessionId         String?         @db.Uuid
-  facilityId        String          @db.Uuid
-  /// Snapshot of the child's area at referral time.
-  areaId            String          @db.Uuid
-  category          FourDCategory?
-  urgency           ReferralUrgency
-  status            ReferralStatus  @default(CREATED)
-  reasonCode        String?
-  notes             String?
-  appointmentAt     DateTime?       @db.Timestamptz(3)
-  closedAt          DateTime?       @db.Timestamptz(3)
-  /// Device-generated id; makes offline re-submission idempotent.
-  clientOperationId String?         @unique @db.Uuid
-  createdById       String          @db.Uuid
-  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
+/// Append-only change history of a facility (old/new values of changed fields).
+model FacilityHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  facilityId String   @db.Uuid
+  /// CREATED, UPDATED, VERIFIED, UNVERIFIED, DEACTIVATED, REACTIVATED
+  action     String
+  changes    Json
+  reason     String?
+  actorId    String   @db.Uuid
+  occurredAt DateTime @default(now()) @db.Timestamptz(3)
 
-  child     Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
-  session   ScreeningSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  facility  Facility          @relation(fields: [facilityId], references: [id], onDelete: Restrict)
-  area      Area              @relation(fields: [areaId], references: [id], onDelete: Restrict)
-  createdBy User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  actor    User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([facilityId, occurredAt])
+}
+
+/// A referral (Step 7 decisions J-N). SQL additions: state machine trigger (every status change
+/// must follow docs/step-7/architecture.md section 6 and be accompanied by a status event);
+/// one active referral per child + screening + category; ISSUED and later need a facility,
+/// issue time and the REFERRAL_DATA_SHARING consent; version +1; no DELETE.
+model Referral {
+  id                           String          @id @default(uuid()) @db.Uuid
+  childId                      String          @db.Uuid
+  sessionId                    String?         @db.Uuid
+  /// The category result this referral is based on, if any.
+  screeningResultId            String?         @db.Uuid
+  clinicalReviewId             String?         @db.Uuid
+  origin                       ReferralOrigin
+  /// Required from ISSUED on.
+  facilityId                   String?         @db.Uuid
+  /// Snapshot of the child's area at referral time.
+  areaId                       String          @db.Uuid
+  category                     FourDCategory?
+  /// Shown as "priority". Labels only - meaning is defined by clinical policy.
+  urgency                      ReferralUrgency
+  status                       ReferralStatus  @default(PENDING_APPROVAL)
+  reasonCode                   String
+  /// Encrypted (enc1:).
+  reasonNote                   String?
+  approvedById                 String?         @db.Uuid
+  approvedAt                   DateTime?       @db.Timestamptz(3)
+  issuedAt                     DateTime?       @db.Timestamptz(3)
+  /// The REFERRAL_DATA_SHARING consent verified at ISSUE.
+  sharingConsentId             String?         @db.Uuid
+  consentVerifiedAt            DateTime?       @db.Timestamptz(3)
+  consentWithdrawnAfterIssueAt DateTime?       @db.Timestamptz(3)
+  /// Encrypted (enc1:). Required when the facility is outside the child's district.
+  outOfDistrictReason          String?
+  appointmentAt                DateTime?       @db.Timestamptz(3)
+  closedAt                     DateTime?       @db.Timestamptz(3)
+  /// Device-generated id; makes a retried submission idempotent.
+  clientOperationId            String?         @unique @db.Uuid
+  version                      Int             @default(1)
+  createdById                  String          @db.Uuid
+  createdAt                    DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt                    DateTime        @updatedAt @db.Timestamptz(3)
+
+  child           Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
+  session         ScreeningSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  screeningResult ScreeningResult?  @relation(fields: [screeningResultId], references: [id], onDelete: Restrict)
+  clinicalReview  ClinicalReview?   @relation(fields: [clinicalReviewId], references: [id], onDelete: Restrict)
+  facility        Facility?         @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  area            Area              @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  sharingConsent  Consent?          @relation(fields: [sharingConsentId], references: [id], onDelete: Restrict)
+  approvedBy      User?             @relation("ReferralApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  createdBy       User              @relation("ReferralCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
 
   statusEvents     ReferralStatusEvent[]
   amendmentImpacts ScreeningAmendmentReferralImpact[]
@@ -1042,45 +1377,103 @@ model Referral {
   @@index([childId])
   @@index([areaId, status])
   @@index([facilityId, status])
+  @@index([status, updatedAt])
 }
 
+/// Append-only referral history. Reports from outside the app carry a source and verification.
 model ReferralStatusEvent {
-  id          String          @id @default(uuid()) @db.Uuid
-  referralId  String          @db.Uuid
-  fromStatus  ReferralStatus?
-  toStatus    ReferralStatus
-  changedById String          @db.Uuid
-  changedAt   DateTime        @default(now()) @db.Timestamptz(3)
-  note        String?
+  id                 String               @id @default(uuid()) @db.Uuid
+  referralId         String               @db.Uuid
+  fromStatus         ReferralStatus?
+  toStatus           ReferralStatus
+  changedById        String               @db.Uuid
+  actorRoleCode      String
+  changedAt          DateTime             @default(now()) @db.Timestamptz(3)
+  source             ReferralUpdateSource
+  verificationStatus VerificationStatus
+  /// When it happened according to the source (e.g. the visit date); changedAt = when entered.
+  effectiveAt        DateTime?            @db.Timestamptz(3)
+  facilityId         String?              @db.Uuid
+  /// This event corrects (reverts) that earlier event (decision J).
+  correctsEventId    String?              @unique @db.Uuid
+  /// Encrypted (enc1:). Required for REJECTED, CANCELLED, CLOSED and corrections.
+  reason             String?
+  /// Encrypted (enc1:).
+  note               String?
 
-  referral  Referral @relation(fields: [referralId], references: [id], onDelete: Restrict)
-  changedBy User     @relation(fields: [changedById], references: [id], onDelete: Restrict)
+  referral      Referral             @relation(fields: [referralId], references: [id], onDelete: Restrict)
+  changedBy     User                 @relation(fields: [changedById], references: [id], onDelete: Restrict)
+  facility      Facility?            @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  correctsEvent ReferralStatusEvent? @relation("ReferralEventCorrection", fields: [correctsEventId], references: [id], onDelete: Restrict)
+  correctedBy   ReferralStatusEvent? @relation("ReferralEventCorrection")
 
   @@index([referralId, changedAt])
 }
 
+/// A follow-up task (Step 7 decision Q). SQL additions: one active task per child + referral +
+/// reason; ASSIGNED / IN_PROGRESS need an assignee; COMPLETED needs completion fields; linked
+/// session / referral / review must belong to the same child; version +1; no DELETE.
 model FollowUp {
-  id            String         @id @default(uuid()) @db.Uuid
-  childId       String         @db.Uuid
-  referralId    String?        @db.Uuid
-  dueDate       DateTime       @db.Date
-  status        FollowUpStatus @default(PENDING)
-  /// Optional; access is still decided by the child's area.
-  assignedToId  String?        @db.Uuid
-  completedAt   DateTime?      @db.Timestamptz(3)
-  completedById String?        @db.Uuid
-  outcomeNote   String?
-  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
+  id                 String         @id @default(uuid()) @db.Uuid
+  childId            String         @db.Uuid
+  referralId         String?        @db.Uuid
+  screeningSessionId String?        @db.Uuid
+  clinicalReviewId   String?        @db.Uuid
+  reasonCode         String
+  /// Encrypted (enc1:).
+  reasonNote         String?
+  dueDate            DateTime       @db.Date
+  status             FollowUpStatus @default(PENDING)
+  assignedToId       String?        @db.Uuid
+  assignedById       String?        @db.Uuid
+  /// Encrypted (enc1:).
+  nextAction         String?
+  completedAt        DateTime?      @db.Timestamptz(3)
+  completedById      String?        @db.Uuid
+  /// Encrypted (enc1:).
+  outcomeNote        String?
+  clientOperationId  String?        @unique @db.Uuid
+  version            Int            @default(1)
+  createdById        String         @db.Uuid
+  createdAt          DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime       @updatedAt @db.Timestamptz(3)
 
-  child       Child     @relation(fields: [childId], references: [id], onDelete: Restrict)
-  referral    Referral? @relation(fields: [referralId], references: [id], onDelete: Restrict)
-  assignedTo  User?     @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
-  completedBy User?     @relation("FollowUpCompletedBy", fields: [completedById], references: [id], onDelete: Restrict)
+  child            Child             @relation(fields: [childId], references: [id], onDelete: Restrict)
+  referral         Referral?         @relation(fields: [referralId], references: [id], onDelete: Restrict)
+  screeningSession ScreeningSession? @relation(fields: [screeningSessionId], references: [id], onDelete: Restrict)
+  clinicalReview   ClinicalReview?   @relation(fields: [clinicalReviewId], references: [id], onDelete: Restrict)
+  assignedTo       User?             @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+  assignedBy       User?             @relation("FollowUpAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+  completedBy      User?             @relation("FollowUpCompletedBy", fields: [completedById], references: [id], onDelete: Restrict)
+  createdBy        User              @relation("FollowUpCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  events           FollowUpEvent[]
 
   @@index([assignedToId, status, dueDate])
   @@index([childId])
   @@index([status, dueDate])
+  @@index([referralId])
+}
+
+/// Append-only history of a follow-up task.
+model FollowUpEvent {
+  id           String            @id @default(uuid()) @db.Uuid
+  followUpId   String            @db.Uuid
+  type         FollowUpEventType
+  fromStatus   FollowUpStatus?
+  toStatus     FollowUpStatus
+  actorId      String            @db.Uuid
+  assignedToId String?           @db.Uuid
+  oldDueDate   DateTime?         @db.Date
+  newDueDate   DateTime?         @db.Date
+  /// Encrypted (enc1:). Required for RESCHEDULED, MISSED, CANCELLED, REASSIGNED.
+  reason       String?
+  occurredAt   DateTime          @default(now()) @db.Timestamptz(3)
+
+  followUp   FollowUp @relation(fields: [followUpId], references: [id], onDelete: Restrict)
+  actor      User     @relation("FollowUpEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+  assignedTo User?    @relation("FollowUpEventAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+
+  @@index([followUpId, occurredAt])
 }
 
 // ======================================================================== Media
@@ -1163,14 +1556,19 @@ model SyncOperation {
   @@index([userId, receivedAt])
 }
 
+/// In-app notification (Step 7 decision S). IDs only - no names or health details. Only readAt
+/// may change, once (trigger). dedupeKey makes reminder runs and retries idempotent.
 model Notification {
-  id        String           @id @default(uuid()) @db.Uuid
-  userId    String           @db.Uuid
-  type      NotificationType
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @db.Uuid
+  type       NotificationType
+  entityType String
+  entityId   String           @db.Uuid
+  dedupeKey  String           @unique
   /// IDs only - no names or health details.
-  payload   Json
-  readAt    DateTime?        @db.Timestamptz(3)
-  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  payload    Json
+  readAt     DateTime?        @db.Timestamptz(3)
+  createdAt  DateTime         @default(now()) @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 

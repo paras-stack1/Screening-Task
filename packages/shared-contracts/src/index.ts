@@ -10,3 +10,5 @@ export * from './consent.js';
 export * from './users.js';
 export * from './screening.js';
 export * from './areas.js';
+export * from './clinicalRules.js';
+export * from './results.js';
