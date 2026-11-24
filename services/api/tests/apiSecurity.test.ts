@@ -128,6 +128,12 @@ describe('protected routes without a valid access token', () => {
     ['get', `/api/v1/guardians/${ID}/invitations`],
     ['post', `/api/v1/guardians/${ID}/invitations`],
     ['post', `/api/v1/guardians/${ID}/invitations/${ID}/revoke`],
+    // Step 8: signed-in parent routes (parent access token; staff tokens are rejected).
+    ['get', '/api/v1/parent/auth/me'],
+    ['post', '/api/v1/parent/auth/logout-all'],
+    ['post', '/api/v1/parent/auth/change-password'],
+    ['post', '/api/v1/parent/auth/phone-change/start'],
+    ['post', '/api/v1/parent/auth/phone-change/confirm'],
     ['get', '/api/v1/users'],
     ['post', '/api/v1/users'],
     ['get', `/api/v1/users/${ID}`],

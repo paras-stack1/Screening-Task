@@ -327,6 +327,20 @@ export function createGuardiansService({ db, pii }: GuardiansServiceDependencies
           changed.push('phone');
         }
       }
+      // Step 8 (PP14): once a parent verified this number by code and activated an account, only
+      // the parent can change it (code sent to the new number). Workers cannot.
+      if (changed.includes('phone') || changed.includes('phoneRemoved')) {
+        const account = await db.parentAccount.findUnique({
+          where: { guardianId },
+          select: { status: true },
+        });
+        if (account && account.status !== 'DISABLED') {
+          throw AppError.conflict(
+            'PHONE_VERIFIED_BY_PARENT',
+            'This number was verified by the parent for the Parent Portal. Only the parent can change it.',
+          );
+        }
+      }
 
       if (changed.length > 0) {
         await db.$transaction(async (tx) => {

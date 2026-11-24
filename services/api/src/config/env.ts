@@ -92,6 +92,8 @@ const envSchema = z
      */
     OTP_HMAC_KEY: base64Key(32, 128).optional(),
     PARENT_OTP_TTL_MINUTES: z.coerce.number().int().min(1).max(10).default(5),
+    /** Audience of parent access tokens (PP2): must differ from JWT_AUDIENCE so staff routes reject them. */
+    PARENT_JWT_AUDIENCE: z.string().min(3).max(100).default('balswasthya-parent-portal'),
     /** Defaults: "silent" under NODE_ENV=test, otherwise "info". */
     LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
     /** Owner credentials for Prisma Migrate. Only checked here so production can refuse them. */
@@ -102,6 +104,13 @@ const envSchema = z
 
     if (env.REFRESH_TOKEN_ABSOLUTE_DAYS < env.REFRESH_TOKEN_IDLE_DAYS) {
       fail('REFRESH_TOKEN_ABSOLUTE_DAYS', 'must be greater than or equal to REFRESH_TOKEN_IDLE_DAYS');
+    }
+
+    if (env.PARENT_JWT_AUDIENCE === env.JWT_AUDIENCE) {
+      fail(
+        'PARENT_JWT_AUDIENCE',
+        'must differ from JWT_AUDIENCE (parent tokens must never pass staff checks)',
+      );
     }
 
     if (env.NODE_ENV !== 'production') return;

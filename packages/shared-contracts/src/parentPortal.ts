@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { indianMobileSchema } from './people.js';
 
 /**
  * Parent Portal onboarding (Step 8; docs/step-8/parent-portal-plan.md, decisions PP1-PP18).
@@ -151,3 +152,96 @@ export const activateParentAccountResponseSchema = z.object({
   maskedPhone: z.string(),
 });
 export type ActivateParentAccountResponse = z.infer<typeof activateParentAccountResponseSchema>;
+
+// ---------------------------------------------------- parent sign-in and account (stage 5)
+// Separate from staff auth: parent access tokens have their own audience and are rejected by
+// every staff route. The role is always PARENT_GUARDIAN and cannot be chosen or changed.
+
+export const PARENT_ROLE = 'PARENT_GUARDIAN' as const;
+const parentPasswordInput = z.string().min(1).max(256);
+
+export const parentLoginRequestSchema = z.strictObject({
+  phone: indianMobileSchema,
+  password: parentPasswordInput,
+  /** Optional user-visible label such as "Android phone". No device identifiers. */
+  deviceLabel: z.string().trim().min(1).max(60).optional(),
+});
+export type ParentLoginRequest = z.input<typeof parentLoginRequestSchema>;
+
+export const parentRefreshRequestSchema = z.strictObject({ refreshToken: z.string().min(1).max(200) });
+export type ParentRefreshRequest = z.infer<typeof parentRefreshRequestSchema>;
+
+export const parentAccountSchema = z.object({
+  id: z.string(),
+  role: z.literal(PARENT_ROLE),
+  /** Shown after sign-in only. */
+  guardianName: z.string(),
+  maskedPhone: z.string(),
+  activatedAt: z.string(),
+  passwordChangedAt: z.string(),
+  privacyNoticeVersion: z.string(),
+  termsVersion: z.string(),
+  /** Number of children currently shared with this parent (details arrive in stage 6). */
+  childCount: z.number().int(),
+});
+export type ParentAccount = z.infer<typeof parentAccountSchema>;
+
+export const parentTokensResponseSchema = z.object({
+  accessToken: z.string(),
+  accessTokenExpiresAt: z.string(),
+  refreshToken: z.string(),
+  refreshTokenExpiresAt: z.string(),
+  account: parentAccountSchema,
+});
+export type ParentTokensResponse = z.infer<typeof parentTokensResponseSchema>;
+
+/** Browser variant (/parent/auth/web/*): the refresh token is an httpOnly cookie, never in JSON. */
+export const parentWebAuthResponseSchema = parentTokensResponseSchema.omit({ refreshToken: true });
+export type ParentWebAuthResponse = z.infer<typeof parentWebAuthResponseSchema>;
+export const PARENT_WEB_CLIENT_VALUE = 'parent-portal';
+
+export const parentMeResponseSchema = z.object({ account: parentAccountSchema });
+export type ParentMeResponse = z.infer<typeof parentMeResponseSchema>;
+
+const newPasswordFields = {
+  newPassword: parentPasswordInput,
+  confirmPassword: parentPasswordInput,
+};
+const passwordsMatch = (v: { newPassword: string; confirmPassword: string }) =>
+  v.newPassword === v.confirmPassword;
+const mismatch = { path: ['confirmPassword'], message: 'Passwords do not match' };
+
+export const parentChangePasswordRequestSchema = z
+  .strictObject({ currentPassword: parentPasswordInput, ...newPasswordFields })
+  .refine(passwordsMatch, mismatch);
+export type ParentChangePasswordRequest = z.infer<typeof parentChangePasswordRequestSchema>;
+
+/** Forgot password: always the same answer, whether or not an account exists. */
+export const parentForgotPasswordRequestSchema = z.strictObject({ phone: indianMobileSchema });
+export type ParentForgotPasswordRequest = z.input<typeof parentForgotPasswordRequestSchema>;
+export const parentForgotPasswordResponseSchema = z.object({
+  accepted: z.literal(true),
+  /** "If an account exists for this number, a code has been sent." */
+  message: z.string(),
+});
+
+export const parentResetPasswordRequestSchema = z
+  .strictObject({
+    phone: indianMobileSchema,
+    code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+    ...newPasswordFields,
+  })
+  .refine(passwordsMatch, mismatch);
+export type ParentResetPasswordRequest = z.input<typeof parentResetPasswordRequestSchema>;
+
+/** Mobile number change (PP14): the code goes to the NEW number; the password confirms it is you. */
+export const parentPhoneChangeStartRequestSchema = z.strictObject({
+  newPhone: indianMobileSchema,
+  currentPassword: parentPasswordInput,
+});
+export type ParentPhoneChangeStartRequest = z.input<typeof parentPhoneChangeStartRequestSchema>;
+export const parentPhoneChangeConfirmRequestSchema = z.strictObject({
+  newPhone: indianMobileSchema,
+  code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+});
+export type ParentPhoneChangeConfirmRequest = z.input<typeof parentPhoneChangeConfirmRequestSchema>;

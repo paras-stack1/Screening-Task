@@ -61,6 +61,22 @@ export function buildAuthConfig(source: Env): AuthConfig {
 
 export const authConfig: AuthConfig = buildAuthConfig(env);
 
+/**
+ * Parent Portal sessions (Step 8, PP2/PP9): same signing key and rules as staff, but a separate
+ * audience (staff routes reject parent tokens and vice versa) and longer refresh lifetimes, since
+ * parents sign in rarely: 30 days idle, 90 days absolute. Access tokens stay at the staff value.
+ */
+export function buildParentAuthConfig(source: Env): AuthConfig {
+  const base = buildAuthConfig(source);
+  return {
+    ...base,
+    jwt: { ...base.jwt, audience: source.PARENT_JWT_AUDIENCE },
+    refresh: { idleTtlMs: 30 * DAY_MS, absoluteTtlMs: 90 * DAY_MS, reuseGraceMs: 30_000 },
+  };
+}
+
+export const parentAuthConfig: AuthConfig = buildParentAuthConfig(env);
+
 /** Guardian phone encryption + lookup hashing with the configured keys (may be unavailable outside production). */
 export const piiCrypto: PiiCrypto = createPiiCrypto({
   encryptionKey: env.PII_ENCRYPTION_KEY,

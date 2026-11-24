@@ -28,6 +28,13 @@ export interface ParentPortalSettings {
   /** Placeholder privacy notice / terms may be accepted (never in production). */
   allowDraftLegal?: boolean;
   /** Per-IP limits for the public onboarding routes, per 15 minutes (tests raise them). */
+  /** Per-IP limits for parent sign-in routes, per 15 minutes (tests raise them). */
+  authRateLimits?: Partial<{
+    loginPerIp: number;
+    refreshPerIp: number;
+    resetPerIp: number;
+    accountPerIp: number;
+  }>;
   publicRateLimits?: {
     validatePerIp: number;
     sendOtpPerIp: number;
