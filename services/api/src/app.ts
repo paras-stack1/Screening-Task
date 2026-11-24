@@ -3,7 +3,7 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import { isDatabaseReachable, prisma } from './config/database';
 import { env, isProduction } from './config/env';
-import { authConfig, piiCrypto } from './config/security';
+import { authConfig, parentAuthConfig, piiCrypto } from './config/security';
 import { aiServiceClient } from './integrations/ai-service/aiServiceClient';
 import { createMockSmsSender, createNoSmsSender } from './integrations/sms/smsSender';
 import { noStore, requireJsonBody } from './middleware/apiHeaders';
@@ -31,6 +31,8 @@ function defaultDependencies(): AppDependencies {
     screeningPolicy: { allowDraftProtocols: !isProduction },
     // Admin portal: refresh cookie is Secure (HTTPS-only) in production (decision P4).
     webSession: { secureCookie: isProduction, allowedOrigins: env.CORS_ORIGINS },
+    // Parent sign-in: separate token audience and longer refresh lifetimes (Step 8, PP2/PP9).
+    parentAuth: parentAuthConfig,
     // Parent Portal (PP5, PP7): no SMS provider exists yet. The mock (local outbox file) is for
     // development only and refused in production by the configuration check.
     parentPortal: {

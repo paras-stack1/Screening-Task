@@ -5,9 +5,9 @@ are as in [children.md](children.md). Contracts: `packages/shared-contracts/src/
 Design and decisions: [../step-8/parent-portal-plan.md](../step-8/parent-portal-plan.md) (PP1-PP18).
 Examples use synthetic data.
 
-> **Stages 3-4.** Workers invite (stage 3); parents can check the link, verify their number
-> with a code and activate an account (stage 4, server side). Login, sessions and password reset
-> arrive in stage 5, the parent screens in stage 6. **No real SMS provider is configured**: in production nothing is sent and invitations stay
+> **Stages 3-5 (server side).** Workers invite (stage 3); parents check the link, verify their
+> number with a code and activate an account (stage 4); parents sign in, manage sessions, reset
+> their password and change their number (stage 5). The parent screens arrive in stage 6. **No real SMS provider is configured**: in production nothing is sent and invitations stay
 > `INVITATION_PENDING` with SMS status `NOT_CONFIGURED`.
 
 ## Worker invitation endpoints (staff access token)
@@ -129,6 +129,60 @@ the invitation and the consumed code. Holding the link alone is never enough to 
 - **Activation grants no consent** for any health-data use; consent stays purpose-specific.
 - The parent is not signed in automatically; login is stage 5.
 
+## Parent sign-in and account (stage 5)
+
+Base `/api/v1/parent/auth`. Parent access tokens use their own audience (`PARENT_JWT_AUDIENCE`,
+default `balswasthya-parent-portal`): **staff routes reject parent tokens and parent routes reject
+staff tokens**. The role is always `PARENT_GUARDIAN`; no endpoint accepts or changes a role.
+Access tokens 15 minutes; refresh tokens rotate on every use, 30 days idle / 90 days absolute.
+Every authenticated request re-checks that the account is ACTIVE and the session is live.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| POST | `/login` | - | `{ phone, password, deviceLabel? }` -> tokens + account |
+| POST | `/refresh` | - | `{ refreshToken }` -> new tokens (rotation) |
+| POST | `/logout` | - | `{ refreshToken }` -> always `204` |
+| POST | `/forgot-password` | - | `{ phone }` -> always `202` with the same message |
+| POST | `/reset-password` | - | `{ phone, code, newPassword, confirmPassword }` |
+| GET | `/me` | parent | account (role, guardian name, masked number, versions, shared child count) |
+| POST | `/logout-all` | parent | ends every session of the account |
+| POST | `/change-password` | parent | `{ currentPassword, newPassword, confirmPassword }` -> new tokens |
+| POST | `/phone-change/start` | parent | `{ newPhone, currentPassword }` -> code to the NEW number |
+| POST | `/phone-change/confirm` | parent | `{ newPhone, code }` -> account |
+| POST | `/web/login`, `/web/refresh`, `/web/logout`, `/web/change-password` | browser | as above, refresh token in a cookie |
+
+**Native vs browser.** The Android app gets the refresh token in the JSON body and keeps it in
+SecureStore. The browser variant `/web/*` never puts it in JSON: it is an httpOnly,
+SameSite=Strict cookie `bs_parent_rt` scoped to `/api/v1/parent/auth/web` (Secure in production);
+those routes require a listed Origin (`CORS_ORIGINS`) and `x-balswasthya-client: parent-portal`.
+
+**Sign-in (PP10).** Unknown number, wrong password, temporary lock and disabled account all give
+the same `401 INVALID_CREDENTIALS`; an unknown number runs a dummy Argon2 check so timing does not
+reveal it. 5 wrong passwords lock sign-in for 1 minute, doubling up to 15 minutes (not revealed).
+Logout, logout-all, password change, reset and disabling end sessions immediately. Replaying a
+rotated refresh token (outside the 30 s lost-response grace) ends the whole session family and is
+audited (`parent_auth.refresh_reuse_detected`).
+
+**Password change.** Needs the current password (a wrong one counts towards the lock and gives
+`422 CURRENT_PASSWORD_WRONG`); the new password follows the activation rules and must differ; all
+other sessions end and a new one is returned.
+
+**Forgot / reset password.** `forgot-password` answers `202` with the same message whether or not
+the number has an account; a code is sent only to a real account (1 per minute, 3 per hour -
+extra requests are silently skipped). Without an SMS provider or OTP key everyone gets the same
+`503`. `reset-password` checks the new password first (`422 WEAK_PASSWORD`), then the code with
+the same rules as activation codes (5 attempts counted atomically, 5 minutes, single use); a wrong
+code and an unknown number give the same `400 RESET_INVALID`. Success sets the new password,
+clears a sign-in lock and ends every session; the parent then signs in.
+
+**Mobile number change (PP14).** Workers can no longer change or remove a number the parent
+verified: `PATCH /guardians/:id` with a phone change answers `409 PHONE_VERIFIED_BY_PARENT` while
+the guardian has a live parent account (other details stay editable). The parent changes it:
+`start` needs the current password and sends a code to the **new** number (60 s resend, 3 per
+hour); `confirm` with that number and code updates the account and the guardian record together,
+ends the account's other sessions, and is audited. A number already used by another live parent
+account: `409 PHONE_IN_USE`.
+
 ## Database rules (migration `20261125100000_step8_parent_portal_accounts`)
 
 - One open invitation per guardian; one non-revoked access row per guardian-child link; one live
@@ -147,6 +201,7 @@ the invitation and the consumed code. Holding the link alone is never enough to 
 | `PARENT_INVITE_TTL_HOURS` | 24 | 1-168 |
 | `OTP_HMAC_KEY` | empty | Base64, 32+ bytes, different from the PII keys. Required in production; empty = no codes (503). |
 | `PARENT_OTP_TTL_MINUTES` | 5 | 1-10 |
+| `PARENT_JWT_AUDIENCE` | `balswasthya-parent-portal` | Must differ from `JWT_AUDIENCE`. |
 | `SMS_PROVIDER` | `mock` in development, otherwise `none` | `none`: nothing sent (`NOT_CONFIGURED`). `mock`: **development only**, refused in production; writes messages to the git-ignored `services/api/.dev-sms/outbox.log`, never to the application log. |
 
 Local development: set `PARENT_PORTAL_URL=http://localhost:8082` (any address; the parent app

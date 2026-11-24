@@ -20,6 +20,8 @@ import { createGuardiansRouter } from '../modules/guardians/guardians.routes';
 import { createGuardianInvitationsRouter } from '../modules/parent-portal/invitations.routes';
 import type { ParentPortalSettings } from '../modules/parent-portal/invitations.service';
 import { createParentOnboardingRouter } from '../modules/parent-portal/onboarding.routes';
+import { createParentAuthRouter } from '../modules/parent-portal/parentAuth.routes';
+import type { AuthConfig } from '../config/security';
 import {
   createClinicalReviewsRouter,
   createFacilitiesRouter,
@@ -53,6 +55,8 @@ export interface ApiRouterDependencies {
   webSession: WebSessionSettings;
   /** Parent Portal onboarding (Step 8): trusted portal address, invitation lifetime, SMS sender. */
   parentPortal: ParentPortalSettings;
+  /** Parent sign-in (Step 8, stage 5): separate audience and session lifetimes. */
+  parentAuth: AuthConfig;
 }
 
 /**
@@ -80,6 +84,17 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/auth/web', createWebAuthRouter(deps.auth, deps.webSession));
   router.use('/auth', createAuthRouter(deps.auth));
   // Step 8 Parent Portal onboarding: PUBLIC, authorised by the invitation token (see the module).
+  router.use(
+    '/parent/auth',
+    createParentAuthRouter({
+      db: deps.auth.db,
+      pii: deps.pii,
+      parentAuth: deps.parentAuth,
+      parentPortal: deps.parentPortal,
+      now: deps.auth.now,
+      web: { allowedOrigins: deps.webSession.allowedOrigins, secureCookie: deps.webSession.secureCookie },
+    }),
+  );
   router.use(
     '/parent',
     createParentOnboardingRouter({

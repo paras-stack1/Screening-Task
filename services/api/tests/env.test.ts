@@ -136,6 +136,13 @@ describe('Parent Portal configuration (Step 8)', () => {
     expect(failingPaths({ ...minimalDevelopment, OTP_HMAC_KEY: 'c2hvcnQ=' })).toContain('OTP_HMAC_KEY');
   });
 
+  it('parent tokens need their own audience', () => {
+    expect(parseEnv(minimalDevelopment).data?.PARENT_JWT_AUDIENCE).toBe('balswasthya-parent-portal');
+    expect(failingPaths({ ...minimalDevelopment, PARENT_JWT_AUDIENCE: 'balswasthya-worker-app' })).toContain(
+      'PARENT_JWT_AUDIENCE',
+    );
+  });
+
   it('rejects an unknown SMS provider and an out-of-range invitation lifetime', () => {
     expect(failingPaths({ ...minimalDevelopment, SMS_PROVIDER: 'twilio' })).toContain('SMS_PROVIDER');
     expect(failingPaths({ ...minimalDevelopment, PARENT_INVITE_TTL_HOURS: '0' })).toContain(
