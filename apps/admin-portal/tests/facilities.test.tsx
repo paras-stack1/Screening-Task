@@ -196,6 +196,14 @@ describe('facilities', () => {
     expect(screen.queryByRole('link', { name: 'Reports' })).toBeNull();
   });
 
+  it('searches as the administrator types, without a search button', async () => {
+    const { user } = await openAs('/facilities');
+    expect(await screen.findByText('No facilities yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Search' })).toBeNull();
+    await user.type(screen.getByLabelText('Name or official code'), 'PHC');
+    await waitFor(() => expect(server.callsTo('/facilities').some((c) => c.search === '?q=PHC')).toBe(true));
+  });
+
   it('creates an unverified facility, then records a verification', async () => {
     const { user } = await openAs('/facilities/new');
     expect(await screen.findByText(/does not receive referrals until it is verified/)).toBeInTheDocument();

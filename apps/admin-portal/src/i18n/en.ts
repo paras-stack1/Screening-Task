@@ -144,7 +144,7 @@ export const en = {
   'areaPicker.change': 'Change area',
   'areaPicker.empty': 'No areas here.',
   'areaPicker.truncated': 'More areas match. Type more of the name.',
-  'areaPicker.subAreas': '{{count}} sub-areas',
+  'areaPicker.subAreas': 'Sub-areas ({{count}})',
 
   'tempPassword.title': 'One-time password for {{loginId}}',
   'tempPassword.body':
@@ -268,8 +268,7 @@ export const en = {
   'nav.reports': 'Reports',
   'common.search': 'Search',
   'facility.title': 'Facilities',
-  'facility.intro':
-    'Referral facilities in your areas. A facility can receive referrals only after it is verified.',
+  'facility.intro': 'Referral facilities in your areas.',
   'facility.search': 'Name or official code',
   'facility.add': 'Add facility',
   'facility.empty': 'No facilities yet.',

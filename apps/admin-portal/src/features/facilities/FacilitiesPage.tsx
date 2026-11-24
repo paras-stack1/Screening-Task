@@ -1,6 +1,6 @@
 import type { AreaNode, FacilitySummary } from '@balswasthya/shared-contracts';
 import { FACILITY_TYPES } from '@balswasthya/shared-contracts';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Alert, Button, Loading, SelectField, TextField } from '../../components/ui';
 import { errorMessageKey, useI18n, type TranslationKey } from '../../i18n';
@@ -15,6 +15,11 @@ export function FacilitiesPage() {
   const [draft, setDraft] = useState('');
   const [search, setSearch] = useState('');
   const list = useFacilityList(search);
+  // Search as you type, after a short pause; Enter applies it at once.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(draft.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [draft]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setSearch(draft.trim());
@@ -25,9 +30,6 @@ export function FacilitiesPage() {
       <p className="muted">{t('facility.intro')}</p>
       <form className="filters" onSubmit={submit} role="search">
         <TextField label={t('facility.search')} value={draft} onChange={(e) => setDraft(e.target.value)} />
-        <Button type="submit" variant="secondary">
-          {t('common.search')}
-        </Button>
         <Link className="btn btn-primary" to="/facilities/new">
           {t('facility.add')}
         </Link>

@@ -275,7 +275,7 @@ export const hi: Record<TranslationKey, string> = {
   'nav.reports': 'रिपोर्ट',
   'common.search': 'खोजें',
   'facility.title': 'सुविधाएँ',
-  'facility.intro': 'आपके क्षेत्रों की रेफ़रल सुविधाएँ। सत्यापन के बाद ही कोई सुविधा रेफ़रल ले सकती है।',
+  'facility.intro': 'आपके क्षेत्रों की रेफ़रल सुविधाएँ।',
   'facility.search': 'नाम या आधिकारिक कोड',
   'facility.add': 'सुविधा जोड़ें',
   'facility.empty': 'अभी कोई सुविधा नहीं।',
