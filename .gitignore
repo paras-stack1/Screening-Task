@@ -62,3 +62,14 @@ data/private/
 
 # Step 8: development-only simulated SMS (may contain invitation links and codes)
 .dev-sms/
+
+# Screening platform (backend/, frontend/) - Python and editor extras
+*$py.class
+*.so
+.Python
+env/
+ENV/
+env.bak/
+venv.bak/
+*.swp
+*.swo

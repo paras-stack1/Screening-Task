@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nanhe Kadam – Pediatric Biomechanical Screening</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js for Disease Probability Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- MediaPipe Tasks Vision ES Module Loader -->
+  <script type="module">
+    import { FilesetResolver, PoseLandmarker, FaceLandmarker, DrawingUtils }
+      from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js";
+    window.MediaPipeVision = { FilesetResolver, PoseLandmarker, FaceLandmarker, DrawingUtils };
+    window.dispatchEvent(new CustomEvent("mediapipe-ready"));
+  </script>
+</head>
+
+<body>
+  <main class="page">
+    <!-- Clean Minimalist Header with Language Switcher -->
+    <header class="app-header">
+      <div class="header-main">
+        <div class="brand-group">
+          <span class="brand-icon">NK</span>
+          <div>
+            <div class="brand-title">
+              Nanhe Kadam <span class="brand-title-hi">नन्हे कदम</span>
+            </div>
+            <p class="brand-tagline" data-i18n="brand_sub">RBSK 2.0 Aligned · Pediatric Biomechanical Screening</p>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <!-- 1-Click Language Switcher (English <-> Hindi) -->
+          <button type="button" id="langToggleBtn" class="lang-toggle-btn" title="Switch Language / भाषा बदलें">
+            <span class="lang-code en active">EN</span>
+            <span class="lang-divider">|</span>
+            <span class="lang-code hi">हिंदी</span>
+          </button>
+          <span class="status-indicator online">
+            <span class="status-dot"></span>
+            <span data-i18n="status_ready">Offline Ready</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Clean Minimal Navigation Tabs -->
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="tab-video" role="tab" aria-selected="true" data-i18n="tab_walking">
+          Walking Gait Analysis (चाल जाँच)
+        </button>
+        <button class="nav-tab" data-tab="tab-skin" role="tab" aria-selected="false" data-i18n="tab_skin">
+          Skin Condition (त्वचा)
+        </button>
+        <button class="nav-tab" data-tab="tab-eye" role="tab" aria-selected="false" data-i18n="tab_eye">
+          Eye Condition (नेत्र)
+        </button>
+      </nav>
+    </header>
+
+    <!-- TAB 1: WALKING GAIT & 33 3D BIOMECHANICAL ANALYSIS -->
+    <section id="tab-video" class="tab-content active" role="tabpanel">
+      <!-- Quick Control Ribbon -->
+      <div class="action-ribbon">
+        <div class="ribbon-inputs">
+          <div class="input-item">
+            <label for="childAgeInput" data-i18n="label_age">Child Age (Months):</label>
+            <input type="number" id="childAgeInput" min="6" max="216" value="24" class="inline-input" />
+          </div>
+          <div class="input-item">
+            <label for="taskTypeSelect" data-i18n="label_task">Screening Task:</label>
+            <select id="taskTypeSelect" class="inline-select">
+              <option value="walking_gait">Walking Gait &amp; Step Symmetry</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ribbon-buttons">
+          <button id="startCamBtn" class="btn btn-primary" data-i18n="btn_start_cam">Start Live Camera</button>
+          <label for="videoFileInputAlt" class="btn btn-secondary" data-i18n="btn_upload_video">Upload Video File</label>
+          <input type="file" id="videoFileInputAlt" accept="video/*" capture="user" style="display: none;" />
+          <button id="runDemoBtn" class="btn btn-accent" data-i18n="btn_run_demo">Run Walking Demo</button>
+          <button type="button" id="playPauseBtn" class="btn btn-ghost" title="Play or Pause Video">⏸ Pause</button>
+          <button type="button" id="restartVideoBtn" class="btn btn-ghost" title="Restart Video from Beginning">↺ Restart</button>
+          <button type="button" id="toggleLabelsBtn" class="btn btn-ghost" title="Toggle Landmark IDs / Names">Labels: Off</button>
+          <button id="startRecordBtn" class="btn btn-record" disabled data-i18n="btn_record">Record Session</button>
+          <button id="stopRecordBtn" class="btn btn-ghost" disabled data-i18n="btn_reset">Reset</button>
+        </div>
+      </div>
+
+      <div class="gait-workspace-grid">
+        <!-- Left: 9:16 Portrait Viewport with 33 3D Landmarks & Foot Triangles -->
+        <div class="viewport-card">
+          <div class="viewport-header">
+            <span class="viewport-title" data-i18n="viewport_title">Live 9:16 Vision Stream</span>
+            <button type="button" id="toggleMarkersBtn" class="btn-micro" data-i18n="btn_markers_on">Markers: Active</button>
+          </div>
+
+          <div class="video-viewport-wrap portrait-9-16">
+            <video id="webcamVideo" playsinline autoplay muted></video>
+            <canvas id="skeletonCanvas"></canvas>
+
+            <!-- 9:16 Proportional Alignment Target Frame -->
+            <div class="camera-guide-frame" id="cameraGuideFrame">
+              <div class="guide-box guide-head-box">
+                <span class="guide-label" data-i18n="guide_head">HEAD TARGET</span>
+              </div>
+              <div class="guide-line guide-shoulder-line">
+                <span class="guide-label-center" data-i18n="guide_shoulders">SHOULDERS</span>
+              </div>
+              <div class="guide-line guide-spine-line"></div>
+              <div class="guide-box guide-feet-box">
+                <span class="guide-label" data-i18n="guide_feet">FEET / ANKLES</span>
+              </div>
+            </div>
+
+            <!-- HUD Overlays -->
+            <div class="hud-pill top-left" id="framingBadge">
+              <span class="hud-dot yellow"></span> <span data-i18n="status_waiting">Waiting for Input...</span>
+            </div>
+            <div class="hud-pill bottom-left" id="fpsBadge">
+              <span id="fpsText">-- FPS</span> · <span id="latencyText">-- ms</span>
+            </div>
+            <div class="hud-pill top-right" id="timerBadge" hidden>
+              <span id="countdownText">12.0s</span> | <span id="frameCountText">0 / 120</span>
+            </div>
+          </div>
+
+          <p id="videoStatus" class="status-bar" role="status" data-i18n="status_ready_prompt">Camera ready. Start camera or select a video to begin tracking.</p>
+        </div>
+
+        <!-- Right: Real-time Telemetry, Sub-Tabs: Stream, 33-Inspector & Kinematics -->
+        <div class="telemetry-card">
+          <!-- Live Telemetry KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="kpi_framing">Framing</span>
+              <strong class="kpi-value" id="teleFraming">Waiting...</strong>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="kpi_spine">Spine Tilt</span>
+              <strong class="kpi-value" id="teleSpine">0.0&deg;</strong>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="kpi_lknee">L-Knee Angle</span>
+              <strong class="kpi-value" id="teleLKnee">180.0&deg;</strong>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="kpi_rknee">R-Knee Angle</span>
+              <strong class="kpi-value" id="teleRKnee">180.0&deg;</strong>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="kpi_gsi">Gait Symmetry (GSI)</span>
+              <strong class="kpi-value" id="teleGSI">--</strong>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label" data-i18n="kpi_yaw">Head Yaw / Gaze</span>
+              <strong class="kpi-value" id="teleYaw">0.0&deg;</strong>
+            </div>
+          </div>
+
+          <!-- Subtabs Navigation -->
+          <div class="subtabs-bar" role="tablist">
+            <button type="button" class="subtab-btn active" data-subtab="subtab-telemetry" data-i18n="subtab_stream">
+              Telemetry Stream
+            </button>
+            <button type="button" class="subtab-btn" data-subtab="subtab-inspector" data-i18n="subtab_inspector">
+              33-Landmarks Inspector
+            </button>
+            <button type="button" class="subtab-btn" data-subtab="subtab-charts" data-i18n="subtab_charts">
+              Real-Time Kinematics
+            </button>
+          </div>
+
+          <!-- Subtab 1: Per-Second Live Engineering Log Table -->
+          <div class="subtab-panel active" id="subtab-telemetry">
+            <div class="log-stream-section">
+              <div class="section-top">
+                <h4 data-i18n="log_stream_title">Per-Second Telemetry Stream (Live Measurements)</h4>
+                <button type="button" id="copyTelemetryBtn" class="btn-micro" data-i18n="btn_copy_json">Copy JSON</button>
+              </div>
+              <div class="table-container">
+                <table class="telemetry-table" id="telemetryTable">
+                  <thead>
+                    <tr>
+                      <th data-i18n="th_sec">Sec</th>
+                      <th data-i18n="th_frame">Frame</th>
+                      <th data-i18n="th_lknee">L-Knee</th>
+                      <th data-i18n="th_rknee">R-Knee</th>
+                      <th data-i18n="th_spine">Spine</th>
+                      <th data-i18n="th_sep">Ankle Sep (s)</th>
+                      <th data-i18n="th_torso">Torso (px)</th>
+                      <th data-i18n="th_status">Framing</th>
+                    </tr>
+                  </thead>
+                  <tbody id="telemetryTableBody">
+                    <tr class="empty-row">
+                      <td colspan="8" data-i18n="empty_log">Live telemetry data will stream here second-by-second...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subtab 2: Complete 33-Landmark Inspector -->
+          <div class="subtab-panel" id="subtab-inspector">
+            <div class="inspector-section">
+              <div class="inspector-toolbar">
+                <input type="text" id="landmarkSearch" class="inspector-search" placeholder="Search joint (e.g. knee, ankle, shoulder)..." />
+                <div class="filter-chips">
+                  <button type="button" class="chip active" data-filter="all">All (33)</button>
+                  <button type="button" class="chip" data-filter="face">Face (11)</button>
+                  <button type="button" class="chip" data-filter="upper">Upper (4)</button>
+                  <button type="button" class="chip" data-filter="arms">Arms (10)</button>
+                  <button type="button" class="chip" data-filter="lower">Lower (8)</button>
+                  <button type="button" id="clearSelectionBtn" class="chip clear-chip" style="display:none;">Clear Selection</button>
+                </div>
+              </div>
+
+              <div class="table-container inspector-container">
+                <table class="inspector-table" id="inspectorTable">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Landmark Name</th>
+                      <th>Side</th>
+                      <th>X (norm)</th>
+                      <th>Y (norm)</th>
+                      <th>Z (depth)</th>
+                      <th>Vis %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inspectorTableBody">
+                    <!-- Populated dynamically from script.js -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="inspector-legend">
+                <span class="legend-item"><span class="legend-dot dot-left"></span> Left (Amber)</span>
+                <span class="legend-item"><span class="legend-dot dot-right"></span> Right (Sky Blue)</span>
+                <span class="legend-item"><span class="legend-dot dot-center"></span> Center (Mint)</span>
+                <span class="legend-tip">💡 Click row to target &amp; highlight on video canvas</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subtab 3: Real-Time Kinematics Charts -->
+          <div class="subtab-panel" id="subtab-charts">
+            <div class="kinematics-section">
+              <div class="chart-stats-bar">
+                <span class="chart-stat-badge stat-amber" id="chartStatLKnee">LK: 180°</span>
+                <span class="chart-stat-badge stat-blue" id="chartStatRKnee">RK: 180°</span>
+                <span class="chart-stat-badge stat-teal" id="chartStatSpine">Spine: 0.0°</span>
+                <span class="chart-stat-badge stat-gray" id="chartStatDelta">|L-R|: 0°</span>
+              </div>
+
+              <div class="realtime-chart-wrap">
+                <canvas id="kinematicsCanvas" width="600" height="190"></canvas>
+              </div>
+
+              <!-- Bilateral Kinematic Symmetry Card -->
+              <div class="bilateral-card">
+                <div class="bilateral-grid">
+                  <div class="bilateral-col col-left">
+                    <span class="bilateral-side-title">LEFT SIDE (Amber)</span>
+                    <div class="bilateral-metric"><span>Knee Angle:</span> <strong id="biLKnee">--°</strong></div>
+                    <div class="bilateral-metric"><span>Hip Angle:</span> <strong id="biLHip">--°</strong></div>
+                    <div class="bilateral-metric"><span>Ankle Height:</span> <strong id="biLAnkle">--</strong></div>
+                  </div>
+                  <div class="bilateral-center">
+                    <span class="bilateral-center-title">SYMMETRY</span>
+                    <strong class="bilateral-diff" id="biKneeDiff">Δ 0.0°</strong>
+                    <span class="bilateral-sub" id="biStatusText">Balanced</span>
+                  </div>
+                  <div class="bilateral-col col-right">
+                    <span class="bilateral-side-title">RIGHT SIDE (Sky Blue)</span>
+                    <div class="bilateral-metric"><span>Knee Angle:</span> <strong id="biRKnee">--°</strong></div>
+                    <div class="bilateral-metric"><span>Hip Angle:</span> <strong id="biRHip">--°</strong></div>
+                    <div class="bilateral-metric"><span>Ankle Height:</span> <strong id="biRAnkle">--</strong></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step-by-Step Mathematical Calculation & Decision Breakdown Card -->
+          <div class="math-breakdown-card" id="mathBreakdownCard" hidden>
+            <div class="math-header">
+              <span class="badge-status" id="mathStatusBadge">STATUS</span>
+              <h4 id="mathResultTitle" data-i18n="math_title">Biomechanical Decision Calculation</h4>
+            </div>
+            <div class="math-steps-list" id="mathStepsList"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: SKIN CLASSIFICATION MODULE -->
+    <section id="tab-skin" class="tab-content" role="tabpanel">
+      <div class="classifier-wrap">
+        <div class="card card-skin" data-endpoint="/predict/skin">
+          <div class="card-top-action">
+            <span class="badge">Skin Lesion Classifier</span>
+            <button class="pill-btn ghost-pill demo-load-btn" type="button" data-target="skin">Load Sample Photo</button>
+          </div>
+          <h3>Childhood Skin Health Screening</h3>
+
+          <div class="input-mode-tabs" role="tablist">
+            <button type="button" class="mode-tab-btn active" data-mode="upload">Upload Photo</button>
+            <button type="button" class="mode-tab-btn" data-mode="camera">Live Camera Capture</button>
+          </div>
+
+          <div class="mode-view mode-upload-view">
+            <label class="upload-box" for="skinFileInput">
+              <div class="upload-text">Select or drop lesion image (.jpg / .png / .webp)</div>
+              <input type="file" id="skinFileInput" accept="image/*" class="file-input" />
+              <img alt="Skin Preview" class="preview-image" style="display:none;" />
+            </label>
+          </div>
+
+          <div class="mode-view mode-camera-view" style="display:none;">
+            <div class="live-cam-viewport">
+              <video class="cam-feed" playsinline autoplay muted></video>
+              <canvas class="cam-snap-canvas" style="display:none;"></canvas>
+              <div class="cam-reticle skin-reticle">
+                <div class="reticle-ring"></div>
+                <span class="reticle-text">Center Lesion Inside Ring</span>
+              </div>
+            </div>
+            <div class="cam-controls-bar">
+              <button type="button" class="action-btn primary-btn btn-open-cam">Start Camera</button>
+              <button type="button" class="action-btn record-btn btn-snap-photo" disabled>Capture Snapshot</button>
+              <button type="button" class="action-btn secondary-btn btn-flip-cam" style="display:none;">Flip Camera</button>
+            </div>
+          </div>
+
+          <button class="submit-btn predict-btn" disabled>Analyze Skin Lesion</button>
+          <p class="status status-msg" role="status"></p>
+
+          <div class="card result-card result-panel" hidden>
+            <div class="result-banner status-banner">
+              <div class="banner-top">
+                <span class="status-pill status-title">STATUS</span>
+                <h4 class="prediction-text">Prediction</h4>
+              </div>
+              <p class="conf-text"></p>
+              <p class="advice-para advice-text"></p>
+            </div>
+            <div class="charts-row">
+              <div class="chart-card">
+                <div class="chart-box"><canvas class="bar-canvas"></canvas></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-box chart-box-sm"><canvas class="doughnut-canvas"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: EYE CLASSIFICATION MODULE -->
+    <section id="tab-eye" class="tab-content" role="tabpanel">
+      <div class="classifier-wrap">
+        <div class="card card-eye" data-endpoint="/predict/eye">
+          <div class="card-top-action">
+            <span class="badge">Ocular AI · Flip TTA</span>
+            <button class="pill-btn ghost-pill demo-load-btn" type="button" data-target="eye">Load Sample Photo</button>
+          </div>
+          <h3>Child Eye Health Screening</h3>
+
+          <div class="input-mode-tabs" role="tablist">
+            <button type="button" class="mode-tab-btn active" data-mode="upload">Upload Photo</button>
+            <button type="button" class="mode-tab-btn" data-mode="camera">Live Camera Capture</button>
+          </div>
+
+          <div class="mode-view mode-upload-view">
+            <label class="upload-box" for="eyeFileInput">
+              <div class="upload-text">Select or drop eye photo (.jpg / .png / .webp)</div>
+              <input type="file" id="eyeFileInput" accept="image/*" class="file-input" />
+              <img alt="Eye Preview" class="preview-image" style="display:none;" />
+            </label>
+          </div>
+
+          <div class="mode-view mode-camera-view" style="display:none;">
+            <div class="live-cam-viewport">
+              <video class="cam-feed" playsinline autoplay muted></video>
+              <canvas class="cam-snap-canvas" style="display:none;"></canvas>
+              <div class="cam-reticle eye-reticle">
+                <div class="reticle-oval"></div>
+                <span class="reticle-text">Align Eye Inside Oval</span>
+              </div>
+            </div>
+            <div class="cam-controls-bar">
+              <button type="button" class="action-btn primary-btn btn-open-cam">Start Camera</button>
+              <button type="button" class="action-btn record-btn btn-snap-photo" disabled>Capture Snapshot</button>
+              <button type="button" class="action-btn secondary-btn btn-flip-cam" style="display:none;">Flip Camera</button>
+            </div>
+          </div>
+
+          <button class="submit-btn predict-btn" disabled>Analyze Eye Image</button>
+          <p class="status status-msg" role="status"></p>
+
+          <div class="card result-card result-panel" hidden>
+            <div class="result-banner status-banner">
+              <div class="banner-top">
+                <span class="status-pill status-title">STATUS</span>
+                <h4 class="prediction-text">Prediction</h4>
+              </div>
+              <p class="conf-text"></p>
+              <p class="advice-para advice-text"></p>
+            </div>
+            <div class="charts-row">
+              <div class="chart-card">
+                <div class="chart-box"><canvas class="bar-canvas"></canvas></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-box chart-box-sm"><canvas class="doughnut-canvas"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Minimal Engineering Footer -->
+    <footer class="app-footer">
+      <span>Nanhe Kadam (RBSK 2.0) · Algorithmic Screening Prototype</span>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
