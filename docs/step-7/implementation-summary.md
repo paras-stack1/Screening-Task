@@ -1,4 +1,4 @@
-# Step 7 - Implementation summary (in progress)
+# Step 7 - Implementation summary and final report
 
 > Updated after each stage. Decisions A-X approved on 2026-11-23 ("approve all recommendations").
 > Branch `feat/step-7-referrals` (from 6G-2, commit `b5e4fce`).
@@ -13,7 +13,7 @@
 | 7D | Referral tracking, follow-ups, notifications + reminder job, dashboard/report APIs | Done (`986e676`) |
 | 7E | Worker app: results, review, notifications | Done (`cf62ab9`) |
 | 7F | Worker app: referrals, follow-ups, dashboards | Done (`d8fba0d`) |
-| **7G** | Admin portal facilities and reports; security and regression testing; all docs; final report | **Done - awaiting review** |
+| 7G | Admin portal facilities and reports; security and regression testing; all docs; final report | Done (`3183ca1`) - approved 2026-11-24 |
 
 ## Stage 7B
 
