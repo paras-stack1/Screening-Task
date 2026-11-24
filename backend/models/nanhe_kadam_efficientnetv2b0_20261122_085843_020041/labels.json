@@ -1,0 +1,67 @@
+{
+  "model": "EfficientNetV2B0",
+  "checks": [
+    "eye",
+    "cleft",
+    "dental",
+    "skin"
+  ],
+  "classes_in_output_order": [
+    {
+      "check": "eye",
+      "label": "cataract"
+    },
+    {
+      "check": "eye",
+      "label": "conjunctivitis"
+    },
+    {
+      "check": "eye",
+      "label": "eyelid_drooping"
+    },
+    {
+      "check": "eye",
+      "label": "normal"
+    },
+    {
+      "check": "eye",
+      "label": "uveitis"
+    },
+    {
+      "check": "cleft",
+      "label": "cleft_lip_and_palate"
+    },
+    {
+      "check": "cleft",
+      "label": "non_cleft"
+    },
+    {
+      "check": "dental",
+      "label": "caries_marked"
+    },
+    {
+      "check": "dental",
+      "label": "no_caries_marked"
+    },
+    {
+      "check": "skin",
+      "label": "acne"
+    },
+    {
+      "check": "skin",
+      "label": "eczema"
+    },
+    {
+      "check": "skin",
+      "label": "fungal_skin_infection"
+    },
+    {
+      "check": "skin",
+      "label": "scabies"
+    }
+  ],
+  "image_size": 224,
+  "photo_input": "RGB pixels 0\u2013255, resized with padding",
+  "check_input": "Integer index in checks",
+  "output": "Class logits in classes_in_output_order"
+}

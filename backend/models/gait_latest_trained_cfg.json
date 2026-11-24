@@ -1,0 +1,47 @@
+{
+  "model_name": "gait_xgboost_model_v2",
+  "schema_version": "2.0.0",
+  "feature_columns": [
+    "child_age_months",
+    "camera_view_frontal",
+    "step_length_si",
+    "step_time_si",
+    "ankle_lift_si",
+    "ankle_rms_velocity",
+    "pelvic_drop_p85_deg",
+    "lateral_trunk_lurch_p85_deg",
+    "left_knee_swing_p10_deg",
+    "right_knee_swing_p10_deg",
+    "knee_lr_asymmetry_deg",
+    "spine_tilt_p90_deg",
+    "stationary_lower_limb_ratio",
+    "stationary_wrist_fft_power"
+  ],
+  "class_names": [
+    "Normal_Age_Appropriate",
+    "Asymmetric_Limp_Gait",
+    "Spastic_Stiff_Gait",
+    "Toe_Walking_Foot_Defect",
+    "Postural_Balance_Weakness"
+  ],
+  "metrics": {
+    "cv_accuracy": 0.59,
+    "cv_balanced_accuracy": 0.5706
+  },
+  "feature_importances": {
+    "spine_tilt_p90_deg": 0.1853,
+    "pelvic_drop_p85_deg": 0.1498,
+    "lateral_trunk_lurch_p85_deg": 0.1099,
+    "ankle_lift_si": 0.0812,
+    "ankle_rms_velocity": 0.0746,
+    "right_knee_swing_p10_deg": 0.0613,
+    "step_length_si": 0.0603,
+    "step_time_si": 0.0592,
+    "knee_lr_asymmetry_deg": 0.0563,
+    "left_knee_swing_p10_deg": 0.0553,
+    "stationary_wrist_fft_power": 0.0534,
+    "stationary_lower_limb_ratio": 0.0534,
+    "child_age_months": 0.0,
+    "camera_view_frontal": 0.0
+  }
+}

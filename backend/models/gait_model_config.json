@@ -1,0 +1,30 @@
+{
+  "model_type": "CalibratedClassifierCV(XGBClassifier, method='isotonic')",
+  "feature_columns": [
+    "child_age_months",
+    "camera_view_frontal",
+    "step_length_si",
+    "step_time_si",
+    "ankle_lift_si",
+    "ankle_rms_velocity",
+    "pelvic_drop_p85_deg",
+    "lateral_trunk_lurch_p85_deg",
+    "left_knee_swing_p10_deg",
+    "right_knee_swing_p10_deg",
+    "knee_lr_asymmetry_deg",
+    "spine_tilt_p90_deg",
+    "stationary_lower_limb_ratio",
+    "stationary_wrist_fft_power"
+  ],
+  "class_names": [
+    "Normal_Age_Appropriate",
+    "Asymmetric_Limp_Gait",
+    "Spastic_Stiff_Gait",
+    "Toe_Walking_Foot_Defect",
+    "Postural_Balance_Weakness",
+    "Rhythmic_Tremor_Mannerism"
+  ],
+  "n_samples": 3000,
+  "test_accuracy": 1.0,
+  "calibrated": true
+}

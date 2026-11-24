@@ -1,0 +1,29 @@
+[
+  {
+    "name": "trial_1",
+    "rate": 0.001,
+    "dropout": 0.2,
+    "weighted": false,
+    "validation_f1": 0.7096687381005308,
+    "checkpoint": "trial_1.keras",
+    "encoder_name": "efficientnetv2-b0"
+  },
+  {
+    "name": "trial_2",
+    "rate": 0.0005,
+    "dropout": 0.3,
+    "weighted": true,
+    "validation_f1": 0.6991701015055417,
+    "checkpoint": "trial_2.keras",
+    "encoder_name": "efficientnetv2-b0"
+  },
+  {
+    "name": "trial_3",
+    "rate": 0.0003,
+    "dropout": 0.15,
+    "weighted": true,
+    "validation_f1": 0.699615568658215,
+    "checkpoint": "trial_3.keras",
+    "encoder_name": "efficientnetv2-b0"
+  }
+]

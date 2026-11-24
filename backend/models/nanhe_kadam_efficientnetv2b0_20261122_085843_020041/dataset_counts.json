@@ -1,0 +1,74 @@
+{
+  "totals": {
+    "train": 2761,
+    "validation": 866,
+    "test": 1019
+  },
+  "classes": {
+    "eye/cataract": {
+      "train": 323,
+      "validation": 110,
+      "test": 110
+    },
+    "eye/conjunctivitis": {
+      "train": 214,
+      "validation": 68,
+      "test": 75
+    },
+    "eye/eyelid_drooping": {
+      "train": 310,
+      "validation": 111,
+      "test": 104
+    },
+    "eye/normal": {
+      "train": 350,
+      "validation": 129,
+      "test": 130
+    },
+    "eye/uveitis": {
+      "train": 133,
+      "validation": 47,
+      "test": 43
+    },
+    "cleft/cleft_lip_and_palate": {
+      "train": 98,
+      "validation": 32,
+      "test": 31
+    },
+    "cleft/non_cleft": {
+      "train": 147,
+      "validation": 50,
+      "test": 50
+    },
+    "dental/caries_marked": {
+      "train": 350,
+      "validation": 64,
+      "test": 166
+    },
+    "dental/no_caries_marked": {
+      "train": 299,
+      "validation": 19,
+      "test": 91
+    },
+    "skin/acne": {
+      "train": 62,
+      "validation": 14,
+      "test": 13
+    },
+    "skin/eczema": {
+      "train": 350,
+      "validation": 183,
+      "test": 161
+    },
+    "skin/fungal_skin_infection": {
+      "train": 117,
+      "validation": 37,
+      "test": 42
+    },
+    "skin/scabies": {
+      "train": 8,
+      "validation": 2,
+      "test": 3
+    }
+  }
+}
