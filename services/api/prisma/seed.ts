@@ -13,6 +13,7 @@ import { PERMISSIONS } from '../src/modules/access-control/permissions';
 import { ROLES } from '../src/modules/access-control/roles';
 import { createArea } from '../src/modules/areas/areaTree';
 import { ensureConsentTemplates } from '../src/modules/consent/consentNotices';
+import { ensureDemoCareContent } from '../src/modules/care-content/demoCareContent';
 import { ensureDemoRuleSets } from '../src/modules/clinical-rules/demoRuleSets';
 import { ensureDemoProtocols } from '../src/modules/screening/demoProtocols';
 
@@ -119,6 +120,9 @@ async function main() {
   // Step 7: DEMONSTRATION rule sets for the demo protocols, as DRAFT (no clinical meaning, never
   // approvable, unusable where draft content is not allowed). An existing set is never changed.
   await ensureDemoRuleSets(prisma);
+  // Step 8B: DEMONSTRATION care content (placeholder videos / activities, DRAFT, never approvable,
+  // hidden where draft content is not allowed). An existing item is never changed.
+  await ensureDemoCareContent(prisma);
 
   const counts = {
     levels: await prisma.areaLevel.count(),

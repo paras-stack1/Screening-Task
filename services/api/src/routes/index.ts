@@ -3,6 +3,7 @@ import { createDataRateLimiters } from '../middleware/rateLimit';
 import { createAreasRouter } from '../modules/areas/areas.routes';
 import { createAuthRouter, type AuthRouterDependencies } from '../modules/auth/auth.routes';
 import { createWebAuthRouter, type WebSessionSettings } from '../modules/auth/webAuth.routes';
+import { createCareContentRouter } from '../modules/care-content/careContent.routes';
 import { createChildrenRouter } from '../modules/children/children.routes';
 import {
   createClinicalRuleSetsRouter,
@@ -123,6 +124,8 @@ export function createApiRouter(deps: ApiRouterDependencies): Router {
   router.use('/screening-results', createScreeningResultsRouter(childData));
   router.use('/clinical-rule-sets', createClinicalRuleSetsRouter(childData));
   router.use('/clinical-reviews', createClinicalReviewsRouter(childData));
+  // Step 8B Parent Care: approved videos and home activities (read-only).
+  router.use('/care-content', createCareContentRouter(childData));
   router.use('/referrals', createReferralsRouter(childData));
   router.use('/facilities', createFacilitiesRouter(childData));
   router.use('/follow-ups', createFollowUpsRouter(childData));

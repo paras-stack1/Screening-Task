@@ -15,3 +15,4 @@ export * from './results.js';
 export * from './referrals.js';
 export * from './followUps.js';
 export * from './parentPortal.js';
+export * from './careContent.js';

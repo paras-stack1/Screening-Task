@@ -1,0 +1,23 @@
+{
+  "dslVersion": 1,
+  "code": "EXAMPLE_VIDEO",
+  "version": 1,
+  "kind": "VIDEO",
+  "topic": "DEVELOPMENT_SOCIAL_PLAY",
+  "category": null,
+  "title": { "en": "EXAMPLE - replace with the approved title", "hi": "उदाहरण - स्वीकृत शीर्षक लिखें" },
+  "summary": { "en": "EXAMPLE - replace with the approved summary.", "hi": "उदाहरण - स्वीकृत सारांश लिखें।" },
+  "ageMinDays": 0,
+  "ageMaxDays": 1095,
+  "video": {
+    "url": "https://videos.programme-channel.gov.in/watch/REPLACE-WITH-APPROVED-LINK",
+    "durationSeconds": 180,
+    "sizeBytes": 15000000,
+    "languages": ["hi"],
+    "hasCaptions": true
+  },
+  "requiresDoctor": false,
+  "sourceReference": "EXAMPLE - channel / producer, title, year",
+  "usagePermission": "EXAMPLE - licence or permission letter reference",
+  "isDemonstration": false
+}
