@@ -1,0 +1,27 @@
+{
+  "dslVersion": 1,
+  "code": "EXAMPLE_ACTIVITY",
+  "version": 1,
+  "kind": "ACTIVITY",
+  "topic": "DEVELOPMENT_MOTOR",
+  "category": null,
+  "title": { "en": "EXAMPLE - replace with the approved title", "hi": "उदाहरण - स्वीकृत शीर्षक लिखें" },
+  "summary": { "en": "EXAMPLE - replace with the approved summary.", "hi": "उदाहरण - स्वीकृत सारांश लिखें।" },
+  "ageMinDays": 180,
+  "ageMaxDays": 365,
+  "steps": [
+    {
+      "en": "EXAMPLE step 1 - copy from the approved source.",
+      "hi": "उदाहरण चरण 1 - स्वीकृत स्रोत से लिखें।"
+    },
+    {
+      "en": "EXAMPLE step 2 - copy from the approved source.",
+      "hi": "उदाहरण चरण 2 - स्वीकृत स्रोत से लिखें।"
+    }
+  ],
+  "suggestedFrequency": { "en": "EXAMPLE - as written in the source", "hi": "उदाहरण - स्रोत के अनुसार" },
+  "requiresDoctor": false,
+  "sourceReference": "EXAMPLE - document name, edition, page / section",
+  "usagePermission": "EXAMPLE - licence or permission letter reference",
+  "isDemonstration": false
+}

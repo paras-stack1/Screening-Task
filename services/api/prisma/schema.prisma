@@ -422,6 +422,9 @@ model User {
   ruleSetsCreated          ClinicalRuleSet[]                  @relation("RuleSetCreatedBy")
   ruleSetsApproved         ClinicalRuleSet[]                  @relation("RuleSetApprovedBy")
   ruleSetEvents            ClinicalRuleSetEvent[]
+  careContentCreated       CareContent[]                      @relation("CareContentCreatedBy")
+  careContentApproved      CareContent[]                      @relation("CareContentApprovedBy")
+  careContentEvents        CareContentEvent[]
   resultRunsGenerated      ScreeningResultRun[]
   reviewsClaimed           ClinicalReview[]                   @relation("ReviewClaimedBy")
   reviewsDecided           ClinicalReview[]                   @relation("ReviewDecidedBy")
@@ -1787,4 +1790,96 @@ model SmsMessage {
   guardian Guardian? @relation(fields: [guardianId], references: [id], onDelete: Restrict)
 
   @@index([guardianId, createdAt])
+}
+
+// =============================================================== Step 8B: Parent Care content
+
+enum CareContentKind {
+  VIDEO
+  ACTIVITY
+}
+
+/// Topic list from the Step 8 audit (decision C5; programme to confirm).
+enum CareContentTopic {
+  DEVELOPMENT_MOTOR
+  DEVELOPMENT_SPEECH_LANGUAGE
+  DEVELOPMENT_SOCIAL_PLAY
+  DEVELOPMENT_COGNITIVE
+  NUTRITION_FEEDING
+  HYGIENE
+  DAILY_CARE
+}
+
+enum CareContentEventType {
+  CREATED
+  STATUS_CHANGED
+}
+
+/// Approved educational video or home activity (Step 8 decisions C2, C4, C5, C8). Versioned and
+/// governed exactly like clinical rule sets: DRAFT -> IN_REVIEW -> APPROVED -> ACTIVE -> RETIRED,
+/// content frozen after DRAFT, demonstration items never approvable, changed only by CLI scripts.
+model CareContent {
+  id                String           @id @default(uuid()) @db.Uuid
+  code              String
+  version           Int
+  kind              CareContentKind
+  topic             CareContentTopic
+  /// Optional Four-D category the item supports.
+  category          FourDCategory?
+  titleEn           String
+  titleHi           String
+  summaryEn         String
+  summaryHi         String
+  /// Inclusive age band in completed days.
+  ageMinDays        Int
+  ageMaxDays        Int
+  /// Doctor-recommended: only a medical officer may assign it (decision C6).
+  requiresDoctor    Boolean          @default(false)
+  /// Required: who made it (document / channel, edition, section).
+  sourceReference   String
+  /// Required: licence or written permission to show it.
+  usagePermission   String
+  /// { dslVersion, steps?, suggestedFrequency?, video? } - validated by careContentDefinitionSchema.
+  definition        Json
+  status            ProtocolStatus   @default(DRAFT)
+  /// Engineering placeholder: never operational, can never be approved.
+  isDemonstration   Boolean          @default(false)
+  /// SHA-256 of the canonical definition, fixed when the item leaves DRAFT.
+  contentSha256     String?
+  approvedById      String?          @db.Uuid
+  approvedAt        DateTime?        @db.Timestamptz(3)
+  approvalReference String?
+  effectiveFrom     DateTime?        @db.Timestamptz(3)
+  retiredAt         DateTime?        @db.Timestamptz(3)
+  /// null only for demonstration items created by the development seed (CHECK).
+  createdById       String?          @db.Uuid
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
+
+  createdBy  User?              @relation("CareContentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy User?              @relation("CareContentApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  events     CareContentEvent[]
+
+  @@unique([code, version])
+  @@index([status, kind, topic, ageMinDays, ageMaxDays])
+}
+
+/// Change history of a care content item (append-only).
+model CareContentEvent {
+  id            String               @id @default(uuid()) @db.Uuid
+  contentId     String               @db.Uuid
+  type          CareContentEventType
+  fromStatus    ProtocolStatus?
+  toStatus      ProtocolStatus
+  /// null only for the development seed creating demonstration items.
+  actorId       String?              @db.Uuid
+  /// Approval document / committee minute reference (no personal data).
+  reference     String?
+  contentSha256 String?
+  occurredAt    DateTime             @default(now()) @db.Timestamptz(3)
+
+  content CareContent @relation(fields: [contentId], references: [id], onDelete: Restrict)
+  actor   User?       @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([contentId, occurredAt])
 }

@@ -179,6 +179,8 @@ describe('protected routes without a valid access token', () => {
     ['get', `/api/v1/screening-results/${ID}`],
     ['get', '/api/v1/clinical-rule-sets'],
     ['get', `/api/v1/clinical-rule-sets/${ID}`],
+    ['get', '/api/v1/care-content'],
+    ['get', `/api/v1/care-content/${ID}`],
     // Step 7C clinical review, referrals and facilities.
     ['get', '/api/v1/clinical-reviews'],
     ['get', `/api/v1/clinical-reviews/${ID}`],

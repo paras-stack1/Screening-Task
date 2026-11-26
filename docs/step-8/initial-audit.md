@@ -7,6 +7,7 @@
 > (1) educational videos, (2) daily home activities, (3) follow-up reminders. AI model integration
 > and image / voice / video **analysis** are out of scope (another team member integrates them later).
 > Branch: `feat/step-8-parent-care` (from Step 7, commit `79eab94`).
+> Progress: stage 8B (content library) implemented 2026-11-26 - see [care-content-governance.md](care-content-governance.md).
 
 ## 1. What exists today
 
